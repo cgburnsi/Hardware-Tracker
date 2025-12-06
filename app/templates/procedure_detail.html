@@ -2,85 +2,88 @@
 
 {% block title %}{{ item['proc_id'] }} – Procedure{% endblock %}
 
-{% block sidebar_filters %}
-  <div class="sidebar-section-title">Procedures</div>
-  <ul class="nav-links">
-    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
-    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
-  </ul>
-{% endblock %}
-
 {% block content %}
+<style>
+  /* Reuse the nice card styles from Hardware Detail */
+  .section-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 1.5rem; overflow: hidden; }
+  .section-header { background: #fcfcfb; border-bottom: 1px solid var(--border-soft); padding: 0.6rem 1rem; font-weight: 600; font-size: 0.85rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center; }
+  .section-body { padding: 1rem; }
+  
+  .detail-row { display: flex; margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .detail-label { width: 140px; color: #666; flex-shrink: 0; }
+  
+  .steps-box { background:#f9f9f9; padding:1rem; border:1px solid #ddd; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 0.9rem; }
+</style>
+
   <div class="page-title-row">
-    <h2 class="page-title">Procedure {{ item['proc_id'] }}</h2>
     <div>
-      <a href="{{ url_for('procedure_edit', id=item['id']) }}" class="primary-button">
-        Edit
-      </a>
-      <a
-        href="{{ url_for('procedure_export_docx', id=item['id']) }}"
-        class="secondary-button"
-        style="margin-left:0.4rem; text-decoration:none;"
-      >
-        Export .docx
-      </a>
-      <a
-        href="{{ url_for('procedure_sections', id=item['id']) }}"
-        class="secondary-button"
-        style="margin-left:0.4rem; text-decoration:none;"
-      >
-        Edit sections
-      </a>
+      <h2 class="page-title" style="display:inline-block; margin-right:1rem;">{{ item['proc_id'] }}</h2>
+      <span style="color:#666; font-size:1rem; font-weight: bold;">Rev {{ item['revision'] }}</span>
+    </div>
+    <div>
+      <a href="{{ url_for('procedures.procedure_export_docx', id=item['id']) }}" class="secondary-button">Export .docx</a>
+      <a href="{{ url_for('procedures.procedure_edit', id=item['id']) }}" class="primary-button">Edit Details</a>
     </div>
   </div>
 
-  <div class="detail-card">
-    <div class="detail-row">
-      <div class="detail-label">Title</div>
-      <div>{{ item['title'] }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Hardware ID</div>
-      <div>{{ item['hardware_id'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Revision</div>
-      <div>{{ item['revision'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Purpose</div>
-      <div>{{ item['purpose'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Hazards</div>
-      <div>{{ item['hazards'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Prereqs</div>
-      <div>{{ item['prereqs'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Created</div>
-      <div>{{ item['created_at'] or '–' }}</div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-label">Updated</div>
-      <div>{{ item['updated_at'] or '–' }}</div>
+  <div class="section-card">
+    <div class="section-header">Overview</div>
+    <div class="section-body">
+      <h3 style="margin-top:0; margin-bottom: 1rem;">{{ item['title'] }}</h3>
+      
+      <div class="detail-row">
+        <div class="detail-label">Target Hardware</div>
+        <div style="font-weight: 600;">{{ item['hardware_id'] or 'Generic (No specific hardware)' }}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Purpose</div>
+        <div>{{ item['purpose'] or '–' }}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-label">Last Updated</div>
+        <div>{{ item['updated_at'] }}</div>
+      </div>
     </div>
   </div>
 
-  <div style="margin-top: 0.8rem;">
-    <h3 style="font-size: 1rem; margin-bottom: 0.3rem;">Steps (legacy text)</h3>
-    <div
-      style="
-        background:#fff;
-        border:1px solid #d1d1c8;
-        padding:0.7rem;
-        white-space:pre-wrap;
-        font-size:0.9rem;
-      "
-    >
-      {{ item['steps'] or '(no steps defined; use "Edit sections" to build structured content)' }}
+  {% if item['hazards'] or item['prereqs'] %}
+  <div class="section-card" style="border-left: 4px solid #f4c842;">
+    <div class="section-header" style="background: #fffdf5;">Safety & Prerequisites</div>
+    <div class="section-body">
+      {% if item['hazards'] %}
+      <div class="detail-row">
+        <div class="detail-label" style="color:#d9534f; font-weight:bold;">Hazards</div>
+        <div style="color:#d9534f; font-weight:500;">{{ item['hazards'] }}</div>
+      </div>
+      {% endif %}
+      
+      {% if item['prereqs'] %}
+      <div class="detail-row">
+        <div class="detail-label">Prerequisites</div>
+        <div>{{ item['prereqs'] }}</div>
+      </div>
+      {% endif %}
     </div>
   </div>
+  {% endif %}
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>Procedure Steps</span>
+      <a href="{{ url_for('procedures.procedure_sections', id=item['id']) }}" class="secondary-button" style="padding: 0.1rem 0.5rem; font-size: 0.75rem;">
+        Edit Sections / Steps
+      </a>
+    </div>
+    <div class="section-body">
+      {% if item['steps'] %}
+        <div class="steps-box">{{ item['steps'] }}</div>
+      {% else %}
+        <div style="color:#888; font-style:italic; text-align: center; padding: 1rem;">
+          No simple steps text defined. 
+          <br>Click "Edit Sections" to add detailed steps.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
 {% endblock %}

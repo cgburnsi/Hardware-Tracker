@@ -19,9 +19,13 @@ def close_db(e=None):
 def init_db():
     db = get_db()
     
-    # We will put the schema string directly here for simplicity
     schema = """
-    CREATE TABLE IF NOT EXISTS hardware (
+    -- Drop tables to ensure a clean slate when re-initializing
+    DROP TABLE IF EXISTS hardware;
+    DROP TABLE IF EXISTS procedures;
+    DROP TABLE IF EXISTS procedure_sections;
+
+    CREATE TABLE hardware (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         hardware_id TEXT UNIQUE NOT NULL,
         description TEXT NOT NULL,
@@ -36,15 +40,17 @@ def init_db():
         safety_class TEXT,
         propellant_or_media TEXT,
         max_rated_pressure REAL,
+        max_rated_temperature REAL,  -- This was missing!
         traveler_path TEXT,
         created_at TEXT,
         updated_at TEXT
     );
     
-    CREATE TABLE IF NOT EXISTS procedures (
+    CREATE TABLE procedures (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         proc_id TEXT UNIQUE NOT NULL,
         title TEXT NOT NULL,
+        type TEXT DEFAULT 'SOP',    -- New Column!
         hardware_id TEXT,
         revision TEXT,
         purpose TEXT,
@@ -55,7 +61,7 @@ def init_db():
         updated_at TEXT
     );
     
-    CREATE TABLE IF NOT EXISTS procedure_sections (
+    CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,

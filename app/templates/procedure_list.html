@@ -1,19 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Procedures{% endblock %}
-
-{% block sidebar_filters %}
-  <div class="sidebar-section-title">Procedures</div>
-  <ul class="nav-links">
-    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
-    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
-  </ul>
-{% endblock %}
+{% block title %}Procedures Index{% endblock %}
 
 {% block content %}
   <div class="page-title-row">
-    <h2 class="page-title">Procedure Index</h2>
-    <a href="{{ url_for('procedure_new') }}" class="primary-button">+ New Procedure</a>
+    <h2 class="page-title">Standard Operating Procedures</h2>
+    <a href="{{ url_for('procedures.procedure_new') }}" class="primary-button">+ Draft New SOP</a>
   </div>
 
   <form method="get" class="search-bar">
@@ -21,7 +13,7 @@
       class="search-input"
       type="text"
       name="q"
-      placeholder="Search by ID, title, or hardware ID…"
+      placeholder="Search by Title, ID, or Hardware…"
       value="{{ q }}"
     >
     <button type="submit" class="search-button">Search</button>
@@ -30,29 +22,33 @@
   <table>
     <thead>
       <tr>
-        <th style="width: 12%">Proc ID</th>
-        <th style="width: 38%">Title</th>
-        <th style="width: 15%">Hardware</th>
+        <th style="width: 15%">Procedure ID</th>
+        <th style="width: 45%">Title</th>
+        <th style="width: 20%">Target Hardware</th>
         <th style="width: 10%">Rev</th>
-        <th style="width: 25%">Updated</th>
+        <th style="width: 10%">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for item in items %}
         <tr>
           <td>
-            <a href="{{ url_for('procedure_detail', id=item['id']) }}">
+            <a href="{{ url_for('procedures.procedure_detail', id=item['id']) }}" style="font-weight:700;">
               {{ item['proc_id'] }}
             </a>
           </td>
           <td>{{ item['title'] }}</td>
           <td>{{ item['hardware_id'] or '–' }}</td>
-          <td>{{ item['revision'] or '–' }}</td>
-          <td>{{ item['updated_at'] or '–' }}</td>
+          <td>{{ item['revision'] or 'A' }}</td>
+          <td>
+             <a href="{{ url_for('procedures.procedure_detail', id=item['id']) }}">View</a>
+          </td>
         </tr>
       {% else %}
         <tr>
-          <td colspan="5">(no procedures found)</td>
+          <td colspan="5" style="text-align:center; padding: 2rem; color:#777;">
+            No procedures found. <a href="{{ url_for('procedures.procedure_new') }}">Draft your first SOP</a>.
+          </td>
         </tr>
       {% endfor %}
     </tbody>

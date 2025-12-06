@@ -4,7 +4,6 @@
 
 {% block sidebar_filters %}
   <div class="sidebar-section-title">Filters</div>
-
   <form method="get">
     <label class="sidebar-label">
       Category:
@@ -15,7 +14,6 @@
         {% endfor %}
       </select>
     </label>
-
     <label class="sidebar-label">
       Status:
       <select name="status" class="sidebar-select">
@@ -25,12 +23,19 @@
         {% endfor %}
       </select>
     </label>
-
     <button type="submit" class="sidebar-button">Apply Filters</button>
   </form>
 {% endblock %}
 
 {% block content %}
+<style>
+  .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge-in-service { background: #d1e7dd; color: #0f5132; }
+  .badge-quarantined { background: #f8d7da; color: #842029; }
+  .badge-new { background: #cfe2ff; color: #084298; }
+  .badge-maintenance { background: #fff3cd; color: #664d03; }
+</style>
+
   <div class="page-title-row">
     <h2 class="page-title">Hardware Index</h2>
     <a href="{{ url_for('hardware.hardware_new') }}" class="primary-button">+ New Hardware</a>
@@ -39,13 +44,7 @@
   <form method="get" class="search-bar">
     <input type="hidden" name="category" value="{{ category }}">
     <input type="hidden" name="status" value="{{ status }}">
-    <input
-      class="search-input"
-      type="text"
-      name="q"
-      placeholder="Search by ID, description, or part number…"
-      value="{{ q }}"
-    >
+    <input class="search-input" type="text" name="q" placeholder="Search by ID, description, or part number…" value="{{ q }}">
     <button type="submit" class="search-button">Search</button>
   </form>
 
@@ -53,29 +52,46 @@
     <thead>
       <tr>
         <th style="width: 10%">ID</th>
-        <th style="width: 35%">Description</th>
+        <th style="width: 30%">Description</th>
+        <th style="width: 10%">Class</th>
         <th style="width: 15%">Category</th>
         <th style="width: 15%">Status</th>
-        <th style="width: 25%">Location</th>
+        <th style="width: 20%">Safety/Media</th>
       </tr>
     </thead>
     <tbody>
       {% for item in items %}
         <tr>
           <td>
-            <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}">
+            <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}" style="font-weight:700;">
               {{ item['hardware_id'] }}
             </a>
           </td>
-          <td>{{ item['description'] }}</td>
-          <td>{{ item['category'] or '' }}</td>
-          <td>{{ item['status'] or '' }}</td>
-          <td>{{ item['location'] or '' }}</td>
+          <td>
+            {{ item['description'] }}
+            {% if item['manufacturer'] %}<div style="font-size:0.75rem; color:#666;">{{ item['manufacturer'] }}</div>{% endif %}
+          </td>
+          <td>
+            {% if item['classification'] == 'Flight' %}<span style="color:#0b5f9c; font-weight:bold;">Flight</span>
+            {% else %}<span style="color:#666;">{{ item['classification'] or '-' }}</span>{% endif %}
+          </td>
+          <td>{{ item['category'] or '-' }}</td>
+          <td>
+            {% set s = item['status']|lower %}
+            {% if 'quarantined' in s %}<span class="badge badge-quarantined">{{ item['status'] }}</span>
+            {% elif 'in-service' in s %}<span class="badge badge-in-service">{{ item['status'] }}</span>
+            {% elif 'new' in s %}<span class="badge badge-new">{{ item['status'] }}</span>
+            {% else %}<span class="badge badge-maintenance">{{ item['status'] }}</span>{% endif %}
+          </td>
+          <td>
+            {% if item['safety_class'] and item['safety_class'] != 'None' %}
+              <span style="color:#d9534f; font-weight:600;">{{ item['safety_class'] }}</span>
+              {% if item['propellant_or_media'] %}<span style="font-size:0.8rem; color:#444;">({{ item['propellant_or_media'] }})</span>{% endif %}
+            {% else %}<span style="color:#999;">-</span>{% endif %}
+          </td>
         </tr>
       {% else %}
-        <tr>
-          <td colspan="5">(no hardware found)</td>
-        </tr>
+        <tr><td colspan="6" style="text-align:center; padding: 2rem; color:#777;">No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.</td></tr>
       {% endfor %}
     </tbody>
   </table>

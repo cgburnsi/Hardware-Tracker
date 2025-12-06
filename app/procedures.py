@@ -81,47 +81,45 @@ def procedure_detail(id):
 def procedure_new():
     db = get_db()
     if request.method == "POST":
+        # 1. Identity
         title = request.form.get("title", "").strip()
-        hardware_id = request.form.get("hardware_id", "").strip()
+        proc_type = request.form.get("type", "SOP").strip() # New Field
         revision = request.form.get("revision", "").strip() or "A"
+        hardware_id = request.form.get("hardware_id", "").strip()
+        
+        # 2. Context & Safety
         purpose = request.form.get("purpose", "").strip()
         hazards = request.form.get("hazards", "").strip()
         prereqs = request.form.get("prereqs", "").strip()
+        
+        # 3. Content
         steps = request.form.get("steps", "").strip()
 
         if not title:
             flash("Title is required.", "error")
             return render_template("procedure_form.html", item=None)
 
+        # ID Generation (We can customize this later for 'Test' types)
         proc_id = generate_new_procedure_id(db)
+        
         now = datetime.utcnow().isoformat(timespec="seconds")
 
         db.execute(
             """
             INSERT INTO procedures
-            (proc_id, title, hardware_id, revision, purpose, hazards, prereqs, steps, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, steps, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                proc_id,
-                title,
-                hardware_id or None,
-                revision,
-                purpose or None,
-                hazards or None,
-                prereqs or None,
-                steps or None,
-                now,
-                now,
+                proc_id, title, proc_type, hardware_id or None, revision,
+                purpose or None, hazards or None, prereqs or None, steps or None,
+                now, now,
             ),
         )
         db.commit()
 
-        flash(f"Created procedure {proc_id}.", "success")
-        cur = db.execute("SELECT id FROM procedures WHERE proc_id = ?", (proc_id,))
-        row = cur.fetchone()
-        
-        # Note the namespaced url_for here:
+        flash(f"Created {proc_type} {proc_id}.", "success")
+        row = db.execute("SELECT id FROM procedures WHERE proc_id = ?", (proc_id,)).fetchone()
         return redirect(url_for("procedures.procedure_detail", id=row["id"]))
 
     return render_template("procedure_form.html", item=None)
@@ -137,6 +135,7 @@ def procedure_edit(id):
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
+        proc_type = request.form.get("type", "SOP").strip() # New Field
         hardware_id = request.form.get("hardware_id", "").strip()
         revision = request.form.get("revision", "").strip()
         purpose = request.form.get("purpose", "").strip()
@@ -153,20 +152,14 @@ def procedure_edit(id):
         db.execute(
             """
             UPDATE procedures
-            SET title = ?, hardware_id = ?, revision = ?, purpose = ?, hazards = ?,
+            SET title = ?, type = ?, hardware_id = ?, revision = ?, purpose = ?, hazards = ?,
                 prereqs = ?, steps = ?, updated_at = ?
             WHERE id = ?
             """,
             (
-                title,
-                hardware_id or None,
-                revision or None,
-                purpose or None,
-                hazards or None,
-                prereqs or None,
-                steps or None,
-                now,
-                id,
+                title, proc_type, hardware_id or None, revision or None,
+                purpose or None, hazards or None, prereqs or None, steps or None,
+                now, id,
             ),
         )
         db.commit()

@@ -5,68 +5,152 @@
 {% endblock %}
 
 {% block content %}
+<style>
+  /* Local styles for the form layout */
+  .form-section {
+    border: 1px solid var(--border-soft);
+    background: #fff;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 4px;
+  }
+  .form-section legend {
+    font-weight: 600;
+    color: var(--accent);
+    padding: 0 0.5rem;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+  }
+  .row-split {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .row-split > div {
+    flex: 1;
+  }
+  .helper-text {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.2rem;
+  }
+</style>
+
   <div class="page-title-row">
-    {% if item %}
-      <h2 class="page-title">Edit {{ item['hardware_id'] }}</h2>
-    {% else %}
-      <h2 class="page-title">New Hardware</h2>
-    {% endif %}
+    <h2 class="page-title">
+      {% if item %}Edit Hardware: <span style="color:var(--text-muted)">{{ item['hardware_id'] }}</span>
+      {% else %}New Hardware Item{% endif %}
+    </h2>
   </div>
 
-  {% if not item %}
-    <p style="font-size: 0.85rem; color: #555; margin-top: 0; margin-bottom: 0.5rem;">
-      The hardware ID (HYYXXX) will be generated automatically when you save.
-    </p>
-  {% endif %}
-
-  <div class="form-card">
-    <form method="post">
+  <form method="post" style="max-width: 800px;">
+    
+    <fieldset class="form-section">
+      <legend>1. Identity & Classification</legend>
+      
       <div class="form-row">
-        <label>Description</label>
-        <input type="text" name="description" value="{{ item['description'] if item else '' }}">
+        <label>Description *</label>
+        <input type="text" name="description" value="{{ item['description'] if item else '' }}" required placeholder="e.g. 1/4 inch Ball Valve, Swagelok">
+      </div>
+
+      <div class="row-split">
+        <div class="form-row">
+          <label>Category</label>
+          <select name="category" class="sidebar-select">
+            <option value="">(Select...)</option>
+            {% for cat in ['Valve', 'Regulator', 'Sensor', 'Tank', 'Fitting', 'Tool', 'Electronics'] %}
+              <option value="{{ cat }}" {% if item and item['category'] == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+            <option value="Other" {% if item and item['category'] == 'Other' %}selected{% endif %}>Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Classification</label>
+          <select name="classification" class="sidebar-select">
+            <option value="Dev" {% if item and item['classification'] == 'Dev' %}selected{% endif %}>Development (Non-Flight)</option>
+            <option value="Flight" {% if item and item['classification'] == 'Flight' %}selected{% endif %}>Flight Hardware</option>
+            <option value="GSE" {% if item and item['classification'] == 'GSE' %}selected{% endif %}>GSE (Ground Support)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row-split">
+        <div class="form-row">
+          <label>Manufacturer</label>
+          <input type="text" name="manufacturer" value="{{ item['manufacturer'] if item else '' }}">
+        </div>
+        <div class="form-row">
+          <label>Part Number</label>
+          <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}">
+        </div>
+        <div class="form-row">
+          <label>Serial Number</label>
+          <input type="text" name="serial_number" value="{{ item['serial_number'] if item else '' }}">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>2. Status & Location</legend>
+      
+      <div class="row-split">
+        <div class="form-row">
+          <label>Status</label>
+          <select name="status" class="sidebar-select">
+            <option value="In-Service" {% if item and item['status'] == 'In-Service' %}selected{% endif %}>In-Service (Ready)</option>
+            <option value="New" {% if item and item['status'] == 'New' %}selected{% endif %}>New (Needs Inspection)</option>
+            <option value="Maintenance" {% if item and item['status'] == 'Maintenance' %}selected{% endif %}>Maintenance / Cleaning</option>
+            <option value="Quarantined" {% if item and item['status'] == 'Quarantined' %}selected{% endif %}>Quarantined (Do Not Use)</option>
+            <option value="Retired" {% if item and item['status'] == 'Retired' %}selected{% endif %}>Retired</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Custodian</label>
+          <input type="text" name="custodian" value="{{ item['custodian'] if item else '' }}" placeholder="Who is responsible?">
+        </div>
       </div>
 
       <div class="form-row">
-        <label>Category</label>
-        <input type="text" name="category" value="{{ item['category'] if item else '' }}">
+        <label>Physical Location</label>
+        <input type="text" name="location" value="{{ item['location'] if item else '' }}" placeholder="e.g. Flammables Cabinet 2, Shelf B">
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section" style="border-left: 4px solid #d9534f;">
+      <legend style="color:#d9534f;">3. Safety Constraints</legend>
+      
+      <div class="row-split">
+        <div class="form-row">
+          <label>Service Media / Propellant</label>
+          <input type="text" name="propellant_or_media" value="{{ item['propellant_or_media'] if item else '' }}" placeholder="e.g. N2, AFM315E, H2O2">
+        </div>
+        <div class="form-row">
+          <label>Safety Hazard Class</label>
+          <select name="safety_class" class="sidebar-select">
+            <option value="None" {% if item and item['safety_class'] == 'None' %}selected{% endif %}>None / Inert</option>
+            <option value="Pressure" {% if item and item['safety_class'] == 'Pressure' %}selected{% endif %}>High Pressure</option>
+            <option value="Flammable" {% if item and item['safety_class'] == 'Flammable' %}selected{% endif %}>Flammable</option>
+            <option value="Toxic" {% if item and item['safety_class'] == 'Toxic' %}selected{% endif %}>Toxic / Biohazard</option>
+            <option value="Cryo" {% if item and item['safety_class'] == 'Cryo' %}selected{% endif %}>Cryogenic</option>
+          </select>
+        </div>
       </div>
 
-      <div class="form-row">
-        <label>Part Number</label>
-        <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}">
+      <div class="row-split">
+        <div class="form-row">
+          <label>Max Rated Pressure (PSI)</label>
+          <input type="number" step="any" name="max_rated_pressure" value="{{ item['max_rated_pressure'] if item else '' }}">
+        </div>
+        <div class="form-row">
+          <label>Max Rated Temp (°C)</label>
+          <input type="number" step="any" name="max_rated_temperature" value="{{ item['max_rated_temperature'] if item else '' }}">
+        </div>
       </div>
+    </fieldset>
 
-      <div class="form-row">
-        <label>Serial Number</label>
-        <input type="text" name="serial_number" value="{{ item['serial_number'] if item else '' }}">
-      </div>
-
-      <div class="form-row">
-        <label>Status</label>
-        <input type="text" name="status" value="{{ item['status'] if item else '' }}">
-      </div>
-
-      <div class="form-row">
-        <label>Custodian</label>
-        <input type="text" name="custodian" value="{{ item['custodian'] if item else '' }}">
-      </div>
-
-      <div class="form-row">
-        <label>Location</label>
-        <input type="text" name="location" value="{{ item['location'] if item else '' }}">
-      </div>
-
-      <div class="form-row">
-        <label>Traveler Path</label>
-        <input type="text" name="traveler_path" value="{{ item['traveler_path'] if item else '' }}">
-      </div>
-
-      <div class="form-actions">
-        <button type="submit" class="primary-button">Save</button>
-        <a href="{{ url_for('hardware_list') }}" class="secondary-button" style="text-decoration:none; margin-left:0.4rem;">
-          Cancel
-        </a>
-      </div>
-    </form>
-  </div>
+    <div class="form-actions">
+      <button type="submit" class="primary-button">Save Hardware Record</button>
+      <a href="{{ url_for('hardware.hardware_list') }}" class="secondary-button" style="text-decoration:none; margin-left:1rem;">Cancel</a>
+    </div>
+  </form>
 {% endblock %}

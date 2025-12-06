@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item['hardware_id'] }} – Hardware{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    <h2 class="page-title">Hardware {{ item['hardware_id'] }}</h2>
+    <a href="{{ url_for('hardware_edit', id=item['id']) }}" class="primary-button">Edit</a>
+  </div>
+
+  <div class="detail-card">
+  <div style="margin-top:0.8rem;">
+  <a href="{{ url_for('procedure_list', hardware_id=item['hardware_id']) }}" class="secondary-button" style="text-decoration:none;">
+    View procedures for this hardware
+  </a>
+</div>
+
+    <div class="detail-row">
+      <div class="detail-label">Description</div>
+      <div>{{ item['description'] }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Category</div>
+      <div>{{ item['category'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Part Number</div>
+      <div>{{ item['part_number'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Serial Number</div>
+      <div>{{ item['serial_number'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Status</div>
+      <div>{{ item['status'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Custodian</div>
+      <div>{{ item['custodian'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Location</div>
+      <div>{{ item['location'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Traveler Path</div>
+      <div>{{ item['traveler_path'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Created</div>
+      <div>{{ item['created_at'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Updated</div>
+      <div>{{ item['updated_at'] or '–' }}</div>
+    </div>
+  </div>
+{% endblock %}

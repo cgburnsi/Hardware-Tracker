@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if item %}Edit {{ item['hardware_id'] }}{% else %}New Hardware{% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    {% if item %}
+      <h2 class="page-title">Edit {{ item['hardware_id'] }}</h2>
+    {% else %}
+      <h2 class="page-title">New Hardware</h2>
+    {% endif %}
+  </div>
+
+  {% if not item %}
+    <p style="font-size: 0.85rem; color: #555; margin-top: 0; margin-bottom: 0.5rem;">
+      The hardware ID (HYYXXX) will be generated automatically when you save.
+    </p>
+  {% endif %}
+
+  <div class="form-card">
+    <form method="post">
+      <div class="form-row">
+        <label>Description</label>
+        <input type="text" name="description" value="{{ item['description'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Category</label>
+        <input type="text" name="category" value="{{ item['category'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Part Number</label>
+        <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Serial Number</label>
+        <input type="text" name="serial_number" value="{{ item['serial_number'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Status</label>
+        <input type="text" name="status" value="{{ item['status'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Custodian</label>
+        <input type="text" name="custodian" value="{{ item['custodian'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Location</label>
+        <input type="text" name="location" value="{{ item['location'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Traveler Path</label>
+        <input type="text" name="traveler_path" value="{{ item['traveler_path'] if item else '' }}">
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="primary-button">Save</button>
+        <a href="{{ url_for('hardware_list') }}" class="secondary-button" style="text-decoration:none; margin-left:0.4rem;">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Hardware Tracker{% endblock %}</title>
+    <style>
+      :root {
+        --bg-main: #f7f7f5;
+        --bg-header: #f4c842;
+        --bg-sidebar: #f0f0ec;
+        --border-soft: #d1d1c8;
+        --text-main: #222;
+        --text-muted: #666;
+        --accent: #0b5f9c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg-main);
+        color: var(--text-main);
+      }
+
+      .page {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 1.5rem;
+        background: var(--bg-header);
+        border-bottom: 1px solid #c6a22f;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+      }
+
+      .app-title {
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        font-size: 1.1rem;
+      }
+
+      .app-subtitle {
+        font-size: 0.85rem;
+        color: #5d4a18;
+      }
+
+      .topbar-right {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+
+      .topbar-link {
+        text-decoration: none;
+        color: #2b2b2b;
+        padding: 0.2rem 0.4rem;
+        border-radius: 2px;
+      }
+
+      .topbar-link:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .layout {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .sidebar {
+        width: 260px;
+        background: var(--bg-sidebar);
+        border-right: 1px solid var(--border-soft);
+        padding: 0.75rem 0.75rem 1rem;
+        font-size: 0.85rem;
+      }
+
+      .sidebar-section-title {
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin: 0.5rem 0 0.25rem;
+      }
+
+      .nav-links {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .nav-links li {
+        margin: 0.15rem 0;
+      }
+
+      .nav-links a {
+        text-decoration: none;
+        color: var(--accent);
+      }
+
+      .nav-links a:hover {
+        text-decoration: underline;
+      }
+
+      .sidebar-label {
+        display: block;
+        margin-top: 0.35rem;
+      }
+
+      .sidebar-input,
+      .sidebar-select {
+        width: 100%;
+        font-size: 0.85rem;
+        padding: 0.15rem 0.25rem;
+        border-radius: 2px;
+        border: 1px solid var(--border-soft);
+        background: #fff;
+      }
+
+      .sidebar-button {
+        margin-top: 0.4rem;
+        width: 100%;
+        padding: 0.25rem 0.4rem;
+        font-size: 0.85rem;
+        border-radius: 2px;
+        border: 1px solid #b8b8af;
+        background: #fff;
+        cursor: pointer;
+      }
+
+      .sidebar-button:hover {
+        background: #e9e9e2;
+      }
+
+      .main {
+        flex: 1;
+        padding: 1rem 1.5rem;
+        min-width: 0;
+      }
+
+      .page-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .page-title {
+        font-size: 1.2rem;
+        margin: 0;
+      }
+
+      .primary-button {
+        background: var(--accent);
+        color: #fff;
+        border-radius: 3px;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid #063757;
+        font-size: 0.85rem;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .primary-button:hover {
+        background: #094b75;
+      }
+
+      .search-bar {
+        margin-bottom: 0.5rem;
+      }
+
+      .search-input {
+        width: 60%;
+        max-width: 480px;
+        padding: 0.3rem 0.4rem;
+        border-radius: 3px;
+        border: 1px solid var(--border-soft);
+        font-size: 0.9rem;
+      }
+
+      .search-button {
+        margin-left: 0.4rem;
+        padding: 0.32rem 0.7rem;
+        font-size: 0.85rem;
+        border-radius: 3px;
+        border: 1px solid #b8b8af;
+        background: #fff;
+        cursor: pointer;
+      }
+
+      .search-button:hover {
+        background: #e9e9e2;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 0.4rem;
+        background: #fff;
+        border: 1px solid var(--border-soft);
+      }
+
+      th, td {
+        border-bottom: 1px solid #e0e0d6;
+        padding: 0.3rem 0.45rem;
+        text-align: left;
+        font-size: 0.85rem;
+      }
+
+      th {
+        background: #f2f2ec;
+        font-weight: 600;
+      }
+
+      tr:hover td {
+        background: #f7f7f1;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .flash-success { color: #146c2e; font-size: 0.85rem; }
+      .flash-error { color: #b00020; font-size: 0.85rem; }
+
+      .flash-list {
+        list-style: none;
+        margin: 0.25rem 0 0.5rem;
+        padding: 0;
+      }
+
+      .detail-card {
+        background: #fff;
+        border: 1px solid var(--border-soft);
+        padding: 0.8rem 1rem;
+        max-width: 720px;
+      }
+
+      .detail-row {
+        display: flex;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+      }
+
+      .detail-label {
+        width: 140px;
+        color: var(--text-muted);
+      }
+
+      .form-card {
+        background: #fff;
+        border: 1px solid var(--border-soft);
+        padding: 0.8rem 1rem;
+        max-width: 720px;
+      }
+
+      .form-row {
+        margin-bottom: 0.5rem;
+      }
+
+      .form-row label {
+        display: block;
+        font-size: 0.85rem;
+        margin-bottom: 0.15rem;
+      }
+
+      .form-row input[type="text"] {
+        width: 100%;
+        padding: 0.3rem 0.4rem;
+        border: 1px solid var(--border-soft);
+        border-radius: 3px;
+        font-size: 0.9rem;
+      }
+
+      .form-actions {
+        margin-top: 0.6rem;
+      }
+
+      .secondary-button {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.85rem;
+        border-radius: 3px;
+        border: 1px solid #b8b8af;
+        background: #fff;
+        cursor: pointer;
+      }
+
+      .secondary-button:hover {
+        background: #e9e9e2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="app-title">ER64 Hardware</div>
+          <div class="app-subtitle">Lab Tracker</div>
+        </div>
+        <div class="topbar-right">
+          <a class="topbar-link" href="{{ url_for('hardware_list') }}">Hardware</a>
+          <a class="topbar-link" href="{{ url_for('hardware_new') }}">New Item</a>
+          <a class="topbar-link" href="{{ url_for('procedure_list') }}">Procedures</a>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-section-title">Navigation</div>
+          <ul class="nav-links">
+            <li><a href="{{ url_for('hardware_list') }}">Hardware Index</a></li>
+            <li><a href="{{ url_for('hardware_new') }}">Add Hardware</a></li>
+          </ul>
+
+          {% block sidebar_filters %}{% endblock %}
+        </aside>
+
+        <main class="main">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <ul class="flash-list">
+                {% for category, message in messages %}
+                  <li class="flash-{{ category }}">{{ message }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item['proc_id'] }} – Procedure{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Procedures</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    <h2 class="page-title">Procedure {{ item['proc_id'] }}</h2>
+    <div>
+      <a href="{{ url_for('procedure_edit', id=item['id']) }}" class="primary-button">
+        Edit
+      </a>
+      <a
+        href="{{ url_for('procedure_export_docx', id=item['id']) }}"
+        class="secondary-button"
+        style="margin-left:0.4rem; text-decoration:none;"
+      >
+        Export .docx
+      </a>
+      <a
+        href="{{ url_for('procedure_sections', id=item['id']) }}"
+        class="secondary-button"
+        style="margin-left:0.4rem; text-decoration:none;"
+      >
+        Edit sections
+      </a>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-row">
+      <div class="detail-label">Title</div>
+      <div>{{ item['title'] }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Hardware ID</div>
+      <div>{{ item['hardware_id'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Revision</div>
+      <div>{{ item['revision'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Purpose</div>
+      <div>{{ item['purpose'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Hazards</div>
+      <div>{{ item['hazards'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Prereqs</div>
+      <div>{{ item['prereqs'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Created</div>
+      <div>{{ item['created_at'] or '–' }}</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Updated</div>
+      <div>{{ item['updated_at'] or '–' }}</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 0.8rem;">
+    <h3 style="font-size: 1rem; margin-bottom: 0.3rem;">Steps (legacy text)</h3>
+    <div
+      style="
+        background:#fff;
+        border:1px solid #d1d1c8;
+        padding:0.7rem;
+        white-space:pre-wrap;
+        font-size:0.9rem;
+      "
+    >
+      {{ item['steps'] or '(no steps defined; use "Edit sections" to build structured content)' }}
+    </div>
+  </div>
+{% endblock %}

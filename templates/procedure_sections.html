@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Sections – {{ proc['proc_id'] }}{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Procedures</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
+    <li><a href="{{ url_for('procedure_detail', id=proc['id']) }}">Back to {{ proc['proc_id'] }}</a></li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    <h2 class="page-title">Sections – {{ proc['proc_id'] }}</h2>
+  </div>
+
+  <div class="detail-card" style="margin-bottom:0.8rem;">
+    <div class="detail-row">
+      <div class="detail-label">Title</div>
+      <div>{{ proc['title'] }}</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:1rem; margin-bottom:0.3rem;">Existing Sections</h3>
+  <div class="detail-card" style="margin-bottom:0.8rem;">
+    {% if sections %}
+      <ol style="margin:0; padding-left:1.3rem;">
+        {% for s in sections %}
+          <li style="margin-bottom:0.4rem;">
+            <strong>{{ s['title'] }}</strong><br>
+            <div style="white-space:pre-wrap; font-size:0.9rem; margin-top:0.15rem;">
+              {{ s['body'] or '' }}
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p style="margin:0;">(no sections yet)</p>
+    {% endif %}
+  </div>
+
+  <h3 style="font-size:1rem; margin-bottom:0.3rem;">Add Section</h3>
+  <div class="form-card">
+    <form method="post">
+      <div class="form-row">
+        <label>Section Title</label>
+        <input type="text" name="title" placeholder="e.g. Purpose, Setup, Procedure Steps">
+      </div>
+      <div class="form-row">
+        <label>Section Body</label>
+        <textarea
+          name="body"
+          rows="8"
+          style="width:100%; font-family:monospace; font-size:0.9rem; padding:0.3rem; border:1px solid #d1d1c8; border-radius:3px;"
+        ></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary-button">Add Section</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

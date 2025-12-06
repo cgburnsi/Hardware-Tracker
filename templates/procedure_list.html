@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Procedures{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Procedures</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    <h2 class="page-title">Procedure Index</h2>
+    <a href="{{ url_for('procedure_new') }}" class="primary-button">+ New Procedure</a>
+  </div>
+
+  <form method="get" class="search-bar">
+    <input
+      class="search-input"
+      type="text"
+      name="q"
+      placeholder="Search by ID, title, or hardware ID…"
+      value="{{ q }}"
+    >
+    <button type="submit" class="search-button">Search</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 12%">Proc ID</th>
+        <th style="width: 38%">Title</th>
+        <th style="width: 15%">Hardware</th>
+        <th style="width: 10%">Rev</th>
+        <th style="width: 25%">Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>
+            <a href="{{ url_for('procedure_detail', id=item['id']) }}">
+              {{ item['proc_id'] }}
+            </a>
+          </td>
+          <td>{{ item['title'] }}</td>
+          <td>{{ item['hardware_id'] or '–' }}</td>
+          <td>{{ item['revision'] or '–' }}</td>
+          <td>{{ item['updated_at'] or '–' }}</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="5">(no procedures found)</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

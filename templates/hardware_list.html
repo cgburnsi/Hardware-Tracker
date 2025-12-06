@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Hardware Index{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Filters</div>
+
+  <form method="get">
+    <label class="sidebar-label">
+      Category:
+      <select name="category" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for c in categories %}
+          <option value="{{ c }}" {% if c == category %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="sidebar-label">
+      Status:
+      <select name="status" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for s in statuses %}
+          <option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <button type="submit" class="sidebar-button">Apply Filters</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    <h2 class="page-title">Hardware Index</h2>
+    <a href="{{ url_for('hardware_new') }}" class="primary-button">+ New Hardware</a>
+  </div>
+
+  <form method="get" class="search-bar">
+    <!-- preserve filters while searching -->
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input
+      class="search-input"
+      type="text"
+      name="q"
+      placeholder="Search by ID, description, or part number…"
+      value="{{ q }}"
+    >
+    <button type="submit" class="search-button">Search</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%">ID</th>
+        <th style="width: 35%">Description</th>
+        <th style="width: 15%">Category</th>
+        <th style="width: 15%">Status</th>
+        <th style="width: 25%">Location</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>
+            <a href="{{ url_for('hardware_detail', id=item['id']) }}">
+              {{ item['hardware_id'] }}
+            </a>
+          </td>
+          <td>{{ item['description'] }}</td>
+          <td>{{ item['category'] or '' }}</td>
+          <td>{{ item['status'] or '' }}</td>
+          <td>{{ item['location'] or '' }}</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="5">(no hardware found)</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

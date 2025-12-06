@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if item %}Edit {{ item['proc_id'] }}{% else %}New Procedure{% endif %}
+{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Procedures</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+  <div class="page-title-row">
+    {% if item %}
+      <h2 class="page-title">Edit {{ item['proc_id'] }}</h2>
+    {% else %}
+      <h2 class="page-title">New Procedure</h2>
+    {% endif %}
+  </div>
+
+  {% if not item %}
+    <p style="font-size:0.85rem; color:#555; margin-top:0; margin-bottom:0.5rem;">
+      The procedure ID (PYY-XXX) will be generated automatically when you save.
+    </p>
+  {% endif %}
+
+  <div class="form-card">
+    <form method="post">
+      <div class="form-row">
+        <label>Title</label>
+        <input type="text" name="title" value="{{ item['title'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Hardware ID (optional)</label>
+        <input type="text" name="hardware_id" value="{{ item['hardware_id'] if item else '' }}" placeholder="e.g. H25001">
+      </div>
+
+      <div class="form-row">
+        <label>Revision</label>
+        <input type="text" name="revision" value="{{ item['revision'] if item else 'A' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Purpose</label>
+        <input type="text" name="purpose" value="{{ item['purpose'] if item else '' }}">
+      </div>
+
+      <div class="form-row">
+        <label>Hazards</label>
+        <input type="text" name="hazards" value="{{ item['hazards'] if item else '' }}" placeholder="e.g. pressure, high temp, chemical">
+      </div>
+
+      <div class="form-row">
+        <label>Prereqs</label>
+        <input type="text" name="prereqs" value="{{ item['prereqs'] if item else '' }}" placeholder="e.g. training, PPE, pre-checks">
+      </div>
+
+      <div class="form-row">
+        <label>Steps (one per line or Markdown)</label>
+        <textarea
+          name="steps"
+          rows="12"
+          style="width:100%; font-family:monospace; font-size:0.9rem; padding:0.3rem; border:1px solid #d1d1c8; border-radius:3px;"
+        >{{ item['steps'] if item else '' }}</textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="primary-button">Save</button>
+        <a href="{{ url_for('procedure_list') }}" class="secondary-button" style="text-decoration:none; margin-left:0.4rem;">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

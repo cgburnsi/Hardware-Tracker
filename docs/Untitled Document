@@ -1,0 +1,259 @@
+Absolutely — here is a clean, **structured summary** of everything we have discussed regarding the **Hardware domain**, the **hardware webpage**, and the overall system shape as it relates to hardware.
+
+I’ll keep this tight, clear, and actionable, without losing any of the important details.
+
+---
+
+# ⭐ **SUMMARY: Hardware in the Advanced Propellants Ops Hub**
+
+The hardware domain is the **backbone** of your system. Every other domain (Procedures, TestOps, Safety, Documents) attaches to hardware in some way, so this conceptual model is foundational.
+
+Below is everything we’ve developed so far.
+
+---
+
+# 1. **Purpose of the Hardware Domain**
+
+The hardware portion of the site acts as the authoritative source of truth for:
+
+* What hardware exists
+* Its identity (HYYXXX)
+* Its current state (location, custodian, status)
+* Its safety context (hazards, propellant/media, pressure/temperature ratings)
+* Its operational history (cleaning, tests, servicing, calibrations)
+* Its relationships (assemblies, children, mates, related parts)
+* Its documents (drawings, travelers, test reports)
+* Its pedigree (the complete history of what has been done to it)
+
+In other words:
+
+> **Hardware holds the identity and lineage for every physical object the lab touches.**
+
+---
+
+# 2. **Key Concept: Hardware as a Hub Object**
+
+Hardware is not passive. It is connected to:
+
+* **Procedures** (which apply to it)
+* **Procedure Runs** (as-run logs)
+* **Small Tests**
+* **Test Campaigns**
+* **Calibration records**
+* **Service records**
+* **Travelers**
+* **Safety documents**
+* **Drawings and schematics**
+
+This creates the hardware’s **pedigree**, essential for both flight and dev work.
+
+---
+
+# 3. **Full Conceptual Field Set for Hardware**
+
+These are the **key fields** — the essential data you need to store for each hardware item. They define what the hardware table *is*.
+
+### **IDENTITY**
+
+* `hardware_id` (HYYXXX — primary identity)
+* `description`
+* `category` (valve, thruster, sensor, tool, fixture, HX, etc.)
+* `classification` (development, flight, flight-spare, GSE, retired)
+
+### **DETAILS**
+
+* `serial_number` (optional)
+* `part_number` (optional)
+* `manufacturer` (optional)
+* `date_added`
+
+### **STATUS & LIFECYCLE**
+
+* `status` (`in-service`, `awaiting-inspection`, `under-test`, `retired`, etc.)
+* `lifecycle_stage` (`new`, `as-received`, `cleaned`, etc.)
+* `date_status_updated`
+* `disposition_notes`
+
+### **LOCATION & CUSTODY**
+
+* `location` (“Lab A rack 3”, etc.)
+* `custodian`
+* `facility` (optional)
+* `loan_status` (`loaned-out`, `in-lab`)
+* `loan_to` / loan notes (optional)
+
+### **SAFETY CONTEXT**
+
+* `safety_class` (`pressure`, `cryo`, `flammable`, `high-temp`, etc.)
+* `propellant_or_media` (`AF-M315E`, `H₂O₂ 90%`, GN₂, etc.)
+* `max_rated_pressure`
+* `max_rated_temperature`
+
+### **RELATIONSHIPS (other objects pointing here)**
+
+Conceptually (these will often be join tables later):
+
+* Linked **Procedures** (which SOPs apply)
+* Linked **Procedure Runs** (cleaning, decontam, assembly steps)
+* Linked **Small Tests**
+* Linked **Test Campaigns**
+* Linked **Calibration records**
+* Linked **Service records**
+
+All of these build the hardware **pedigree**.
+
+### **DOCUMENT LINKS**
+
+Metadata references to:
+
+* Drawings
+* Schematics
+* Test reports
+* Travelers
+* Calibration certs
+* Safety docs
+
+Actual files live **outside** the system — the Ops Hub only holds the metadata + link.
+
+---
+
+# 4. **Workflow Around Hardware**
+
+What we designed is that hardware sits in the middle of all operations:
+
+### Adding hardware
+
+* You create an HYYXXX record in the system.
+* You classify it.
+* You assign category, custodian, location.
+
+### Viewing hardware
+
+The “Hardware Detail Page” (in the future) will show:
+
+#### **Top section: Identity**
+
+* ID, description, serial number, category, classification, status, location, custodian.
+
+#### **Safety section**
+
+* Hazards
+* SDS links
+* JHAs that reference this hardware
+* Pressure/temperature ratings
+
+#### **Pedigree / History section**
+
+* All **Procedure Runs** performed on it (cleaning, assembly, decontam)
+* All **Small Tests**
+* All **Test Campaign runs** involving it
+* All **Calibration events**
+* All **Servicing events**
+* All **Loan events**
+
+Chronologically, this forms its “life story.”
+
+#### **Documents section**
+
+* Drawings
+* Test reports
+* Travelers
+* Data folder links
+
+---
+
+# 5. **Relationship to Procedures and Procedure Runs**
+
+This was a critical breakthrough yesterday:
+
+### **Procedure**
+
+* The *plan* / SOP / test procedure
+* Revisioned, formal, persistent
+* NOT tied to a specific hardware instance
+* Lives in the Procedures domain
+
+### **Procedure Run**
+
+* A *single execution* of that procedure
+* Actually applied to hardware
+* Records step outcomes, deviations, notes
+* Lives in the TestOps domain
+* **Linked back to hardware**
+
+Example:
+
+**Procedure**: Valve Decontamination SOP (P25-001)
+**Procedure Run**:
+
+* On 2025-11-18
+* Applied to H24012
+* Run by J. Smith
+* Step 6 deviation noted
+* Links to follow-up servicing
+
+Procedure Runs will be a **major part** of the hardware pedigree.
+
+---
+
+# 6. **High-level UI / Navigation Implications**
+
+The conceptual structure implies:
+
+### Left nav (contextual)
+
+* Filters by hardware status, category, custodian, flight/dev, etc.
+* Quick links like “Add hardware”
+
+### Hardware List Page
+
+* Search
+* Filters
+* Table of hardware items
+* Buttons for:
+
+  * View
+  * Edit
+  * Add new
+  * View assembly (future)
+
+### Hardware Detail Page (core of the experience)
+
+Sections:
+
+* Identity
+* Safety
+* Operations / Pedigree (Procedure Runs, Tests)
+* Documents
+* Notes
+* Links to related procedures
+
+This becomes the centerpiece of the Ops Hub.
+
+---
+
+# 7. **Why the Hardware domain matters so much**
+
+The hardware object is the **anchor** for:
+
+* traceability
+* test linkage
+* procedure execution
+* history
+* safety context
+* document indexing
+
+If you do the hardware domain right, everything else slots into place naturally.
+
+And you already **designed the right conceptual shape**.
+
+---
+
+# ⭐ If you want, next we can:
+
+* Define **key fields** for Procedures
+* Define **key fields** for Procedure Runs
+* Or start sketching what the **Hardware Detail Page** will eventually show (in sections)
+
+Which direction do you want to go next?
+

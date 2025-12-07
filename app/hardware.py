@@ -55,7 +55,6 @@ def hardware_list():
     cur = db.execute(query, params)
     items = cur.fetchall()
 
-    # Get distinct categories and statuses for filters
     cats = db.execute("SELECT DISTINCT category FROM hardware WHERE category IS NOT NULL ORDER BY category").fetchall()
     stats = db.execute("SELECT DISTINCT status FROM hardware WHERE status IS NOT NULL ORDER BY status").fetchall()
 
@@ -69,6 +68,25 @@ def hardware_list():
         statuses=[s["status"] for s in stats if s["status"]],
     )
 
+# --- NEW ROUTE: Manufacturer Management ---
+@bp.route("/manufacturers", methods=["GET", "POST"])
+def manufacturer_list():
+    db = get_db()
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        website = request.form.get("website", "").strip()
+        
+        if name:
+            try:
+                db.execute("INSERT INTO manufacturers (name, website) VALUES (?, ?)", (name, website))
+                db.commit()
+                flash(f"Added {name}", "success")
+            except:
+                flash("Manufacturer already exists.", "error")
+                
+    items = db.execute("SELECT * FROM manufacturers ORDER BY name").fetchall()
+    return render_template("manufacturer_list.html", items=items)
+
 @bp.route("/<int:id>")
 def hardware_detail(id):
     db = get_db()
@@ -81,6 +99,8 @@ def hardware_detail(id):
 
 @bp.route("/new", methods=("GET", "POST"))
 def hardware_new():
+    db = get_db()
+    
     if request.method == "POST":
         # 1. Identity
         description = request.form.get("description", "").strip()
@@ -96,7 +116,7 @@ def hardware_new():
         location = request.form.get("location", "").strip()
         traveler_path = request.form.get("traveler_path", "").strip()
         
-        # 3. Safety (Convert empty strings to None for numbers)
+        # 3. Safety
         safety_class = request.form.get("safety_class", "").strip()
         propellant_or_media = request.form.get("propellant_or_media", "").strip()
         max_pressure = request.form.get("max_rated_pressure", "").strip()
@@ -104,9 +124,10 @@ def hardware_new():
 
         if not description:
             flash("Description is required.", "error")
-            return render_template("hardware_form.html", item=None)
+            # We must pass manufacturers here too in case of error!
+            manufs = db.execute("SELECT name FROM manufacturers ORDER BY name").fetchall()
+            return render_template("hardware_form.html", item=None, manufacturers=manufs)
 
-        db = get_db()
         hardware_id = generate_new_hardware_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
 
@@ -129,11 +150,12 @@ def hardware_new():
         db.commit()
         flash(f"Created hardware {hardware_id}.", "success")
         
-        # Get the ID of the new item to redirect to detail page
         row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (hardware_id,)).fetchone()
         return redirect(url_for("hardware.hardware_detail", id=row["id"]))
 
-    return render_template("hardware_form.html", item=None)
+    # GET: Fetch manufacturers list
+    manufs = db.execute("SELECT name FROM manufacturers ORDER BY name").fetchall()
+    return render_template("hardware_form.html", item=None, manufacturers=manufs)
 
 @bp.route("/<int:id>/edit", methods=("GET", "POST"))
 def hardware_edit(id):
@@ -168,7 +190,8 @@ def hardware_edit(id):
 
         if not description:
             flash("Description is required.", "error")
-            return render_template("hardware_form.html", item=item)
+            manufs = db.execute("SELECT name FROM manufacturers ORDER BY name").fetchall()
+            return render_template("hardware_form.html", item=item, manufacturers=manufs)
 
         now = datetime.utcnow().isoformat(timespec="seconds")
 
@@ -192,4 +215,6 @@ def hardware_edit(id):
         flash("Hardware updated.", "success")
         return redirect(url_for("hardware.hardware_detail", id=id))
 
-    return render_template("hardware_form.html", item=item)
+    # GET: Fetch manufacturers list
+    manufs = db.execute("SELECT name FROM manufacturers ORDER BY name").fetchall()
+    return render_template("hardware_form.html", item=item, manufacturers=manufs)

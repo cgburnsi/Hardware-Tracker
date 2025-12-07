@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Manage Manufacturers{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h2 class="page-title">Manufacturer List</h2>
+  <a href="{{ url_for('hardware.hardware_list') }}" class="secondary-button">Back to Hardware</a>
+</div>
+
+<div style="display: flex; gap: 2rem; align-items: flex-start;">
+  
+  <div style="flex: 1;">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Website</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in items %}
+        <tr>
+          <td><strong>{{ m['name'] }}</strong></td>
+          <td>
+            {% if m['website'] %}
+              <a href="{{ m['website'] }}" target="_blank" rel="noopener noreferrer">Link</a>
+            {% else %}
+              <span style="color:#999;">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+          <tr><td colspan="2" style="color:#777;">No manufacturers found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="width: 300px; background: #fff; padding: 1.5rem; border: 1px solid var(--border-soft); border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <h4 style="margin-top:0; margin-bottom: 1rem;">Add New Vendor</h4>
+    
+    <form method="post">
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Name</label>
+        <input type="text" name="name" required style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px;">
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Website (Optional)</label>
+        <input type="text" name="website" placeholder="https://..." style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px;">
+      </div>
+      
+      <button type="submit" class="primary-button" style="width:100%;">Add Manufacturer</button>
+    </form>
+    
+    <div style="margin-top: 1rem; font-size: 0.8rem; color: #666; line-height: 1.4;">
+      <strong>Note:</strong> Adding a vendor here makes it available immediately in the dropdown menu on the "New Hardware" page.
+    </div>
+  </div>
+
+</div>
+{% endblock %}

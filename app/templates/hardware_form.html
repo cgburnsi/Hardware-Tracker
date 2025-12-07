@@ -77,8 +77,29 @@
       <div class="row-split">
         <div class="form-row">
           <label>Manufacturer</label>
-          <input type="text" name="manufacturer" value="{{ item['manufacturer'] if item else '' }}">
+          <div style="display: flex; gap: 0.5rem;">
+            <select name="manufacturer" class="sidebar-select">
+              <option value="">(Select...)</option>
+              {% for m in manufacturers %}
+                <option value="{{ m['name'] }}" 
+                  {% if item and item['manufacturer'] == m['name'] %}selected{% endif %}>
+                  {{ m['name'] }}
+                </option>
+              {% endfor %}
+              
+              {% if item and item['manufacturer'] and item['manufacturer'] not in manufacturers|map(attribute='name') %}
+                <option value="{{ item['manufacturer'] }}" selected>{{ item['manufacturer'] }} (Legacy)</option>
+              {% endif %}
+            </select>
+            
+            <a href="{{ url_for('hardware.manufacturer_list') }}" 
+               class="secondary-button" 
+               style="padding: 0.1rem 0.6rem; font-size: 1.2rem; line-height: 1.2rem; text-decoration: none;"
+               title="Add new manufacturer"
+               target="_blank">+</a>
+          </div>
         </div>
+
         <div class="form-row">
           <label>Part Number</label>
           <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}">

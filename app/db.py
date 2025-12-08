@@ -20,11 +20,17 @@ def init_db():
     db = get_db()
     
     schema = """
-    -- 1. CLEANUP (Drop old tables to reset)
+    -- 1. CLEANUP (Drop ALL tables to ensure a clean reset)
     DROP TABLE IF EXISTS hardware;
     DROP TABLE IF EXISTS procedures;
     DROP TABLE IF EXISTS procedure_sections;
     DROP TABLE IF EXISTS manufacturers;
+    DROP TABLE IF EXISTS custodians;
+    DROP TABLE IF EXISTS locations;
+    DROP TABLE IF EXISTS media;
+    DROP TABLE IF EXISTS port_configs;
+    DROP TABLE IF EXISTS hardware_log;   -- This was missing!
+    DROP TABLE IF EXISTS procedure_runs; -- This matches the new feature
 
     -- 2. HARDWARE TABLE
     CREATE TABLE hardware (
@@ -33,46 +39,63 @@ def init_db():
         description TEXT NOT NULL,
         category TEXT,
         classification TEXT,
+        manufacturer TEXT,
         part_number TEXT,
         serial_number TEXT,
-        manufacturer TEXT,
+        
+        -- MSFC TRACKING
+        ecn TEXT,
+        calibration_id TEXT,
+        repair_id TEXT,
+        work_order_id TEXT,
+
+        -- TECHNICAL PARAMS
+        port_configuration TEXT,
+        cv REAL,
+        orifice_diameter REAL,
+
+        -- STATUS & LOCATION
         status TEXT,
         location TEXT,
         custodian TEXT,
+
+        -- SAFETY & COMPLIANCE
         safety_class TEXT,
         propellant_or_media TEXT,
+        cleaning_spec TEXT,
+        compliance_specs TEXT,
         max_rated_pressure REAL,
         max_rated_temperature REAL,
+
         traveler_path TEXT,
         created_at TEXT,
         updated_at TEXT
     );
-    
-    -- 3. MANUFACTURERS TABLE (Controlled List)
-    CREATE TABLE manufacturers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        website TEXT,
-        notes TEXT
-    );
 
-    -- 4. PROCEDURES TABLE (Definitions)
+    -- 3. LOOKUP TABLES
+    CREATE TABLE manufacturers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, website TEXT);
+    CREATE TABLE custodians (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
+    CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
+    CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
+    CREATE TABLE port_configs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
+    
+    -- 4. PROCEDURES
     CREATE TABLE procedures (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         proc_id TEXT UNIQUE NOT NULL,
         title TEXT NOT NULL,
-        type TEXT DEFAULT 'SOP',    -- 'SOP' or 'Test'
+        type TEXT DEFAULT 'SOP',
         hardware_id TEXT,
         revision TEXT,
         purpose TEXT,
         hazards TEXT,
         prereqs TEXT,
-        steps TEXT,                 -- Simple text steps (optional)
+        steps TEXT,
         created_at TEXT,
         updated_at TEXT
     );
     
-    -- 5. PROCEDURE SECTIONS TABLE (The detailed steps)
+    -- 5. SECTIONS (Procedure Steps)
     CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
@@ -81,16 +104,37 @@ def init_db():
         body TEXT,
         FOREIGN KEY (procedure_id) REFERENCES procedures(id)
     );
-    
-    -- 6. PRE-SEED DATA
-    INSERT OR IGNORE INTO manufacturers (name) VALUES 
-    ('Swagelok'), 
-    ('Parker'), 
-    ('McMaster-Carr'), 
-    ('Omega'), 
-    ('DigiKey'), 
-    ('Thorlabs'), 
-    ('National Instruments');
+
+    -- 6. HARDWARE HISTORY LOG
+    CREATE TABLE hardware_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hardware_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        action_type TEXT,   -- e.g. 'Update', 'Status Change'
+        description TEXT,   -- e.g. 'Moved from Rack A to Storage'
+        FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+    );
+
+    -- 7. PROCEDURE RUNS (Execution Log)
+    CREATE TABLE procedure_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT UNIQUE NOT NULL,      -- e.g. 'R25-001'
+        procedure_id INTEGER NOT NULL,    -- Which SOP?
+        hardware_id INTEGER NOT NULL,     -- Which Hardware?
+        operator TEXT NOT NULL,           -- Who did it?
+        timestamp TEXT NOT NULL,          -- When?
+        status TEXT NOT NULL,             -- 'In-Progress', 'Completed', 'Failed', 'Aborted'
+        notes TEXT,                       -- General comments
+        FOREIGN KEY (procedure_id) REFERENCES procedures(id),
+        FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+    );
+
+    -- 8. SEED DATA
+    INSERT OR IGNORE INTO manufacturers (name) VALUES ('Swagelok'), ('Parker'), ('McMaster-Carr'), ('Omega'), ('DigiKey');
+    INSERT OR IGNORE INTO custodians (name) VALUES ('Lab Manager'), ('Test Engineer'), ('Quality Lead');
+    INSERT OR IGNORE INTO locations (name) VALUES ('Flammables Cabinet'), ('Rack A'), ('Rack B'), ('Clean Room');
+    INSERT OR IGNORE INTO media (name) VALUES ('N2'), ('He'), ('H2O'), ('H2O2'), ('AF-M315E'), ('Hydrazine');
+    INSERT OR IGNORE INTO port_configs (name) VALUES ('1/4" Tube'), ('1/8" Tube'), ('1/4" NPT'), ('1/4" VCR'), ('3/8" Tube');
     """
     
     db.executescript(schema)

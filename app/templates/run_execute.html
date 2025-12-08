@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Running {{ run['run_id'] }}{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <div>
+    <h2 class="page-title">Run: {{ run['run_id'] }}</h2>
+    <span style="color:#666; font-size:1.1rem;">{{ run['proc_id'] }} applied to <strong>{{ run['hardware_id'] }}</strong></span>
+  </div>
+  <div style="background:#eef; padding:0.3rem 0.8rem; border-radius:4px; font-weight:bold; color:#004085; border:1px solid #b6d4fe;">
+    Status: {{ run['status'] }}
+  </div>
+</div>
+
+<form method="post">
+  <div style="margin-top:1rem;">
+    {% for s in sections %}
+    <div style="background:#fff; border:1px solid #ddd; padding:1rem; margin-bottom:1rem; border-radius:4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+           <h4 style="margin:0; color:#333;">{{ loop.index }}. {{ s['title'] }}</h4>
+           <div style="margin-top:0.5rem; white-space: pre-wrap; font-family:monospace; color:#555; font-size:0.95rem;">{{ s['body'] }}</div>
+        </div>
+        <input type="checkbox" style="transform: scale(1.5); margin-top:0.2rem; cursor:pointer;">
+      </div>
+    </div>
+    {% else %}
+      <div style="padding:2rem; text-align:center; color:#777; background:#fff; border:1px solid #ddd;">
+        No specific steps defined in this procedure. Follow generic SOP text.
+      </div>
+    {% endfor %}
+  </div>
+
+  <div style="background:#f8f9fa; padding:1.5rem; border:1px solid #ccc; margin-top:2rem; border-radius:4px;">
+    <h4 style="margin-top:0;">Complete Run</h4>
+    
+    <div class="form-row">
+      <label>Run Notes / Observations / Deviations</label>
+      <textarea name="notes" rows="3" style="width:100%; padding:0.5rem; border:1px solid #bbb;"></textarea>
+    </div>
+    
+    <div class="row-split" style="align-items:flex-end;">
+      <div class="form-row" style="flex:1;">
+        <label>Final Status</label>
+        <select name="status" class="sidebar-select" style="padding:0.4rem;">
+          <option value="Completed">Pass / Completed</option>
+          <option value="Failed">Failed / Non-Conforming</option>
+          <option value="Aborted">Aborted / Cancelled</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+         <button type="submit" class="primary-button" style="width:100%; padding:0.6rem; background:#28a745; border-color:#28a745;">Submit Run Record</button>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

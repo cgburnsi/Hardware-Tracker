@@ -87,6 +87,40 @@
     </div>
   </div>
 
+  <div class="section-card">
+    <div class="section-header">Tracking & Compliance</div>
+    <div class="section-body">
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="data-label">ECN</div>
+          <div class="data-value" style="font-family:monospace;">{{ item['ecn'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Calibration</div>
+          <div class="data-value">{{ item['calibration_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Repair Ref</div>
+          <div class="data-value">{{ item['repair_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Work Order</div>
+          <div class="data-value">{{ item['work_order_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Cleaning Spec</div>
+          <div class="data-value" style="color:#0b5f9c; font-weight:600;">{{ item['cleaning_spec'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Other Specs</div>
+          <div class="data-value">{{ item['compliance_specs'] or '–' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
   {% if item['safety_class'] and item['safety_class'] != 'None' %}
   <div class="section-card safety-card">
     <div class="section-header" style="color:#d9534f; background:#fff5f5;">Safety Constraints</div>
@@ -123,6 +157,38 @@
         <div style="font-weight:600; margin-bottom:0.25rem;">No history recorded yet</div>
         <div style="font-size:0.85rem;">When we build the "Procedure Runner," completed runs will appear here.</div>
       </div>
+    </div>
+  </div>
+  
+  <div class="section-card">
+    <div class="section-header">Operational History</div>
+    <div class="section-body">
+      
+      {% if logs %}
+        <table style="width:100%; font-size:0.9rem;">
+          <thead>
+            <tr>
+              <th style="text-align:left; width: 140px; color:#999;">Date (UTC)</th>
+              <th style="text-align:left;">Event</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 0.5rem 0; color:#555;">{{ log['timestamp'] }}</td>
+              <td style="padding: 0.5rem 0;">
+                <strong>{{ log['action_type'] }}</strong>: {{ log['description'] }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div style="text-align: center; color: #888; font-style:italic; padding:1rem;">
+          No history recorded yet.
+        </div>
+      {% endif %}
+
     </div>
   </div>
 {% endblock %}

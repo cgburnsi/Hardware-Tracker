@@ -18,14 +18,14 @@
   .step-title { font-weight: 600; margin-bottom: 0.25rem; color: #333; }
   .step-body { font-family: monospace; font-size: 0.9rem; color: #555; white-space: pre-wrap; }
   
-  /* Tag for Data Steps */
+  /* Visual Tags for Step Types */
   .data-tag { display: inline-block; background: #e3f2fd; color: #0d47a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; border: 1px solid #bbdefb; }
   
   .add-box { background: #f4f4f2; border: 2px dashed #ccc; padding: 1.5rem; border-radius: 4px; margin-top: 1.5rem; }
   textarea { width: 100%; border: 1px solid var(--border-soft); padding: 0.5rem; border-radius: 3px; font-family: inherit; }
   
-  /* Select styling */
-  .config-row { display: flex; gap: 1rem; background: #fff; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem; align-items: center; }
+  /* Configuration Row Styling */
+  .config-row { display: flex; gap: 1rem; background: #fff; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
 </style>
 
   <div class="page-title-row">
@@ -45,6 +45,9 @@
             {{ s['title'] }}
             {% if s['input_type'] == 'number' %}
               <span class="data-tag">DATA: Number ({{ s['unit'] }})</span>
+              {% if s['min_value'] is not none or s['max_value'] is not none %}
+                <span style="font-size:0.75rem; color:#666; font-weight:normal;">[Limit: {{ s['min_value'] or '∞' }} - {{ s['max_value'] or '∞' }}]</span>
+              {% endif %}
             {% elif s['input_type'] == 'text' %}
               <span class="data-tag">DATA: Text Input</span>
             {% elif s['input_type'] == 'bool' %}
@@ -56,7 +59,7 @@
           {% endif %}
         </div>
         <div>
-          <button style="border:none; background:none; cursor:pointer; color:#999;">✕</button>
+          <button style="border:none; background:none; cursor:pointer; color:#999;" title="Delete (Stub)">✕</button>
         </div>
       </div>
     {% else %}
@@ -68,6 +71,7 @@
     <div class="add-box">
       <h4 style="margin-top:0; margin-bottom:1rem;">+ Add New Section</h4>
       <form method="post">
+        
         <div class="form-row">
           <label>Section Title</label>
           <input type="text" name="title" required placeholder="e.g. Record Supply Pressure" style="width:100%; padding:0.4rem;">
@@ -78,9 +82,9 @@
           <textarea name="body" rows="3" placeholder="Verify gauge reads between 50 and 60 PSI."></textarea>
         </div>
 
-     <div class="form-row">
+        <div class="form-row">
           <label>Data Capture (Optional)</label>
-          <div class="config-row" style="flex-wrap: wrap;">
+          <div class="config-row">
             
             <div style="flex: 2; min-width: 150px;">
               <label style="font-size: 0.75rem; color:#666; display:block;">Input Type</label>
@@ -109,6 +113,11 @@
 
           </div>
         </div>
+
+        <button type="submit" class="primary-button" style="margin-top: 1rem;">Add Section</button>
+      </form>
+    </div>
+  </div>
 
   <script>
     function toggleDataFields(val) {

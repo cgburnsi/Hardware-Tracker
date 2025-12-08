@@ -28,33 +28,67 @@
       "traveler_path": "",
       "created_at": "2025-12-08T00:18:16",
       "updated_at": "2025-12-08T00:18:16"
+    },
+    {
+      "id": 2,
+      "hardware_id": "H25002",
+      "description": "gg",
+      "category": "",
+      "classification": "",
+      "manufacturer": "",
+      "part_number": "",
+      "serial_number": "",
+      "ecn": "",
+      "calibration_id": "",
+      "repair_id": "",
+      "work_order_id": "",
+      "port_configuration": "",
+      "cv": null,
+      "orifice_diameter": null,
+      "status": "New",
+      "location": "",
+      "custodian": "",
+      "safety_class": "None",
+      "propellant_or_media": "",
+      "cleaning_spec": "",
+      "compliance_specs": "",
+      "max_rated_pressure": null,
+      "max_rated_temperature": null,
+      "traveler_path": "",
+      "created_at": "2025-12-08T01:37:25",
+      "updated_at": "2025-12-08T01:37:25"
     }
   ],
   "manufacturers": [
     {
       "id": 1,
       "name": "Swagelok",
-      "website": null
+      "website": null,
+      "notes": null
     },
     {
       "id": 2,
       "name": "Parker",
-      "website": null
+      "website": null,
+      "notes": null
     },
     {
       "id": 3,
       "name": "McMaster-Carr",
-      "website": null
+      "website": null,
+      "notes": null
     },
     {
       "id": 4,
       "name": "Omega",
-      "website": null
+      "website": null,
+      "notes": null
     },
     {
       "id": 5,
       "name": "DigiKey",
-      "website": null
+      "website": null,
+      "notes": null
     }
   ],
   "custodians": [
@@ -143,14 +177,14 @@
       "proc_id": "P25-001",
       "title": "Solenoid Valve Decontamination",
       "type": "SOP",
-      "hardware_id": "None",
+      "hardware_id": "Solenoid Valves",
       "revision": "A",
-      "purpose": "None",
+      "purpose": "Do some things",
       "hazards": "None",
       "prereqs": "None",
       "steps": "Nonea new step\r\nanother step",
       "created_at": "2025-12-08T00:18:38",
-      "updated_at": "2025-12-08T00:27:54"
+      "updated_at": "2025-12-08T01:31:04"
     }
   ],
   "procedure_sections": [
@@ -159,21 +193,36 @@
       "procedure_id": 1,
       "order_index": 1,
       "title": "section 1",
-      "body": "a. do this\r\nb. do that.\r\nc. do more"
+      "body": "a. do this\r\nb. do that.\r\nc. do more",
+      "input_type": "none",
+      "unit": null
     },
     {
       "id": 2,
       "procedure_id": 1,
       "order_index": 2,
       "title": "section 2",
-      "body": "1. add more to the tank\r\n2. take some out of the tank\r\n3. repoeat steps 34"
+      "body": "1. add more to the tank\r\n2. take some out of the tank\r\n3. repoeat steps 34",
+      "input_type": "none",
+      "unit": null
     },
     {
       "id": 3,
       "procedure_id": 1,
       "order_index": 3,
       "title": "more section",
-      "body": "1. more things to do\r\nmore things to do\r\nmore and more more things"
+      "body": "1. more things to do\r\nmore things to do\r\nmore and more more things",
+      "input_type": "none",
+      "unit": null
+    },
+    {
+      "id": 4,
+      "procedure_id": 1,
+      "order_index": 4,
+      "title": "reord something",
+      "body": "Here is where you record things",
+      "input_type": "number",
+      "unit": "psi"
     }
   ],
   "hardware_log": [
@@ -204,6 +253,34 @@
       "timestamp": "2025-12-08T01:21:55",
       "action_type": "Procedure Run",
       "description": "Procedure Run R25-004 (P25-001) completed. Status: Completed"
+    },
+    {
+      "id": 5,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T01:30:32",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-005 (P25-001) completed. Status: Completed"
+    },
+    {
+      "id": 6,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T01:45:23",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-007 (P25-001) completed. Status: Failed"
+    },
+    {
+      "id": 7,
+      "hardware_id": 2,
+      "timestamp": "2025-12-08T01:46:37",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-008 (P25-001) completed. Status: Completed"
+    },
+    {
+      "id": 8,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T01:46:46",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-006 (P25-001) completed. Status: Aborted"
     }
   ],
   "procedure_runs": [
@@ -246,6 +323,47 @@
       "timestamp": "2025-12-08T01:19:49",
       "status": "Completed",
       "notes": ""
+    },
+    {
+      "id": 5,
+      "run_id": "R25-005",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "gg",
+      "timestamp": "2025-12-08T01:30:21",
+      "status": "Completed",
+      "notes": "new"
+    },
+    {
+      "id": 6,
+      "run_id": "R25-006",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "f",
+      "timestamp": "2025-12-08T01:33:01",
+      "status": "Aborted",
+      "notes": ""
+    },
+    {
+      "id": 7,
+      "run_id": "R25-007",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "fgfg",
+      "timestamp": "2025-12-08T01:44:27",
+      "status": "Failed",
+      "notes": ""
+    },
+    {
+      "id": 8,
+      "run_id": "R25-008",
+      "procedure_id": 1,
+      "hardware_id": 2,
+      "operator": "jhgkyt",
+      "timestamp": "2025-12-08T01:46:05",
+      "status": "Completed",
+      "notes": "fun times\r\n"
     }
-  ]
+  ],
+  "run_values": []
 }

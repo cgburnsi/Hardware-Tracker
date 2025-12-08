@@ -5,62 +5,33 @@
 <style>
   /* Touch-friendly Step Card */
   .step-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start; /* Align top so inputs don't center vertically weirdly */
-    transition: background 0.2s;
+    background: #fff; border: 1px solid #ddd; border-radius: 6px;
+    padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    display: flex; justify-content: space-between; align-items: flex-start;
   }
-  
-  /* The "Tappable" Checkbox Area */
   .checkbox-target {
-    width: 60px;
-    display: flex;
-    align-self: stretch; /* Full height click area */
-    align-items: center;
-    justify-content: center;
-    border-left: 1px solid #eee;
-    padding-left: 1rem;
-    cursor: pointer;
-    margin-left: 1rem;
+    width: 60px; display: flex; align-self: stretch; align-items: center; justify-content: center;
+    border-left: 1px solid #eee; padding-left: 1rem; cursor: pointer; margin-left: 1rem;
   }
   input[type="checkbox"] { transform: scale(1.8); accent-color: var(--accent); cursor: pointer; }
 
-  /* Segmented Control for Status (Pass/Fail) */
-  .status-toggle {
-    display: flex;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 0.5rem;
-  }
-  .status-option {
-    flex: 1;
-    text-align: center;
-    padding: 0.8rem;
-    cursor: pointer;
-    font-weight: 600;
-    background: #f8f9fa;
-    border-right: 1px solid #ccc;
-  }
+  /* Status Toggle */
+  .status-toggle { display: flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+  .status-option { flex: 1; text-align: center; padding: 0.8rem; cursor: pointer; font-weight: 600; background: #f8f9fa; border-right: 1px solid #ccc; }
   .status-option:last-child { border-right: none; }
   
-  /* Radio logic hidden, label styled */
   input[type="radio"] { display: none; }
-  input[type="radio"]:checked + label {
-    color: white;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-  }
-  
+  input[type="radio"]:checked + label { color: white; box-shadow: inset 0 0 5px rgba(0,0,0,0.2); }
   #st-pass:checked + label { background: #28a745; }
   #st-fail:checked + label { background: #dc3545; }
   #st-abort:checked + label { background: #6c757d; }
+
+  /* Read Only Mode styling */
+  .readonly-mode input, .readonly-mode textarea { background: #f9f9f9; color: #555; border-color: #ddd; pointer-events: none; }
+  .readonly-mode .checkbox-target { pointer-events: none; opacity: 0.7; }
 </style>
+
+{% set is_readonly = (run['status'] in ['Completed', 'Failed', 'Aborted']) %}
 
 <div class="page-title-row">
   <div>
@@ -69,9 +40,20 @@
       PROC: <strong>{{ run['proc_id'] }}</strong> <span style="margin:0 0.5rem;">•</span> HW: <strong>{{ run['hardware_id'] }}</strong>
     </div>
   </div>
+  
+  {% if is_readonly %}
+    <div style="background:#444; color:#fff; padding:0.4rem 0.8rem; border-radius:4px; font-weight:bold;">
+      LOCKED: {{ run['status']|upper }}
+    </div>
+  {% else %}
+    <div style="background:#eef; color:#004085; padding:0.4rem 0.8rem; border-radius:4px; font-weight:bold;">
+      ACTIVE
+    </div>
+  {% endif %}
 </div>
 
-<form method="post">
+<form method="post" class="{% if is_readonly %}readonly-mode{% endif %}">
+  
   <div style="max-width: 800px;">
     {% for s in sections %}
     <label class="step-card">
@@ -85,82 +67,103 @@
                <input type="number" step="any" 
                       name="val_{{ s['id'] }}"  
                       placeholder="Value"
-                      {% if s['min_value'] is not none %}min="{{ s['min_value'] }}"{% endif %}
-                      {% if s['max_value'] is not none %}max="{{ s['max_value'] }}"{% endif %}
+                      value="{{ values.get(s['id'], '') }}"
                       style="width: 100%; max-width: 150px; padding: 0.6rem; border: 1px solid #bbb; border-radius: 4px; font-weight:bold; color:#0b5f9c; font-size:1rem;"
                       oninput="checkLimit(this, {{ s['min_value'] or 'null' }}, {{ s['max_value'] or 'null' }})"
-                      onclick="event.preventDefault(); this.focus();"> <span style="font-weight:600; color:#555;">{{ s['unit'] }}</span>
+                      onclick="if(!{{ 'true' if is_readonly else 'false' }}) { event.preventDefault(); this.focus(); }">
                
+               <span style="font-weight:600; color:#555;">{{ s['unit'] }}</span>
+               
+               <script>
+                 document.addEventListener("DOMContentLoaded", function(){
+                   const el = document.querySelector('input[name="val_{{ s['id'] }}"]');
+                   if(el && el.value) checkLimit(el, {{ s['min_value'] or 'null' }}, {{ s['max_value'] or 'null' }});
+                 });
+               </script>
+
                {% if s['min_value'] is not none or s['max_value'] is not none %}
                  <span style="font-size:0.8rem; color:#888; margin-left:0.5rem;">
-                   (Range: 
-                    {% if s['min_value'] is not none %}{{ s['min_value'] }}{% else %}∞{% endif %} 
-                    – 
-                    {% if s['max_value'] is not none %}{{ s['max_value'] }}{% else %}∞{% endif %})
+                   (Range: {{ s['min_value'] if s['min_value'] is not none else '∞' }} – {{ s['max_value'] if s['max_value'] is not none else '∞' }})
                  </span>
                {% endif %}
              </div>
-             <div class="limit-warning" style="color:#d9534f; font-weight:600; font-size:0.85rem; margin-top:0.3rem; display:none;">
-               ⚠ Value Out of Spec!
+             <div class="limit-warning" style="color:#d9534f; font-weight:700; font-size:0.9rem; margin-top:0.4rem; display:none; padding: 0.4rem; background: #fff5f5; border-radius: 4px; border-left: 3px solid #d9534f;">
+               ⚠ OUT OF TOLERANCE
              </div>
            </div>
 
          {% elif s['input_type'] == 'text' %}
            <div style="margin-top: 0.8rem;">
              <input type="text" name="val_{{ s['id'] }}" placeholder="Enter Observations..." 
+                    value="{{ values.get(s['id'], '') }}"
                     style="width: 100%; padding: 0.6rem; border: 1px solid #bbb; border-radius: 4px; font-size:1rem;"
-                    onclick="event.preventDefault(); this.focus();">
+                    onclick="if(!{{ 'true' if is_readonly else 'false' }}) { event.preventDefault(); this.focus(); }">
            </div>
          {% endif %}
       </div>
       
       <div class="checkbox-target">
-        <input type="checkbox" name="check_{{ s['id'] }}">
+        <input type="checkbox" name="check_{{ s['id'] }}" 
+               {% if values.get(s['id']) == 'true' %}checked{% endif %}>
       </div>
     </label>
     {% else %}
       <div style="padding:2rem; text-align:center; color:#777; background:#fff; border:1px solid #ddd; border-radius:6px;">
-        No specific steps defined. Follow standard procedure text.
+        No specific steps defined.
       </div>
     {% endfor %}
   </div>
 
   <div style="max-width: 800px; background:#fff; padding:1.5rem; border:1px solid #ddd; border-radius:6px; margin-top:2rem;">
-    <h4 style="margin-top:0;">Finalize Run</h4>
+    <h4 style="margin-top:0;">Run Summary</h4>
     
     <div style="margin-bottom: 1rem;">
       <label style="display:block; margin-bottom:0.3rem; font-weight:600; color:#555;">Notes & Deviations</label>
-      <textarea name="notes" rows="3" style="width:100%; padding:0.6rem; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:1rem;"></textarea>
+      <textarea name="notes" rows="3" style="width:100%; padding:0.6rem; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:1rem;">{{ run['notes'] or '' }}</textarea>
     </div>
     
     <label style="display:block; margin-bottom:0.3rem; font-weight:600; color:#555;">Result</label>
-    <div class="status-toggle">
-      <input type="radio" name="status" id="st-pass" value="Completed" checked>
-      <label for="st-pass" class="status-option">PASS</label>
+    
+    {% if is_readonly %}
+      <div style="padding:1rem; border:1px solid #ddd; background:#f4f4f4; border-radius:4px; font-weight:bold; text-align:center;">
+        {{ run['status']|upper }}
+      </div>
+      <div style="margin-top:1rem; text-align:right;">
+        <a href="{{ url_for('procedures.run_list') }}" class="secondary-button">Back to Log</a>
+      </div>
+    {% else %}
+      <div class="status-toggle">
+        <input type="radio" name="final_result" id="st-pass" value="Completed" {% if run['status'] == 'Completed' or run['status'] == 'In-Progress' %}checked{% endif %}>
+        <label for="st-pass" class="status-option">PASS</label>
 
-      <input type="radio" name="status" id="st-fail" value="Failed">
-      <label for="st-fail" class="status-option">FAIL</label>
-      
-      <input type="radio" name="status" id="st-abort" value="Aborted">
-      <label for="st-abort" class="status-option">ABORT</label>
-    </div>
+        <input type="radio" name="final_result" id="st-fail" value="Failed" {% if run['status'] == 'Failed' %}checked{% endif %}>
+        <label for="st-fail" class="status-option">FAIL</label>
+        
+        <input type="radio" name="final_result" id="st-abort" value="Aborted" {% if run['status'] == 'Aborted' %}checked{% endif %}>
+        <label for="st-abort" class="status-option">ABORT</label>
+      </div>
 
-    <button type="submit" class="primary-button" style="width:100%; margin-top: 1.5rem; padding: 1rem; font-size: 1.1rem;">
-      Submit Run Record
-    </button>
+      <div style="display:flex; gap:1rem; margin-top: 1.5rem;">
+         <button type="submit" name="action" value="save" class="secondary-button" style="flex:1; padding: 1rem; font-size: 1rem;">
+           Save Progress
+         </button>
+         <button type="submit" name="action" value="finish" class="primary-button" style="flex:2; padding: 1rem; font-size: 1.1rem;">
+           Finalize & Submit
+         </button>
+      </div>
+    {% endif %}
   </div>
 </form>
 
 <script>
   function checkLimit(input, min, max) {
     const val = parseFloat(input.value);
-    // Find the warning div (it's the next sibling of the parent container)
     const warning = input.parentElement.nextElementSibling; 
     
-    // Reset styles
+    input.classList.remove('out-of-spec');
     input.style.borderColor = "#bbb";
-    input.style.backgroundColor = "#fff";
     input.style.color = "#0b5f9c";
+    input.style.backgroundColor = "#fff";
     if (warning) warning.style.display = "none";
     
     if (isNaN(val) || input.value === "") return;
@@ -170,13 +173,11 @@
     if (max !== null && val > max) outOfSpec = true;
 
     if (outOfSpec) {
-      input.style.borderColor = "#d9534f";
-      input.style.backgroundColor = "#fff5f5";
-      input.style.color = "#d9534f";
+      input.classList.add('out-of-spec');
       if (warning) warning.style.display = "block";
     } else {
-      input.style.borderColor = "#28a745"; // Green border
-      input.style.backgroundColor = "#f0fff4"; // Light green bg
+      input.style.borderColor = "#28a745";
+      input.style.backgroundColor = "#f0fff4";
       input.style.color = "#155724";
     }
   }

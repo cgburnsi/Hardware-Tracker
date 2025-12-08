@@ -205,10 +205,14 @@ def run_setup():
     procedures = db.execute("SELECT id, proc_id, title FROM procedures ORDER BY proc_id").fetchall()
     return render_template("run_setup.html", hardware=hardware, procedures=procedures, sel_hw=hw_id_arg)
 
+
+
 @bp.route("/run/<int:id>/execute", methods=["GET", "POST"])
 def run_execute(id):
     """Step 2: The Checklist"""
     db = get_db()
+    
+    # 1. Fetch Run & Procedure Info
     run = db.execute("""
         SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc 
         FROM procedure_runs r
@@ -217,30 +221,59 @@ def run_execute(id):
         WHERE r.id = ?
     """, (id,)).fetchone()
     
+    # 2. Fetch Sections
     sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (run['procedure_id'],)).fetchall()
+
+    # 3. Fetch Existing Values
+    val_rows = db.execute("SELECT section_id, value FROM run_values WHERE run_id = ?", (id,)).fetchall()
+    saved_values = {row['section_id']: row['value'] for row in val_rows}
 
     if request.method == "POST":
         notes = request.form.get("notes", "")
-        status = request.form.get("status", "Completed")
         
-        # 1. Update Run Record
+        # --- NEW LOGIC START ---
+        # Determine Status based on WHICH button was clicked ('action')
+        action = request.form.get("action")
+        
+        if action == "save":
+            # If saving progress, ALWAYS stay In-Progress, ignore the radio buttons
+            status = "In-Progress"
+        else:
+            # If finishing, look at the radio button selection ('final_result')
+            status = request.form.get("final_result", "Completed")
+        # --- NEW LOGIC END ---
+
+        # A. Update Main Run Record
         db.execute("UPDATE procedure_runs SET status = ?, notes = ? WHERE id = ?", (status, notes, id))
         
-        # 2. Add Entry to Hardware History Log
-        log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) completed. Status: {status}"
-        now = datetime.utcnow().isoformat(timespec="seconds")
-        db.execute("INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                   (run['hardware_id'], now, "Procedure Run", log_desc))
+        # B. Save Step Values
+        db.execute("DELETE FROM run_values WHERE run_id = ?", (id,))
+        
+        for s in sections:
+            sid = s['id']
+            if request.form.get(f"check_{sid}"):
+                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, "true"))
+            
+            val_data = request.form.get(f"val_{sid}")
+            if val_data:
+                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, val_data))
+
+        # C. Log to Hardware History (Only if finished)
+        if status in ['Completed', 'Failed', 'Aborted']:
+             log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) - Status: {status}"
+             now = datetime.utcnow().isoformat(timespec="seconds")
+             db.execute("INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+                        (run['hardware_id'], now, "Procedure Run", log_desc))
         
         db.commit()
-        flash(f"Run {run['run_id']} finished.", "success")
-        return redirect(url_for("hardware.hardware_detail", id=run['hardware_id']))
+        flash(f"Run {run['run_id']} saved.", "success")
+        
+        if status == 'In-Progress':
+            return redirect(url_for("procedures.run_list"))
+        else:
+            return redirect(url_for("hardware.hardware_detail", id=run['hardware_id']))
 
-    return render_template("run_execute.html", run=run, sections=sections)
-
-
-
-# ... existing code ...
+    return render_template("run_execute.html", run=run, sections=sections, values=saved_values)
 
 @bp.route("/runs")
 def run_list():

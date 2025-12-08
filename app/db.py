@@ -98,15 +98,19 @@ def init_db():
     );
     
     -- 5. SECTIONS (Procedure Steps)
-    -- (Added input_type and unit for Smart Steps feature)
     CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,
         title TEXT NOT NULL,
         body TEXT,
-        input_type TEXT DEFAULT 'none',  -- 'none', 'number', 'text', 'bool'
+        
+        -- DATA CONFIG
+        input_type TEXT DEFAULT 'none',
         unit TEXT,
+        min_value REAL,   -- New: Lower limit
+        max_value REAL,   -- New: Upper limit
+        
         FOREIGN KEY (procedure_id) REFERENCES procedures(id)
     );
 

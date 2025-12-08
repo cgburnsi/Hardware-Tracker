@@ -78,13 +78,13 @@
           <textarea name="body" rows="3" placeholder="Verify gauge reads between 50 and 60 PSI."></textarea>
         </div>
 
-        <div class="form-row">
+     <div class="form-row">
           <label>Data Capture (Optional)</label>
-          <div class="config-row">
+          <div class="config-row" style="flex-wrap: wrap;">
             
-            <div style="flex: 1;">
+            <div style="flex: 2; min-width: 150px;">
               <label style="font-size: 0.75rem; color:#666; display:block;">Input Type</label>
-              <select name="input_type" class="sidebar-select" onchange="toggleUnit(this.value)">
+              <select name="input_type" class="sidebar-select" onchange="toggleDataFields(this.value)">
                 <option value="none">None (Instruction Only)</option>
                 <option value="number">Number (Float)</option>
                 <option value="text">Text (Short Answer)</option>
@@ -92,32 +92,40 @@
               </select>
             </div>
 
-            <div style="flex: 1; opacity: 0.5;" id="unit-wrapper">
-              <label style="font-size: 0.75rem; color:#666; display:block;">Unit (if Number)</label>
-              <input type="text" name="unit" placeholder="e.g. PSI, V, °C" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
+            <div style="flex: 1; min-width: 80px; opacity: 0.5;" class="data-field">
+              <label style="font-size: 0.75rem; color:#666; display:block;">Unit</label>
+              <input type="text" name="unit" placeholder="PSI" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
+            </div>
+
+            <div style="flex: 1; min-width: 80px; opacity: 0.5;" class="data-field">
+              <label style="font-size: 0.75rem; color:#666; display:block;">Min Limit</label>
+              <input type="number" step="any" name="min_value" placeholder="0.0" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
+            </div>
+
+            <div style="flex: 1; min-width: 80px; opacity: 0.5;" class="data-field">
+              <label style="font-size: 0.75rem; color:#666; display:block;">Max Limit</label>
+              <input type="number" step="any" name="max_value" placeholder="10.0" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
             </div>
 
           </div>
         </div>
 
-        <button type="submit" class="primary-button" style="margin-top: 1rem;">Add Section</button>
-      </form>
-    </div>
-  </div>
-
   <script>
-    function toggleUnit(val) {
-      const wrapper = document.getElementById('unit-wrapper');
-      const input = wrapper.querySelector('input');
-      if (val === 'number') {
-        wrapper.style.opacity = '1';
-        input.disabled = false;
-        input.focus();
-      } else {
-        wrapper.style.opacity = '0.5';
-        input.disabled = true;
-        input.value = '';
-      }
+    function toggleDataFields(val) {
+      const fields = document.querySelectorAll('.data-field');
+      const isNum = (val === 'number');
+      
+      fields.forEach(div => {
+        const input = div.querySelector('input');
+        if (isNum) {
+          div.style.opacity = '1';
+          input.disabled = false;
+        } else {
+          div.style.opacity = '0.5';
+          input.disabled = true;
+          input.value = '';
+        }
+      });
     }
   </script>
 {% endblock %}

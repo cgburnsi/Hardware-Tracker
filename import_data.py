@@ -17,20 +17,19 @@ def import_data():
     
     print(f"Restoring data into {DB_PATH}...")
 
-    # 1. LOOKUP TABLES (Simple Name Lists)
+    # 1. LOOKUP TABLES
     simple_tables = ['manufacturers', 'custodians', 'locations', 'media', 'port_configs']
     for table in simple_tables:
         if table in data:
             print(f"  - Importing {table}...")
             for item in data[table]:
-                # Manufactuers has website/notes, others are just name
                 if table == 'manufacturers':
                     cur.execute("INSERT OR IGNORE INTO manufacturers (name, website, notes) VALUES (?, ?, ?)",
                                 (item.get('name'), item.get('website'), item.get('notes')))
                 else:
                     cur.execute(f"INSERT OR IGNORE INTO {table} (name) VALUES (?)", (item.get('name'),))
 
-    # 2. HARDWARE (The Big Table)
+    # 2. HARDWARE
     if 'hardware' in data:
         print("  - Importing hardware...")
         for item in data['hardware']:
@@ -73,18 +72,20 @@ def import_data():
                 item.get('created_at'), item.get('updated_at')
             ))
 
-    # 4. PROCEDURE SECTIONS (Steps)
+    # 4. PROCEDURE SECTIONS (Updated with Min/Max)
     if 'procedure_sections' in data:
         print("  - Importing sections...")
         for item in data['procedure_sections']:
             cur.execute("""
                 INSERT OR IGNORE INTO procedure_sections (
-                    procedure_id, order_index, title, body, input_type, unit
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    procedure_id, order_index, title, body, 
+                    input_type, unit, min_value, max_value
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item.get('procedure_id'), item.get('order_index'), 
                 item.get('title'), item.get('body'),
-                item.get('input_type', 'none'), item.get('unit')
+                item.get('input_type', 'none'), item.get('unit'),
+                item.get('min_value'), item.get('max_value')  # NEW COLUMNS
             ))
 
     # 5. LOGS & RUNS

@@ -143,17 +143,24 @@ def procedure_sections(id):
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
         
-        # NEW: Capture Data Config
         input_type = request.form.get("input_type", "none").strip()
         unit = request.form.get("unit", "").strip()
+        
+        # NEW: Capture Limits (Handle empty strings as None)
+        min_val = request.form.get("min_value", "").strip()
+        max_val = request.form.get("max_value", "").strip()
+        min_val = float(min_val) if min_val else None
+        max_val = float(max_val) if max_val else None
 
         if title:
             row = db.execute("SELECT COALESCE(MAX(order_index), 0) as max_ord FROM procedure_sections WHERE procedure_id=?", (id,)).fetchone()
             next_ord = row['max_ord'] + 1
             
             db.execute(
-                "INSERT INTO procedure_sections (procedure_id, order_index, title, body, input_type, unit) VALUES (?, ?, ?, ?, ?, ?)",
-                (id, next_ord, title, body, input_type, unit)
+                """INSERT INTO procedure_sections 
+                   (procedure_id, order_index, title, body, input_type, unit, min_value, max_value) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (id, next_ord, title, body, input_type, unit, min_val, max_val)
             )
             db.commit()
             flash("Section added.", "success")

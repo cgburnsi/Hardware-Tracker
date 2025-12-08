@@ -20,7 +20,7 @@ def init_db():
     db = get_db()
     
     schema = """
-    -- 1. CLEANUP (Drop ALL tables to ensure a clean reset)
+    -- 1. CLEANUP
     DROP TABLE IF EXISTS hardware;
     DROP TABLE IF EXISTS procedures;
     DROP TABLE IF EXISTS procedure_sections;
@@ -29,8 +29,9 @@ def init_db():
     DROP TABLE IF EXISTS locations;
     DROP TABLE IF EXISTS media;
     DROP TABLE IF EXISTS port_configs;
-    DROP TABLE IF EXISTS hardware_log;   -- This was missing!
-    DROP TABLE IF EXISTS procedure_runs; -- This matches the new feature
+    DROP TABLE IF EXISTS hardware_log;
+    DROP TABLE IF EXISTS procedure_runs;
+    DROP TABLE IF EXISTS run_values;
 
     -- 2. HARDWARE TABLE
     CREATE TABLE hardware (
@@ -73,7 +74,8 @@ def init_db():
     );
 
     -- 3. LOOKUP TABLES
-    CREATE TABLE manufacturers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, website TEXT);
+    -- (Added 'notes' back to manufacturers!)
+    CREATE TABLE manufacturers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, website TEXT, notes TEXT);
     CREATE TABLE custodians (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
@@ -96,12 +98,15 @@ def init_db():
     );
     
     -- 5. SECTIONS (Procedure Steps)
+    -- (Added input_type and unit for Smart Steps feature)
     CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,
         title TEXT NOT NULL,
         body TEXT,
+        input_type TEXT DEFAULT 'none',  -- 'none', 'number', 'text', 'bool'
+        unit TEXT,
         FOREIGN KEY (procedure_id) REFERENCES procedures(id)
     );
 
@@ -110,26 +115,36 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         hardware_id INTEGER NOT NULL,
         timestamp TEXT NOT NULL,
-        action_type TEXT,   -- e.g. 'Update', 'Status Change'
-        description TEXT,   -- e.g. 'Moved from Rack A to Storage'
+        action_type TEXT,
+        description TEXT,
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
     -- 7. PROCEDURE RUNS (Execution Log)
     CREATE TABLE procedure_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        run_id TEXT UNIQUE NOT NULL,      -- e.g. 'R25-001'
-        procedure_id INTEGER NOT NULL,    -- Which SOP?
-        hardware_id INTEGER NOT NULL,     -- Which Hardware?
-        operator TEXT NOT NULL,           -- Who did it?
-        timestamp TEXT NOT NULL,          -- When?
-        status TEXT NOT NULL,             -- 'In-Progress', 'Completed', 'Failed', 'Aborted'
-        notes TEXT,                       -- General comments
+        run_id TEXT UNIQUE NOT NULL,
+        procedure_id INTEGER NOT NULL,
+        hardware_id INTEGER NOT NULL,
+        operator TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT,
         FOREIGN KEY (procedure_id) REFERENCES procedures(id),
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 8. SEED DATA
+    -- 8. RUN VALUES (Data Recording)
+    CREATE TABLE run_values (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        section_id INTEGER NOT NULL,
+        value TEXT,
+        FOREIGN KEY (run_id) REFERENCES procedure_runs(id),
+        FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
+    );
+
+    -- 9. SEED DATA
     INSERT OR IGNORE INTO manufacturers (name) VALUES ('Swagelok'), ('Parker'), ('McMaster-Carr'), ('Omega'), ('DigiKey');
     INSERT OR IGNORE INTO custodians (name) VALUES ('Lab Manager'), ('Test Engineer'), ('Quality Lead');
     INSERT OR IGNORE INTO locations (name) VALUES ('Flammables Cabinet'), ('Rack A'), ('Rack B'), ('Clean Room');

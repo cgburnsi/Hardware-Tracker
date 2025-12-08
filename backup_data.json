@@ -6,28 +6,28 @@
       "description": "aasdf",
       "category": "",
       "classification": "",
-      "manufacturer": "DigiKey",
-      "part_number": "3312d33",
-      "serial_number": "2",
+      "manufacturer": "",
+      "part_number": "",
+      "serial_number": "",
       "ecn": "",
       "calibration_id": "",
       "repair_id": "",
       "work_order_id": "",
-      "port_configuration": "1/4\" Tube",
-      "cv": 1.3,
+      "port_configuration": "",
+      "cv": null,
       "orifice_diameter": null,
-      "status": "New",
-      "location": "Flammables Cabinet",
-      "custodian": "Chris Burnside",
-      "safety_class": "Pressure",
-      "propellant_or_media": "AF-M315E",
+      "status": "In-Service",
+      "location": "",
+      "custodian": "",
+      "safety_class": "None",
+      "propellant_or_media": "",
       "cleaning_spec": "",
       "compliance_specs": "",
       "max_rated_pressure": null,
       "max_rated_temperature": null,
       "traveler_path": "",
-      "created_at": "2025-12-07T22:34:46",
-      "updated_at": "2025-12-07T22:43:32"
+      "created_at": "2025-12-08T00:18:16",
+      "updated_at": "2025-12-08T00:18:16"
     }
   ],
   "manufacturers": [
@@ -57,6 +57,195 @@
       "website": null
     }
   ],
-  "procedures": [],
-  "procedure_sections": []
+  "custodians": [
+    {
+      "id": 1,
+      "name": "Lab Manager"
+    },
+    {
+      "id": 2,
+      "name": "Test Engineer"
+    },
+    {
+      "id": 3,
+      "name": "Quality Lead"
+    }
+  ],
+  "locations": [
+    {
+      "id": 1,
+      "name": "Flammables Cabinet"
+    },
+    {
+      "id": 2,
+      "name": "Rack A"
+    },
+    {
+      "id": 3,
+      "name": "Rack B"
+    },
+    {
+      "id": 4,
+      "name": "Clean Room"
+    }
+  ],
+  "media": [
+    {
+      "id": 1,
+      "name": "N2"
+    },
+    {
+      "id": 2,
+      "name": "He"
+    },
+    {
+      "id": 3,
+      "name": "H2O"
+    },
+    {
+      "id": 4,
+      "name": "H2O2"
+    },
+    {
+      "id": 5,
+      "name": "AF-M315E"
+    },
+    {
+      "id": 6,
+      "name": "Hydrazine"
+    }
+  ],
+  "port_configs": [
+    {
+      "id": 1,
+      "name": "1/4\" Tube"
+    },
+    {
+      "id": 2,
+      "name": "1/8\" Tube"
+    },
+    {
+      "id": 3,
+      "name": "1/4\" NPT"
+    },
+    {
+      "id": 4,
+      "name": "1/4\" VCR"
+    },
+    {
+      "id": 5,
+      "name": "3/8\" Tube"
+    }
+  ],
+  "procedures": [
+    {
+      "id": 1,
+      "proc_id": "P25-001",
+      "title": "Solenoid Valve Decontamination",
+      "type": "SOP",
+      "hardware_id": "None",
+      "revision": "A",
+      "purpose": "None",
+      "hazards": "None",
+      "prereqs": "None",
+      "steps": "Nonea new step\r\nanother step",
+      "created_at": "2025-12-08T00:18:38",
+      "updated_at": "2025-12-08T00:27:54"
+    }
+  ],
+  "procedure_sections": [
+    {
+      "id": 1,
+      "procedure_id": 1,
+      "order_index": 1,
+      "title": "section 1",
+      "body": "a. do this\r\nb. do that.\r\nc. do more"
+    },
+    {
+      "id": 2,
+      "procedure_id": 1,
+      "order_index": 2,
+      "title": "section 2",
+      "body": "1. add more to the tank\r\n2. take some out of the tank\r\n3. repoeat steps 34"
+    },
+    {
+      "id": 3,
+      "procedure_id": 1,
+      "order_index": 3,
+      "title": "more section",
+      "body": "1. more things to do\r\nmore things to do\r\nmore and more more things"
+    }
+  ],
+  "hardware_log": [
+    {
+      "id": 1,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T00:21:56",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-001 (P25-001) completed. Status: Completed"
+    },
+    {
+      "id": 2,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T00:22:46",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-002 (P25-001) completed. Status: Aborted"
+    },
+    {
+      "id": 3,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T00:28:16",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-003 (P25-001) completed. Status: Completed"
+    },
+    {
+      "id": 4,
+      "hardware_id": 1,
+      "timestamp": "2025-12-08T01:21:55",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-004 (P25-001) completed. Status: Completed"
+    }
+  ],
+  "procedure_runs": [
+    {
+      "id": 1,
+      "run_id": "R25-001",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "Burnside",
+      "timestamp": "2025-12-08T00:21:53",
+      "status": "Completed",
+      "notes": ""
+    },
+    {
+      "id": 2,
+      "run_id": "R25-002",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "cb",
+      "timestamp": "2025-12-08T00:22:28",
+      "status": "Aborted",
+      "notes": "did something"
+    },
+    {
+      "id": 3,
+      "run_id": "R25-003",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "ded",
+      "timestamp": "2025-12-08T00:28:09",
+      "status": "Completed",
+      "notes": "yeah"
+    },
+    {
+      "id": 4,
+      "run_id": "R25-004",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "j",
+      "timestamp": "2025-12-08T01:19:49",
+      "status": "Completed",
+      "notes": ""
+    }
+  ]
 }

@@ -1,64 +1,123 @@
 {% extends "base.html" %}
 
-{% block title %}Sections – {{ proc['proc_id'] }}{% endblock %}
+{% block title %}Edit Steps: {{ proc['proc_id'] }}{% endblock %}
 
 {% block sidebar_filters %}
-  <div class="sidebar-section-title">Procedures</div>
+  <div class="sidebar-section-title">Actions</div>
   <ul class="nav-links">
-    <li><a href="{{ url_for('procedure_list') }}">Procedure Index</a></li>
-    <li><a href="{{ url_for('procedure_new') }}">New Procedure</a></li>
-    <li><a href="{{ url_for('procedure_detail', id=proc['id']) }}">Back to {{ proc['proc_id'] }}</a></li>
+    <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedures.procedure_detail', id=proc['id']) }}">Back to Detail</a></li>
   </ul>
 {% endblock %}
 
 {% block content %}
+<style>
+  .step-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 0.8rem; padding: 1rem; display: flex; gap: 1rem; }
+  .step-index { font-weight: 700; color: #999; font-size: 1.2rem; min-width: 30px; }
+  .step-content { flex: 1; }
+  .step-title { font-weight: 600; margin-bottom: 0.25rem; color: #333; }
+  .step-body { font-family: monospace; font-size: 0.9rem; color: #555; white-space: pre-wrap; }
+  
+  /* Tag for Data Steps */
+  .data-tag { display: inline-block; background: #e3f2fd; color: #0d47a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; border: 1px solid #bbdefb; }
+  
+  .add-box { background: #f4f4f2; border: 2px dashed #ccc; padding: 1.5rem; border-radius: 4px; margin-top: 1.5rem; }
+  textarea { width: 100%; border: 1px solid var(--border-soft); padding: 0.5rem; border-radius: 3px; font-family: inherit; }
+  
+  /* Select styling */
+  .config-row { display: flex; gap: 1rem; background: #fff; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem; align-items: center; }
+</style>
+
   <div class="page-title-row">
-    <h2 class="page-title">Sections – {{ proc['proc_id'] }}</h2>
+    <div>
+      <h2 class="page-title" style="display:inline-block; margin-right:0.5rem;">Edit Steps</h2>
+      <span style="color:#666; font-size:1.1rem;">for {{ proc['proc_id'] }}</span>
+    </div>
+    <a href="{{ url_for('procedures.procedure_detail', id=proc['id']) }}" class="secondary-button">Done / Return</a>
   </div>
 
-  <div class="detail-card" style="margin-bottom:0.8rem;">
-    <div class="detail-row">
-      <div class="detail-label">Title</div>
-      <div>{{ proc['title'] }}</div>
+  <div style="max-width: 800px;">
+    {% for s in sections %}
+      <div class="step-card">
+        <div class="step-index">{{ loop.index }}</div>
+        <div class="step-content">
+          <div class="step-title">
+            {{ s['title'] }}
+            {% if s['input_type'] == 'number' %}
+              <span class="data-tag">DATA: Number ({{ s['unit'] }})</span>
+            {% elif s['input_type'] == 'text' %}
+              <span class="data-tag">DATA: Text Input</span>
+            {% elif s['input_type'] == 'bool' %}
+              <span class="data-tag">CHECK: Pass/Fail</span>
+            {% endif %}
+          </div>
+          {% if s['body'] %}
+            <div class="step-body">{{ s['body'] }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <button style="border:none; background:none; cursor:pointer; color:#999;">✕</button>
+        </div>
+      </div>
+    {% else %}
+      <div style="text-align:center; padding: 2rem; color:#888; border: 1px solid #ddd; background:#fff; border-radius:4px;">
+        No sections defined yet. Add the first one below.
+      </div>
+    {% endfor %}
+
+    <div class="add-box">
+      <h4 style="margin-top:0; margin-bottom:1rem;">+ Add New Section</h4>
+      <form method="post">
+        <div class="form-row">
+          <label>Section Title</label>
+          <input type="text" name="title" required placeholder="e.g. Record Supply Pressure" style="width:100%; padding:0.4rem;">
+        </div>
+        
+        <div class="form-row">
+          <label>Detailed Steps / Instructions</label>
+          <textarea name="body" rows="3" placeholder="Verify gauge reads between 50 and 60 PSI."></textarea>
+        </div>
+
+        <div class="form-row">
+          <label>Data Capture (Optional)</label>
+          <div class="config-row">
+            
+            <div style="flex: 1;">
+              <label style="font-size: 0.75rem; color:#666; display:block;">Input Type</label>
+              <select name="input_type" class="sidebar-select" onchange="toggleUnit(this.value)">
+                <option value="none">None (Instruction Only)</option>
+                <option value="number">Number (Float)</option>
+                <option value="text">Text (Short Answer)</option>
+                <option value="bool">Pass / Fail Check</option>
+              </select>
+            </div>
+
+            <div style="flex: 1; opacity: 0.5;" id="unit-wrapper">
+              <label style="font-size: 0.75rem; color:#666; display:block;">Unit (if Number)</label>
+              <input type="text" name="unit" placeholder="e.g. PSI, V, °C" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
+            </div>
+
+          </div>
+        </div>
+
+        <button type="submit" class="primary-button" style="margin-top: 1rem;">Add Section</button>
+      </form>
     </div>
   </div>
 
-  <h3 style="font-size:1rem; margin-bottom:0.3rem;">Existing Sections</h3>
-  <div class="detail-card" style="margin-bottom:0.8rem;">
-    {% if sections %}
-      <ol style="margin:0; padding-left:1.3rem;">
-        {% for s in sections %}
-          <li style="margin-bottom:0.4rem;">
-            <strong>{{ s['title'] }}</strong><br>
-            <div style="white-space:pre-wrap; font-size:0.9rem; margin-top:0.15rem;">
-              {{ s['body'] or '' }}
-            </div>
-          </li>
-        {% endfor %}
-      </ol>
-    {% else %}
-      <p style="margin:0;">(no sections yet)</p>
-    {% endif %}
-  </div>
-
-  <h3 style="font-size:1rem; margin-bottom:0.3rem;">Add Section</h3>
-  <div class="form-card">
-    <form method="post">
-      <div class="form-row">
-        <label>Section Title</label>
-        <input type="text" name="title" placeholder="e.g. Purpose, Setup, Procedure Steps">
-      </div>
-      <div class="form-row">
-        <label>Section Body</label>
-        <textarea
-          name="body"
-          rows="8"
-          style="width:100%; font-family:monospace; font-size:0.9rem; padding:0.3rem; border:1px solid #d1d1c8; border-radius:3px;"
-        ></textarea>
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="primary-button">Add Section</button>
-      </div>
-    </form>
-  </div>
+  <script>
+    function toggleUnit(val) {
+      const wrapper = document.getElementById('unit-wrapper');
+      const input = wrapper.querySelector('input');
+      if (val === 'number') {
+        wrapper.style.opacity = '1';
+        input.disabled = false;
+        input.focus();
+      } else {
+        wrapper.style.opacity = '0.5';
+        input.disabled = true;
+        input.value = '';
+      }
+    }
+  </script>
 {% endblock %}

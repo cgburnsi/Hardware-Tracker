@@ -138,15 +138,26 @@ def procedure_edit(id):
 def procedure_sections(id):
     db = get_db()
     proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
+    
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
+        
+        # NEW: Capture Data Config
+        input_type = request.form.get("input_type", "none").strip()
+        unit = request.form.get("unit", "").strip()
+
         if title:
             row = db.execute("SELECT COALESCE(MAX(order_index), 0) as max_ord FROM procedure_sections WHERE procedure_id=?", (id,)).fetchone()
             next_ord = row['max_ord'] + 1
-            db.execute("INSERT INTO procedure_sections (procedure_id, order_index, title, body) VALUES (?, ?, ?, ?)", (id, next_ord, title, body))
+            
+            db.execute(
+                "INSERT INTO procedure_sections (procedure_id, order_index, title, body, input_type, unit) VALUES (?, ?, ?, ?, ?, ?)",
+                (id, next_ord, title, body, input_type, unit)
+            )
             db.commit()
             flash("Section added.", "success")
+            
     sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id=? ORDER BY order_index", (id,)).fetchall()
     return render_template("procedure_sections.html", proc=proc, sections=sections)
 
@@ -219,3 +230,26 @@ def run_execute(id):
         return redirect(url_for("hardware.hardware_detail", id=run['hardware_id']))
 
     return render_template("run_execute.html", run=run, sections=sections)
+
+
+
+# ... existing code ...
+
+@bp.route("/runs")
+def run_list():
+    db = get_db()
+    
+    # Fetch all runs with details
+    runs = db.execute("""
+        SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc 
+        FROM procedure_runs r
+        JOIN procedures p ON r.procedure_id = p.id
+        JOIN hardware h ON r.hardware_id = h.id
+        ORDER BY r.timestamp DESC
+    """).fetchall()
+    
+    return render_template("run_list.html", runs=runs)
+
+# ... existing code ...
+
+

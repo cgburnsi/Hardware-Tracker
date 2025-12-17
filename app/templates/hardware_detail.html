@@ -119,9 +119,7 @@
     </div>
   </div>
 
-
-
-  {% if item['safety_class'] and item['safety_class'] != 'None' %}
+  {% if (item['safety_class'] and item['safety_class'] != 'None') or item['max_rated_pressure'] %}
   <div class="section-card safety-card">
     <div class="section-header" style="color:#d9534f; background:#fff5f5;">Safety Constraints</div>
     <div class="section-body">
@@ -134,10 +132,29 @@
           <div class="data-label">Service Media</div>
           <div class="data-value">{{ item['propellant_or_media'] or '–' }}</div>
         </div>
+        
         <div class="data-item">
-          <div class="data-label">Max Pressure</div>
-          <div class="data-value">{{ item['max_rated_pressure'] }} PSI</div>
+          <div class="data-label">Pressure Rating</div>
+          <div class="data-value safety-val">
+            {% if item['max_rated_pressure'] %}
+              {{ item['max_rated_pressure'] }} PSI 
+              <span style="font-size:0.8em; color:#666; font-weight:normal;">({{ item['pressure_rating_type'] }})</span>
+            {% else %}
+              –
+            {% endif %}
+          </div>
         </div>
+
+        {% if item['proof_pressure'] or item['burst_pressure'] %}
+          <div class="data-item">
+            <div class="data-label">Test Limits</div>
+            <div class="data-value" style="font-size:0.85rem;">
+              {% if item['proof_pressure'] %}<div>Proof: {{ item['proof_pressure'] }} PSI</div>{% endif %}
+              {% if item['burst_pressure'] %}<div>Burst: {{ item['burst_pressure'] }} PSI</div>{% endif %}
+            </div>
+          </div>
+        {% endif %}
+
         <div class="data-item">
           <div class="data-label">Max Temp</div>
           <div class="data-value">{{ item['max_rated_temperature'] }} °C</div>
@@ -146,8 +163,6 @@
     </div>
   </div>
   {% endif %}
-
-
   
   <div class="section-card">
     <div class="section-header">Operational History</div>
@@ -159,6 +174,7 @@
             <tr>
               <th style="text-align:left; width: 140px; color:#999;">Date (UTC)</th>
               <th style="text-align:left;">Event</th>
+              <th style="text-align:right; width: 60px; color:#999;">Op</th>
             </tr>
           </thead>
           <tbody>
@@ -167,6 +183,9 @@
               <td style="padding: 0.5rem 0; color:#555;">{{ log['timestamp'] }}</td>
               <td style="padding: 0.5rem 0;">
                 <strong>{{ log['action_type'] }}</strong>: {{ log['description'] }}
+              </td>
+              <td style="padding: 0.5rem 0; text-align:right; font-weight:bold; color:#555;">
+                {{ log['operator'] or '-' }}
               </td>
             </tr>
             {% endfor %}

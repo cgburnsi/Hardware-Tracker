@@ -66,7 +66,12 @@ def init_db():
         propellant_or_media TEXT,
         cleaning_spec TEXT,
         compliance_specs TEXT,
-        max_rated_pressure REAL,
+        
+        -- UPDATED PRESSURE SECTION
+        max_rated_pressure REAL,  -- The main value (e.g. 1000)
+        pressure_rating_type TEXT DEFAULT 'MAWP', -- NEW: 'MAWP' or 'MEOP'
+        proof_pressure REAL,      -- NEW: For Aero/Space hardware
+        burst_pressure REAL,      -- NEW: For Aero/Space hardware
         max_rated_temperature REAL,
 
         traveler_path TEXT,

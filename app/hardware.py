@@ -1,9 +1,7 @@
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from app.db import get_db
-from app.auth import login_required # Add this import at the top
-from flask import g # Make sure 'g' is imported from flask
-
+from app.auth import login_required
 
 bp = Blueprint('hardware', __name__, url_prefix='/hardware')
 
@@ -124,10 +122,10 @@ def hardware_detail(id):
         flash("Hardware not found.", "error")
         return redirect(url_for("hardware.hardware_list"))
         
-    # Pass 'logs' to the template
     return render_template("hardware_detail.html", item=item, logs=logs)
 
 @bp.route("/new", methods=("GET", "POST"))
+@login_required
 def hardware_new():
     db = get_db()
     
@@ -162,7 +160,12 @@ def hardware_new():
         propellant_or_media = request.form.get("propellant_or_media", "").strip()
         cleaning_spec = request.form.get("cleaning_spec", "").strip()
         compliance_specs = request.form.get("compliance_specs", "").strip()
+        
+        # Pressure & Temp
         max_pressure = request.form.get("max_rated_pressure", "").strip()
+        pressure_type = request.form.get("pressure_rating_type", "MAWP").strip()
+        proof_pressure = request.form.get("proof_pressure", "").strip()
+        burst_pressure = request.form.get("burst_pressure", "").strip()
         max_temp = request.form.get("max_rated_temperature", "").strip()
 
         if not description:
@@ -181,9 +184,10 @@ def hardware_new():
                 port_configuration, cv, orifice_diameter,
                 status, custodian, location, 
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs, 
-                max_rated_pressure, max_rated_temperature,
+                max_rated_pressure, pressure_rating_type, proof_pressure, burst_pressure,
+                max_rated_temperature,
                 traveler_path, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 hardware_id, description, category, classification, manufacturer,
@@ -192,7 +196,8 @@ def hardware_new():
                 port_configuration, cv or None, orifice_diameter or None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs, 
-                max_pressure or None, max_temp or None,
+                max_pressure or None, pressure_type, proof_pressure or None, burst_pressure or None,
+                max_temp or None,
                 traveler_path, now, now
             )
         )
@@ -205,7 +210,7 @@ def hardware_new():
     return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
 
 @bp.route("/<int:id>/edit", methods=("GET", "POST"))
-@login_required  # <--- NEW: Forces login before running this function
+@login_required
 def hardware_edit(id):
     db = get_db()
     cur = db.execute("SELECT * FROM hardware WHERE id = ?", (id,))
@@ -246,20 +251,24 @@ def hardware_edit(id):
         propellant_or_media = request.form.get("propellant_or_media", "").strip()
         cleaning_spec = request.form.get("cleaning_spec", "").strip()
         compliance_specs = request.form.get("compliance_specs", "").strip()
+        
+        # Pressure & Temp
         max_pressure = request.form.get("max_rated_pressure", "").strip()
+        pressure_type = request.form.get("pressure_rating_type", "MAWP").strip()
+        proof_pressure = request.form.get("proof_pressure", "").strip()
+        burst_pressure = request.form.get("burst_pressure", "").strip()
         max_temp = request.form.get("max_rated_temperature", "").strip()
 
-        # 6. Change Reason (New Field)
+        # 6. Change Reason (Required)
         change_reason = request.form.get("change_reason", "").strip()
 
         if not description:
             flash("Description is required.", "error")
             return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
-        
-        # NEW: Force the user to enter a reason
+
+        # Force the user to enter a reason
         if not change_reason:
             flash("A 'Reason for Change' is required to update this item.", "error")
-            # We return the template immediately so they can fix it
             return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
 
         now = datetime.utcnow().isoformat(timespec="seconds")
@@ -276,7 +285,10 @@ def hardware_edit(id):
             'repair_id': (repair_id, "Repair Ref"),
             'calibration_id': (calibration_id, "Calibration"),
             'cleaning_spec': (cleaning_spec, "Clean Spec"),
-            'ecn': (ecn, "ECN")
+            'ecn': (ecn, "ECN"),
+            'max_rated_pressure': (max_pressure, f"Pressure ({pressure_type})"),
+            'proof_pressure': (proof_pressure, "Proof Pressure"),
+            'burst_pressure': (burst_pressure, "Burst Pressure")
         }
 
         for field, (new_val, label) in fields_to_track.items():
@@ -301,17 +313,15 @@ def hardware_edit(id):
             
             final_log = " | ".join(log_parts)
             
-            # GET OPERATOR FROM SESSION
-            current_operator = g.user['initials'] # e.g. "CGB"
-            
-            # Label the action type intelligently
             action_type = "Update"
             if "Status" in str(changes): action_type = "Status Change"
             if "Repair" in str(changes) or "Work Order" in str(changes): action_type = "Maintenance"
 
+            current_operator = g.user['initials']
+
             db.execute(
-                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                (id, now, action_type, final_log)
+                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description, operator) VALUES (?, ?, ?, ?, ?)",
+                (id, now, action_type, final_log, current_operator)
             )
 
         # --- SAVE UPDATE ---
@@ -324,7 +334,8 @@ def hardware_edit(id):
                 port_configuration=?, cv=?, orifice_diameter=?,
                 status=?, custodian=?, location=?, 
                 safety_class=?, propellant_or_media=?, cleaning_spec=?, compliance_specs=?,
-                max_rated_pressure=?, max_rated_temperature=?,
+                max_rated_pressure=?, pressure_rating_type=?, proof_pressure=?, burst_pressure=?,
+                max_rated_temperature=?,
                 traveler_path=?, updated_at=?
             WHERE id=?
             """,
@@ -335,7 +346,8 @@ def hardware_edit(id):
                 port_configuration, cv or None, orifice_diameter or None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
-                max_pressure or None, max_temp or None,
+                max_pressure or None, pressure_type, proof_pressure or None, burst_pressure or None,
+                max_temp or None,
                 traveler_path, now, id
             )
         )
@@ -343,13 +355,7 @@ def hardware_edit(id):
         flash("Hardware updated.", "success")
         return redirect(url_for("hardware.hardware_detail", id=id))
 
-    # GET Request
     return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
-
-
-
-
-# ... existing code ...
 
 # --- GENERIC LIST HELPERS ---
 
@@ -376,7 +382,6 @@ def handle_simple_list(table_name, page_title):
         name = request.form.get("name", "").strip()
         if name:
             try:
-                # Safe injection: table_name is hardcoded in our routes above, not user input
                 db.execute(f"INSERT INTO {table_name} (name) VALUES (?)", (name,))
                 db.commit()
                 flash(f"Added {name}", "success")

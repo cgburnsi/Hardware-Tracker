@@ -183,8 +183,9 @@
       </div>
     </fieldset>
 
-    <fieldset class="form-section" style="border-left: 4px solid #d9534f;">
+<fieldset class="form-section" style="border-left: 4px solid #d9534f;">
       <legend style="color:#d9534f;">4. Safety Constraints</legend>
+      
       <div class="row-split">
         <div class="form-row">
           <label>Service Media</label>
@@ -195,7 +196,7 @@
                 <option value="{{ m['name'] }}" {% if item and item['propellant_or_media'] == m['name'] %}selected{% endif %}>{{ m['name'] }}</option>
               {% endfor %}
             </select>
-            <a href="{{ url_for('hardware.media_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Media">+</a>
+            <a href="{{ url_for('hardware.media_list') }}" class="secondary-button add-btn" target="_blank">+</a>
           </div>
         </div>
         <div class="form-row">
@@ -205,19 +206,53 @@
              <option value="Pressure" {% if item and item['safety_class'] == 'Pressure' %}selected{% endif %}>Pressure</option>
              <option value="Flammable" {% if item and item['safety_class'] == 'Flammable' %}selected{% endif %}>Flammable</option>
              <option value="Toxic" {% if item and item['safety_class'] == 'Toxic' %}selected{% endif %}>Toxic</option>
-             <option value="Cryo" {% if item and item['safety_class'] == 'Cryo' %}selected{% endif %}>Cryo</option>
           </select>
         </div>
       </div>
-      <div class="row-split">
-        <div class="form-row">
-          <label>Max Rated Pressure (PSI)</label>
-          <input type="number" step="any" name="max_rated_pressure" value="{{ item['max_rated_pressure'] if item else '' }}">
-        </div>
-        <div class="form-row">
-          <label>Max Rated Temp (°C)</label>
-          <input type="number" step="any" name="max_rated_temperature" value="{{ item['max_rated_temperature'] if item else '' }}">
-        </div>
+
+      <div style="background: #fff5f5; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+          <label style="font-weight:600; color:#d9534f; margin-bottom:0.5rem; display:block;">Pressure Ratings (PSI)</label>
+          
+          <div style="display: flex; gap: 1rem; align-items: flex-end;">
+            
+            <div style="flex: 2;">
+              <label style="font-size:0.75rem; color:#666;">Rated Limit</label>
+              <input type="number" step="any" name="max_rated_pressure" 
+                     value="{{ item['max_rated_pressure'] if item else '' }}" 
+                     placeholder="e.g. 1000">
+            </div>
+
+            <div style="flex: 1;">
+              <label style="font-size:0.75rem; color:#666;">Type</label>
+              <select name="pressure_rating_type" class="sidebar-select" style="background:#fff;">
+                <option value="MAWP" {% if item and item['pressure_rating_type'] == 'MAWP' %}selected{% endif %}>MAWP (Ind)</option>
+                <option value="MEOP" {% if item and item['pressure_rating_type'] == 'MEOP' %}selected{% endif %}>MEOP (Aero)</option>
+                <option value="MDP" {% if item and item['pressure_rating_type'] == 'MDP' %}selected{% endif %}>MDP</option>
+              </select>
+            </div>
+
+            <div style="flex: 1;">
+              <label style="font-size:0.75rem; color:#666;">Proof (Test)</label>
+              <input type="number" step="any" name="proof_pressure" 
+                     value="{{ item['proof_pressure'] if item else '' }}" 
+                     placeholder="1.5x">
+            </div>
+            
+            <div style="flex: 1;">
+              <label style="font-size:0.75rem; color:#666;">Burst (Fail)</label>
+              <input type="number" step="any" name="burst_pressure" 
+                     value="{{ item['burst_pressure'] if item else '' }}" 
+                     placeholder="4.0x">
+            </div>
+          </div>
+          <div style="font-size:0.75rem; color:#d9534f; margin-top:0.4rem;">
+            * Industrial items usually only need <strong>MAWP</strong>. Aerospace items use <strong>MEOP</strong> plus Proof/Burst.
+          </div>
+      </div>
+
+      <div class="form-row" style="margin-top:1rem;">
+        <label>Max Rated Temp (°C)</label>
+        <input type="number" step="any" name="max_rated_temperature" value="{{ item['max_rated_temperature'] if item else '' }}">
       </div>
     </fieldset>
     

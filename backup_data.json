@@ -87,7 +87,7 @@
       "max_rated_temperature": null,
       "traveler_path": "",
       "created_at": "2025-12-17T00:41:20",
-      "updated_at": "2025-12-17T00:41:20",
+      "updated_at": "2025-12-17T01:27:53",
       "parent_id": null
     }
   ],
@@ -211,6 +211,22 @@
     {
       "id": 11,
       "name": "Flange"
+    }
+  ],
+  "personnel": [
+    {
+      "id": 1,
+      "name": "Chris Burnside",
+      "initials": "CGB",
+      "pin_code": "101",
+      "role": "Admin"
+    },
+    {
+      "id": 2,
+      "name": "Test Operator",
+      "initials": "TST",
+      "pin_code": "999",
+      "role": "Technician"
     }
   ],
   "procedures": [
@@ -545,119 +561,152 @@
       "hardware_id": 1,
       "timestamp": "2025-12-08T00:21:56",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-001 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-001 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 2,
       "hardware_id": 1,
       "timestamp": "2025-12-08T00:22:46",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-002 (P25-001) completed. Status: Aborted"
+      "description": "Procedure Run R25-002 (P25-001) completed. Status: Aborted",
+      "operator": null
     },
     {
       "id": 3,
       "hardware_id": 1,
       "timestamp": "2025-12-08T00:28:16",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-003 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-003 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 4,
       "hardware_id": 1,
       "timestamp": "2025-12-08T01:21:55",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-004 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-004 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 5,
       "hardware_id": 1,
       "timestamp": "2025-12-08T01:30:32",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-005 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-005 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 6,
       "hardware_id": 1,
       "timestamp": "2025-12-08T01:45:23",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-007 (P25-001) completed. Status: Failed"
+      "description": "Procedure Run R25-007 (P25-001) completed. Status: Failed",
+      "operator": null
     },
     {
       "id": 7,
       "hardware_id": 2,
       "timestamp": "2025-12-08T01:46:37",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-008 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-008 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 8,
       "hardware_id": 1,
       "timestamp": "2025-12-08T01:46:46",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-006 (P25-001) completed. Status: Aborted"
+      "description": "Procedure Run R25-006 (P25-001) completed. Status: Aborted",
+      "operator": null
     },
     {
       "id": 9,
       "hardware_id": 1,
       "timestamp": "2025-12-08T02:09:49",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-009 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-009 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 10,
       "hardware_id": 1,
       "timestamp": "2025-12-08T02:19:00",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-010 (P25-001) completed. Status: Completed"
+      "description": "Procedure Run R25-010 (P25-001) completed. Status: Completed",
+      "operator": null
     },
     {
       "id": 11,
       "hardware_id": 1,
       "timestamp": "2025-12-08T02:23:09",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-011 (P25-001) - Status: Completed"
+      "description": "Procedure Run R25-011 (P25-001) - Status: Completed",
+      "operator": null
     },
     {
       "id": 12,
       "hardware_id": 2,
       "timestamp": "2025-12-08T02:23:42",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-012 (P25-001) - Status: Completed"
+      "description": "Procedure Run R25-012 (P25-001) - Status: Completed",
+      "operator": null
     },
     {
       "id": 13,
       "hardware_id": 1,
       "timestamp": "2025-12-08T02:25:26",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-013 (P25-001) - Status: Aborted"
+      "description": "Procedure Run R25-013 (P25-001) - Status: Aborted",
+      "operator": null
     },
     {
       "id": 14,
       "hardware_id": 1,
       "timestamp": "2025-12-16T22:21:39",
       "action_type": "Procedure Run",
-      "description": "Procedure Run R25-016 (P25-001) - Status: Completed"
+      "description": "Procedure Run R25-016 (P25-001) - Status: Completed",
+      "operator": null
     },
     {
       "id": 15,
       "hardware_id": 2,
       "timestamp": "2025-12-17T00:20:46",
       "action_type": "Update",
-      "description": "NOTE: Calibration | ECN set to 'M123456'"
+      "description": "NOTE: Calibration | ECN set to 'M123456'",
+      "operator": null
     },
     {
       "id": 16,
       "hardware_id": 2,
       "timestamp": "2025-12-17T00:21:12",
       "action_type": "Update",
-      "description": "ECN: 'M123456' \u2192 'M123453'"
+      "description": "ECN: 'M123456' \u2192 'M123453'",
+      "operator": null
     },
     {
       "id": 17,
       "hardware_id": 2,
       "timestamp": "2025-12-17T01:03:50",
       "action_type": "Update",
-      "description": "NOTE: somet"
+      "description": "NOTE: somet",
+      "operator": null
+    },
+    {
+      "id": 18,
+      "hardware_id": 3,
+      "timestamp": "2025-12-17T01:27:53",
+      "action_type": "Update",
+      "description": "NOTE: i wanted to do it.",
+      "operator": null
+    },
+    {
+      "id": 19,
+      "hardware_id": 2,
+      "timestamp": "2025-12-17T01:29:04",
+      "action_type": "Procedure Run",
+      "description": "Procedure Run R25-026 (P25-002) - Status: Completed",
+      "operator": null
     }
   ],
   "procedure_runs": [
@@ -909,6 +958,16 @@
       "operator": "rr",
       "timestamp": "2025-12-16T23:47:27",
       "status": "In-Progress",
+      "notes": ""
+    },
+    {
+      "id": 26,
+      "run_id": "R25-026",
+      "procedure_id": 2,
+      "hardware_id": 2,
+      "operator": "wer",
+      "timestamp": "2025-12-17T01:29:01",
+      "status": "Completed",
       "notes": ""
     }
   ],

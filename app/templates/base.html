@@ -181,6 +181,13 @@
             </a>
           </div>
 
+         <div class="sidebar-group">
+            <div class="sidebar-label">Team</div>
+            <a href="{{ url_for('auth.register') }}" class="nav-link">
+              <span class="nav-link-icon">👥</span> Manage Team
+            </a>
+          </div>
+
           {% block sidebar_filters %}{% endblock %}
           
         </aside>

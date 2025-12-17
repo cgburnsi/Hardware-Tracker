@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['app/db.py', 'app/templates/hardware_form.html', 'app/hardware.py', 'app/templates/manufacturer_list.html']
+recent_files = ['app/db.py', 'app/procedures.py', 'app/templates/procedure_sections.html', 'export_data.py', 'import_data.py', 'app/templates/run_list.html', 'app/templates/base.html', 'app/templates/run_execute.html']
 
 [main]
 version = 0.2.0

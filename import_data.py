@@ -42,8 +42,8 @@ def import_data():
                     status, custodian, location, 
                     safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                     max_rated_pressure, max_rated_temperature,
-                    traveler_path, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    traveler_path, created_at, updated_at, parent_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item.get('hardware_id'), item.get('description'), item.get('category'),
                 item.get('classification'), item.get('manufacturer'), item.get('part_number'),
@@ -53,7 +53,7 @@ def import_data():
                 item.get('status'), item.get('custodian'), item.get('location'),
                 item.get('safety_class'), item.get('propellant_or_media'), item.get('cleaning_spec'), item.get('compliance_specs'),
                 item.get('max_rated_pressure'), item.get('max_rated_temperature'),
-                item.get('traveler_path'), item.get('created_at'), item.get('updated_at')
+                item.get('traveler_path'), item.get('created_at'), item.get('updated_at'), item.get('parent_id')
             ))
 
     # 3. PROCEDURES
@@ -72,20 +72,23 @@ def import_data():
                 item.get('created_at'), item.get('updated_at')
             ))
 
-    # 4. PROCEDURE SECTIONS (Updated with Min/Max)
+    # 4. PROCEDURE SECTIONS (UPDATED)
     if 'procedure_sections' in data:
         print("  - Importing sections...")
         for item in data['procedure_sections']:
             cur.execute("""
                 INSERT OR IGNORE INTO procedure_sections (
-                    procedure_id, order_index, title, body, 
-                    input_type, unit, min_value, max_value
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    procedure_id, order_index, 
+                    step_label, title, body, command, substeps,
+                    input_type, unit, min_value, max_value,
+                    requires_initials
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item.get('procedure_id'), item.get('order_index'), 
-                item.get('title'), item.get('body'),
+                item.get('step_label'), item.get('title'), item.get('body'), item.get('command'), item.get('substeps'),
                 item.get('input_type', 'none'), item.get('unit'),
-                item.get('min_value'), item.get('max_value')  # NEW COLUMNS
+                item.get('min_value'), item.get('max_value'),
+                item.get('requires_initials', 0)
             ))
 
     # 5. LOGS & RUNS
@@ -110,8 +113,8 @@ def import_data():
     if 'run_values' in data:
         print("  - Importing run values...")
         for item in data['run_values']:
-            cur.execute("INSERT OR IGNORE INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)",
-                        (item.get('run_id'), item.get('section_id'), item.get('value')))
+            cur.execute("INSERT OR IGNORE INTO run_values (run_id, section_id, value, initials) VALUES (?, ?, ?, ?)",
+                        (item.get('run_id'), item.get('section_id'), item.get('value'), item.get('initials')))
 
     conn.commit()
     conn.close()

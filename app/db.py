@@ -70,11 +70,14 @@ def init_db():
 
         traveler_path TEXT,
         created_at TEXT,
-        updated_at TEXT
+        updated_at TEXT,
+        
+        -- NEW COLUMN:
+        parent_id INTEGER, 
+        FOREIGN KEY (parent_id) REFERENCES hardware(id)
     );
 
     -- 3. LOOKUP TABLES
-    -- (Added 'notes' back to manufacturers!)
     CREATE TABLE manufacturers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, website TEXT, notes TEXT);
     CREATE TABLE custodians (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
@@ -102,14 +105,20 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,
+        
+        -- Display Config
+        step_label TEXT,
         title TEXT NOT NULL,
         body TEXT,
+        command TEXT,
+        substeps TEXT,
         
-        -- DATA CONFIG
+        -- Data Config
         input_type TEXT DEFAULT 'none',
         unit TEXT,
-        min_value REAL,   -- New: Lower limit
-        max_value REAL,   -- New: Upper limit
+        min_value REAL,
+        max_value REAL,
+        requires_initials INTEGER DEFAULT 0,
         
         FOREIGN KEY (procedure_id) REFERENCES procedures(id)
     );
@@ -124,7 +133,7 @@ def init_db():
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 7. PROCEDURE RUNS (Execution Log)
+    -- 7. PROCEDURE RUNS
     CREATE TABLE procedure_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id TEXT UNIQUE NOT NULL,
@@ -138,12 +147,13 @@ def init_db():
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 8. RUN VALUES (Data Recording)
+    -- 8. RUN VALUES
     CREATE TABLE run_values (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
         section_id INTEGER NOT NULL,
         value TEXT,
+        initials TEXT,
         FOREIGN KEY (run_id) REFERENCES procedure_runs(id),
         FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
     );

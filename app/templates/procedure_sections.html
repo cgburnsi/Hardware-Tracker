@@ -8,23 +8,61 @@
     <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
     <li><a href="{{ url_for('procedures.procedure_detail', id=proc['id']) }}">Back to Detail</a></li>
   </ul>
+
+  <div style="padding: 1rem 0; border-top: 1px solid #eee; margin-top: 1rem;">
+    <div class="sidebar-section-title" style="margin-top:0;">Tools</div>
+    <form method="post" action="{{ url_for('procedures.renumber_sections', id=proc['id']) }}"
+          onsubmit="return confirm('This will overwrite all Step # labels to 1, 2, 3... Are you sure?');">
+      <button type="submit" class="secondary-button" style="width:100%; text-align:center; font-size:0.85rem;">
+        ↻ Renumber Steps (1-N)
+      </button>
+    </form>
+  </div>
 {% endblock %}
+
 
 {% block content %}
 <style>
-  .step-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 0.8rem; padding: 1rem; display: flex; gap: 1rem; }
-  .step-index { font-weight: 700; color: #999; font-size: 1.2rem; min-width: 30px; }
+  .step-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 0.8rem; padding: 1rem; display: flex; gap: 1rem; align-items: flex-start; }
+  
+  /* Step Index */
+  .step-index { 
+    font-weight: 800; color: #555; font-size: 1.1rem; min-width: 45px; text-align: right; margin-right: 0.5rem; margin-top: 0.2rem;
+  }
+  
   .step-content { flex: 1; }
-  .step-title { font-weight: 600; margin-bottom: 0.25rem; color: #333; }
-  .step-body { font-family: monospace; font-size: 0.9rem; color: #555; white-space: pre-wrap; }
+  .step-title { font-weight: 600; margin-bottom: 0.25rem; color: #333; font-size: 1.05rem; }
+  .step-body { font-family: monospace; font-size: 0.9rem; color: #555; white-space: pre-wrap; margin-top: 0.5rem; }
   
-  /* Visual Tags for Step Types */
-  .data-tag { display: inline-block; background: #e3f2fd; color: #0d47a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; border: 1px solid #bbdefb; }
+  /* Command Block Style */
+  .cmd-block {
+    display: inline-block; background: #2d3436; color: #00cec9;
+    font-family: monospace; padding: 0.2rem 0.6rem; border-radius: 4px;
+    font-size: 0.85rem; margin-top: 0.4rem; border: 1px solid #000;
+  }
+
+  /* Sub-steps Display */
+  .substep-list { margin-top: 0.5rem; background: #f9f9f9; padding: 0.5rem; border-radius: 4px; border: 1px solid #eee; }
+  .substep-item { display: flex; align-items: center; font-size: 0.85rem; color: #444; margin-bottom: 0.2rem; }
+  .substep-item:before { content: "☐"; margin-right: 0.5rem; font-size: 1.1rem; }
+
+  /* Data Tags */
+  .data-tag { display: inline-block; background: #e3f2fd; color: #0d47a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; margin-left: 0.5rem; border: 1px solid #bbdefb; vertical-align: middle;}
   
+  /* Action Buttons */
+  .step-actions { display: flex; flex-direction: column; gap: 0.3rem; }
+  .icon-btn { 
+    border: 1px solid #ddd; background: #f8f9fa; color: #555; 
+    width: 32px; height: 32px; border-radius: 4px; cursor: pointer; 
+    display: flex; align-items: center; justify-content: center; font-size: 1rem;
+    transition: all 0.2s;
+  }
+  .icon-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
+  .icon-btn.delete:hover { background: #ffebee; color: #c62828; border-color: #ffcdd2; }
+
   .add-box { background: #f4f4f2; border: 2px dashed #ccc; padding: 1.5rem; border-radius: 4px; margin-top: 1.5rem; }
   textarea { width: 100%; border: 1px solid var(--border-soft); padding: 0.5rem; border-radius: 3px; font-family: inherit; }
   
-  /* Configuration Row Styling */
   .config-row { display: flex; gap: 1rem; background: #fff; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
 </style>
 
@@ -36,31 +74,67 @@
     <a href="{{ url_for('procedures.procedure_detail', id=proc['id']) }}" class="secondary-button">Done / Return</a>
   </div>
 
-  <div style="max-width: 800px;">
+  <div style="max-width: 850px;">
     {% for s in sections %}
       <div class="step-card">
-        <div class="step-index">{{ loop.index }}</div>
+        <div class="step-index">{{ s['step_label'] if s['step_label'] else loop.index }}</div>
+        
         <div class="step-content">
           <div class="step-title">
             {{ s['title'] }}
+            
             {% if s['input_type'] == 'number' %}
               <span class="data-tag">DATA: Number ({{ s['unit'] }})</span>
-              {% if s['min_value'] is not none or s['max_value'] is not none %}
-                <span style="font-size:0.75rem; color:#666; font-weight:normal;">[Limit: {{ s['min_value'] or '∞' }} - {{ s['max_value'] or '∞' }}]</span>
-              {% endif %}
             {% elif s['input_type'] == 'text' %}
               <span class="data-tag">DATA: Text Input</span>
             {% elif s['input_type'] == 'bool' %}
               <span class="data-tag">CHECK: Pass/Fail</span>
+            {% elif s['input_type'] == 'table' %}
+              <span class="data-tag" style="background:#e8f5e9; color:#1b5e20; border-color:#c8e6c9;">DATA: Table</span>
+            {% endif %}
+            
+            {% if s['requires_initials'] %}
+               <span class="data-tag" style="background:#fff3cd; color:#856404; border-color:#ffeeba;">REQ: Initials</span>
             {% endif %}
           </div>
+
+          {% if s['command'] %}
+            <div class="cmd-block">> {{ s['command'] }}</div>
+          {% endif %}
+
           {% if s['body'] %}
             <div class="step-body">{{ s['body'] }}</div>
           {% endif %}
+
+          {% if s['substeps'] %}
+            <div class="substep-list">
+              {% for line in s['substeps'].split('\n') %}
+                <div class="substep-item">{{ line }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
-        <div>
-          <button style="border:none; background:none; cursor:pointer; color:#999;" title="Delete (Stub)">✕</button>
+        
+        <div class="step-actions">
+          
+          {% if not loop.first %}
+          <form method="post" action="{{ url_for('procedures.move_section', id=proc['id'], section_id=s['id'], direction='up') }}">
+            <button type="submit" class="icon-btn" title="Move Up">↑</button>
+          </form>
+          {% endif %}
+
+          {% if not loop.last %}
+          <form method="post" action="{{ url_for('procedures.move_section', id=proc['id'], section_id=s['id'], direction='down') }}">
+            <button type="submit" class="icon-btn" title="Move Down">↓</button>
+          </form>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('procedures.delete_section', id=proc['id'], section_id=s['id']) }}" 
+                onsubmit="return confirm('Delete this step?');">
+            <button type="submit" class="icon-btn delete" title="Delete">✕</button>
+          </form>
         </div>
+
       </div>
     {% else %}
       <div style="text-align:center; padding: 2rem; color:#888; border: 1px solid #ddd; background:#fff; border-radius:4px;">
@@ -72,18 +146,35 @@
       <h4 style="margin-top:0; margin-bottom:1rem;">+ Add New Section</h4>
       <form method="post">
         
-        <div class="form-row">
-          <label>Section Title</label>
-          <input type="text" name="title" required placeholder="e.g. Record Supply Pressure" style="width:100%; padding:0.4rem;">
+        <div class="form-row" style="display:flex; gap:1rem;">
+          <div style="flex:1; max-width: 100px;">
+            <label>Step #</label>
+            <input type="text" name="step_label" placeholder="e.g. 2.1" style="width:100%; padding:0.4rem;">
+          </div>
+          <div style="flex:4;">
+            <label>Section Title (Instruction)</label>
+            <input type="text" name="title" required placeholder="e.g. Verify Valve Configuration" style="width:100%; padding:0.4rem;">
+          </div>
         </div>
         
         <div class="form-row">
-          <label>Detailed Steps / Instructions</label>
-          <textarea name="body" rows="3" placeholder="Verify gauge reads between 50 and 60 PSI."></textarea>
+          <label>Command / Script / File (Optional)</label>
+          <input type="text" name="command" placeholder="e.g. rcsm_readout.py" style="width:100%; padding:0.4rem; font-family:monospace; background:#fff;">
+        </div>
+        
+        <div class="form-row" style="display:flex; gap:1rem;">
+            <div style="flex:1;">
+                <label>Detailed Instructions</label>
+                <textarea name="body" rows="4" placeholder="Additional context..."></textarea>
+            </div>
+            <div style="flex:1;">
+                <label>Table Definitions (Rows)</label>
+                <textarea name="substeps" rows="4" placeholder="Format: Label | Optional Note&#10;&#10;Example:&#10;Serial No.&#10;Visual Insp. | Pass/Fail" style="font-family:monospace; background:#fff;"></textarea>
+            </div>
         </div>
 
         <div class="form-row">
-          <label>Data Capture (Optional)</label>
+          <label>Data & Accountability</label>
           <div class="config-row">
             
             <div style="flex: 2; min-width: 150px;">
@@ -93,6 +184,7 @@
                 <option value="number">Number (Float)</option>
                 <option value="text">Text (Short Answer)</option>
                 <option value="bool">Pass / Fail Check</option>
+                <option value="table">Data Table (Matrix)</option>
               </select>
             </div>
 
@@ -111,6 +203,13 @@
               <input type="number" step="any" name="max_value" placeholder="10.0" style="width:100%; padding:0.35rem; border:1px solid #ccc; border-radius:3px;" disabled>
             </div>
 
+            <div style="flex: 1; min-width: 100px; display:flex; align-items:center; justify-content:center; border-left:1px solid #eee; padding-left:1rem;">
+               <label style="cursor:pointer; font-size:0.9rem; font-weight:600; color:#333;">
+                 <input type="checkbox" name="requires_initials" style="transform: scale(1.2); margin-right:0.4rem;">
+                 Require<br>Initials
+               </label>
+            </div>
+
           </div>
         </div>
 
@@ -123,7 +222,9 @@
     function toggleDataFields(val) {
       const fields = document.querySelectorAll('.data-field');
       const isNum = (val === 'number');
+      const substepsBox = document.querySelector('textarea[name="substeps"]');
       
+      // Toggle Min/Max/Unit inputs
       fields.forEach(div => {
         const input = div.querySelector('input');
         if (isNum) {
@@ -135,6 +236,15 @@
           input.value = '';
         }
       });
+      
+      // Update Substeps Placeholder based on mode
+      if (val === 'table') {
+        substepsBox.placeholder = "Format: Label | Optional Note\n\nExample:\nSerial No.\nVisual Insp. | Pass/Fail";
+        substepsBox.previousElementSibling.textContent = "Table Definitions (Rows)";
+      } else {
+        substepsBox.placeholder = "Check Wrench\nCheck Gauge\nVerify Power";
+        substepsBox.previousElementSibling.textContent = "Sub-Steps Checklist (One per line)";
+      }
     }
   </script>
 {% endblock %}

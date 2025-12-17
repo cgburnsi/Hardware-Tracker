@@ -1,8 +1,7 @@
+import json
 import os
-import tempfile
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
-from docx import Document
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from app.db import get_db
 
 bp = Blueprint('procedures', __name__, url_prefix='/procedures')
@@ -114,7 +113,6 @@ def procedure_edit(id):
     db = get_db()
     item = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
     if request.method == "POST":
-        # ... (Same logic as procedure_new basically)
         title = request.form.get("title", "").strip()
         proc_type = request.form.get("type", "SOP").strip()
         hardware_id = request.form.get("hardware_id", "").strip()
@@ -140,27 +138,42 @@ def procedure_sections(id):
     proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
     
     if request.method == "POST":
+        # 1. Capture Basic Text
+        step_label = request.form.get("step_label", "").strip()
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
+        command = request.form.get("command", "").strip()
+        substeps = request.form.get("substeps", "").strip()
         
+        # 2. Capture Configuration
         input_type = request.form.get("input_type", "none").strip()
         unit = request.form.get("unit", "").strip()
         
-        # NEW: Capture Limits (Handle empty strings as None)
+        # 3. Capture Limits
         min_val = request.form.get("min_value", "").strip()
         max_val = request.form.get("max_value", "").strip()
         min_val = float(min_val) if min_val else None
         max_val = float(max_val) if max_val else None
+        
+        # 4. Capture Initials Checkbox
+        req_init = 1 if request.form.get("requires_initials") else 0
 
         if title:
+            # Calculate Sort Order
             row = db.execute("SELECT COALESCE(MAX(order_index), 0) as max_ord FROM procedure_sections WHERE procedure_id=?", (id,)).fetchone()
             next_ord = row['max_ord'] + 1
             
+            # Default label if missing
+            if not step_label:
+                step_label = str(next_ord)
+
             db.execute(
                 """INSERT INTO procedure_sections 
-                   (procedure_id, order_index, title, body, input_type, unit, min_value, max_value) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (id, next_ord, title, body, input_type, unit, min_val, max_val)
+                   (procedure_id, order_index, step_label, title, body, command, substeps,
+                    input_type, unit, min_value, max_value, requires_initials) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (id, next_ord, step_label, title, body, command, substeps, 
+                 input_type, unit, min_val, max_val, req_init)
             )
             db.commit()
             flash("Section added.", "success")
@@ -170,9 +183,7 @@ def procedure_sections(id):
 
 @bp.route("/<int:id>/export/docx")
 def procedure_export_docx(id):
-    # (Keep your existing export logic here - omitted for brevity but paste it back in!)
-    # ...
-    return "Export Logic Placeholder (Paste your old function here)"
+    return "Export Logic Placeholder"
 
 # ---------------------------------------------------------------------------
 # PROCEDURE RUNNER (The Execution Engine)
@@ -205,8 +216,6 @@ def run_setup():
     procedures = db.execute("SELECT id, proc_id, title FROM procedures ORDER BY proc_id").fetchall()
     return render_template("run_setup.html", hardware=hardware, procedures=procedures, sel_hw=hw_id_arg)
 
-
-
 @bp.route("/run/<int:id>/execute", methods=["GET", "POST"])
 def run_execute(id):
     """Step 2: The Checklist"""
@@ -221,44 +230,66 @@ def run_execute(id):
         WHERE r.id = ?
     """, (id,)).fetchone()
     
-    # 2. Fetch Sections
+    # 2. Fetch Sections (Steps)
     sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (run['procedure_id'],)).fetchall()
 
-    # 3. Fetch Existing Values
-    val_rows = db.execute("SELECT section_id, value FROM run_values WHERE run_id = ?", (id,)).fetchall()
-    saved_values = {row['section_id']: row['value'] for row in val_rows}
+    # 3. Fetch Existing Saved Values
+    val_rows = db.execute("SELECT section_id, value, initials FROM run_values WHERE run_id = ?", (id,)).fetchall()
+    saved_values = {row['section_id']: {'val': row['value'], 'init': row['initials']} for row in val_rows}
 
     if request.method == "POST":
         notes = request.form.get("notes", "")
         
-        # --- NEW LOGIC START ---
-        # Determine Status based on WHICH button was clicked ('action')
+        # Determine Status
         action = request.form.get("action")
-        
         if action == "save":
-            # If saving progress, ALWAYS stay In-Progress, ignore the radio buttons
             status = "In-Progress"
         else:
-            # If finishing, look at the radio button selection ('final_result')
             status = request.form.get("final_result", "Completed")
-        # --- NEW LOGIC END ---
 
         # A. Update Main Run Record
         db.execute("UPDATE procedure_runs SET status = ?, notes = ? WHERE id = ?", (status, notes, id))
         
-        # B. Save Step Values
+        # B. Save Step Values (Reset old values for this run first)
         db.execute("DELETE FROM run_values WHERE run_id = ?", (id,))
         
         for s in sections:
             sid = s['id']
-            if request.form.get(f"check_{sid}"):
-                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, "true"))
+            initials = request.form.get(f"init_{sid}", "").strip()
+            val_data = None
             
-            val_data = request.form.get(f"val_{sid}")
-            if val_data:
-                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, val_data))
+            # --- LOGIC 1: DATA TABLE (Matrix) ---
+            if s['input_type'] == 'table' and s['substeps']:
+                # Parse the definition to know how many rows we have
+                lines = [line for line in s['substeps'].split('\n') if line.strip()]
+                results = []
+                for i, line in enumerate(lines):
+                    # Inputs are named "table_SID_ROWINDEX"
+                    row_val = request.form.get(f"table_{sid}_{i}", "").strip()
+                    results.append(row_val)
+                val_data = json.dumps(results)
 
-        # C. Log to Hardware History (Only if finished)
+            # --- LOGIC 2: CHECKLIST (Sub-steps) ---
+            elif s['substeps']:
+                lines = s['substeps'].split('\n')
+                results = []
+                for i, line in enumerate(lines):
+                    is_checked = request.form.get(f"check_{sid}_{i}")
+                    results.append("true" if is_checked else "false")
+                val_data = json.dumps(results)
+
+            # --- LOGIC 3: STANDARD INPUTS ---
+            elif request.form.get(f"check_{sid}"):
+                val_data = "true"
+            elif request.form.get(f"val_{sid}"):
+                val_data = request.form.get(f"val_{sid}")
+            
+            # Only save if we have data OR initials
+            if val_data or initials:
+                db.execute("INSERT INTO run_values (run_id, section_id, value, initials) VALUES (?, ?, ?, ?)", 
+                           (id, sid, val_data, initials))
+
+        # C. Log to Hardware History
         if status in ['Completed', 'Failed', 'Aborted']:
              log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) - Status: {status}"
              now = datetime.utcnow().isoformat(timespec="seconds")
@@ -275,11 +306,11 @@ def run_execute(id):
 
     return render_template("run_execute.html", run=run, sections=sections, values=saved_values)
 
+
+
 @bp.route("/runs")
 def run_list():
     db = get_db()
-    
-    # Fetch all runs with details
     runs = db.execute("""
         SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc 
         FROM procedure_runs r
@@ -287,9 +318,77 @@ def run_list():
         JOIN hardware h ON r.hardware_id = h.id
         ORDER BY r.timestamp DESC
     """).fetchall()
-    
     return render_template("run_list.html", runs=runs)
 
-# ... existing code ...
 
 
+
+# ---------------------------------------------------------------------------
+# Section Management (Delete / Reorder)
+# ---------------------------------------------------------------------------
+
+@bp.route("/<int:id>/sections/<int:section_id>/delete", methods=["POST"])
+def delete_section(id, section_id):
+    db = get_db()
+    db.execute("DELETE FROM procedure_sections WHERE id = ? AND procedure_id = ?", (section_id, id))
+    db.commit()
+    return redirect(url_for('procedures.procedure_sections', id=id))
+
+@bp.route("/<int:id>/sections/<int:section_id>/move/<direction>", methods=["POST"])
+def move_section(id, section_id, direction):
+    db = get_db()
+    
+    # 1. Get the current section
+    current = db.execute("SELECT * FROM procedure_sections WHERE id = ?", (section_id,)).fetchone()
+    if not current:
+        return redirect(url_for('procedures.procedure_sections', id=id))
+    
+    curr_order = current['order_index']
+    
+    # 2. Find the neighbor to swap with
+    if direction == 'up':
+        # Find the section with the largest order_index that is LESS than current
+        neighbor = db.execute("""
+            SELECT * FROM procedure_sections 
+            WHERE procedure_id = ? AND order_index < ? 
+            ORDER BY order_index DESC LIMIT 1
+        """, (id, curr_order)).fetchone()
+        
+    elif direction == 'down':
+        # Find the section with the smallest order_index that is GREATER than current
+        neighbor = db.execute("""
+            SELECT * FROM procedure_sections 
+            WHERE procedure_id = ? AND order_index > ? 
+            ORDER BY order_index ASC LIMIT 1
+        """, (id, curr_order)).fetchone()
+    
+    # 3. Swap them
+    if neighbor:
+        neighbor_order = neighbor['order_index']
+        
+        # We use a temporary value to avoid unique constraint collisions (if any)
+        db.execute("UPDATE procedure_sections SET order_index = -1 WHERE id = ?", (section_id,))
+        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (curr_order, neighbor['id']))
+        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (neighbor_order, section_id))
+        db.commit()
+
+    return redirect(url_for('procedures.procedure_sections', id=id))
+
+
+@bp.route("/<int:id>/sections/renumber", methods=["POST"])
+def renumber_sections(id):
+    db = get_db()
+    # 1. Fetch all sections in the current order
+    sections = db.execute("SELECT id FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (id,)).fetchall()
+    
+    # 2. Reset them to 1, 2, 3...
+    for index, row in enumerate(sections):
+        new_num = index + 1
+        db.execute(
+            "UPDATE procedure_sections SET order_index = ?, step_label = ? WHERE id = ?", 
+            (new_num, str(new_num), row['id'])
+        )
+    
+    db.commit()
+    flash("Steps renumbered successfully (1, 2, 3...).", "success")
+    return redirect(url_for('procedures.procedure_sections', id=id))

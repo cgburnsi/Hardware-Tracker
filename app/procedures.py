@@ -1,8 +1,9 @@
 import json
 import os
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from app.db import get_db
+from app.auth import login_required # <--- NEW IMPORT
 
 bp = Blueprint('procedures', __name__, url_prefix='/procedures')
 
@@ -53,6 +54,7 @@ def generate_run_id(db):
 # ---------------------------------------------------------------------------
 
 @bp.route("/")
+@login_required # <--- Protect
 def procedure_list():
     db = get_db()
     q = request.args.get("q", "").strip()
@@ -67,6 +69,7 @@ def procedure_list():
     return render_template("procedure_list.html", items=items, q=q)
 
 @bp.route("/<int:id>")
+@login_required # <--- Protect
 def procedure_detail(id):
     db = get_db()
     item = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
@@ -76,6 +79,7 @@ def procedure_detail(id):
     return render_template("procedure_detail.html", item=item)
 
 @bp.route("/new", methods=["GET", "POST"])
+@login_required # <--- Protect
 def procedure_new():
     db = get_db()
     if request.method == "POST":
@@ -109,6 +113,7 @@ def procedure_new():
     return render_template("procedure_form.html", item=None)
 
 @bp.route("/<int:id>/edit", methods=["GET", "POST"])
+@login_required # <--- Protect
 def procedure_edit(id):
     db = get_db()
     item = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
@@ -133,37 +138,32 @@ def procedure_edit(id):
     return render_template("procedure_form.html", item=item)
 
 @bp.route("/<int:id>/sections", methods=["GET", "POST"])
+@login_required # <--- Protect
 def procedure_sections(id):
     db = get_db()
     proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
     
     if request.method == "POST":
-        # 1. Capture Basic Text
         step_label = request.form.get("step_label", "").strip()
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
         command = request.form.get("command", "").strip()
         substeps = request.form.get("substeps", "").strip()
         
-        # 2. Capture Configuration
         input_type = request.form.get("input_type", "none").strip()
         unit = request.form.get("unit", "").strip()
         
-        # 3. Capture Limits
         min_val = request.form.get("min_value", "").strip()
         max_val = request.form.get("max_value", "").strip()
         min_val = float(min_val) if min_val else None
         max_val = float(max_val) if max_val else None
         
-        # 4. Capture Initials Checkbox
         req_init = 1 if request.form.get("requires_initials") else 0
 
         if title:
-            # Calculate Sort Order
             row = db.execute("SELECT COALESCE(MAX(order_index), 0) as max_ord FROM procedure_sections WHERE procedure_id=?", (id,)).fetchone()
             next_ord = row['max_ord'] + 1
             
-            # Default label if missing
             if not step_label:
                 step_label = str(next_ord)
 
@@ -181,7 +181,63 @@ def procedure_sections(id):
     sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id=? ORDER BY order_index", (id,)).fetchall()
     return render_template("procedure_sections.html", proc=proc, sections=sections)
 
+@bp.route("/<int:id>/sections/<int:section_id>/delete", methods=["POST"])
+@login_required
+def delete_section(id, section_id):
+    db = get_db()
+    db.execute("DELETE FROM procedure_sections WHERE id = ? AND procedure_id = ?", (section_id, id))
+    db.commit()
+    return redirect(url_for('procedures.procedure_sections', id=id))
+
+@bp.route("/<int:id>/sections/<int:section_id>/move/<direction>", methods=["POST"])
+@login_required
+def move_section(id, section_id, direction):
+    db = get_db()
+    current = db.execute("SELECT * FROM procedure_sections WHERE id = ?", (section_id,)).fetchone()
+    if not current:
+        return redirect(url_for('procedures.procedure_sections', id=id))
+    
+    curr_order = current['order_index']
+    
+    if direction == 'up':
+        neighbor = db.execute("""
+            SELECT * FROM procedure_sections 
+            WHERE procedure_id = ? AND order_index < ? 
+            ORDER BY order_index DESC LIMIT 1
+        """, (id, curr_order)).fetchone()
+    elif direction == 'down':
+        neighbor = db.execute("""
+            SELECT * FROM procedure_sections 
+            WHERE procedure_id = ? AND order_index > ? 
+            ORDER BY order_index ASC LIMIT 1
+        """, (id, curr_order)).fetchone()
+    
+    if neighbor:
+        neighbor_order = neighbor['order_index']
+        db.execute("UPDATE procedure_sections SET order_index = -1 WHERE id = ?", (section_id,))
+        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (curr_order, neighbor['id']))
+        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (neighbor_order, section_id))
+        db.commit()
+
+    return redirect(url_for('procedures.procedure_sections', id=id))
+
+@bp.route("/<int:id>/sections/renumber", methods=["POST"])
+@login_required
+def renumber_sections(id):
+    db = get_db()
+    sections = db.execute("SELECT id FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (id,)).fetchall()
+    for index, row in enumerate(sections):
+        new_num = index + 1
+        db.execute(
+            "UPDATE procedure_sections SET order_index = ?, step_label = ? WHERE id = ?", 
+            (new_num, str(new_num), row['id'])
+        )
+    db.commit()
+    flash("Steps renumbered successfully (1, 2, 3...).", "success")
+    return redirect(url_for('procedures.procedure_sections', id=id))
+
 @bp.route("/<int:id>/export/docx")
+@login_required
 def procedure_export_docx(id):
     return "Export Logic Placeholder"
 
@@ -190,6 +246,7 @@ def procedure_export_docx(id):
 # ---------------------------------------------------------------------------
 
 @bp.route("/run/setup", methods=["GET", "POST"])
+@login_required # <--- Protect
 def run_setup():
     """Step 1: Pick Hardware and Procedure"""
     db = get_db()
@@ -198,7 +255,9 @@ def run_setup():
     if request.method == "POST":
         hw_id = request.form.get("hardware_id")
         proc_id = request.form.get("procedure_id")
-        operator = request.form.get("operator")
+        
+        # CHANGED: Auto-grab user from session instead of form
+        operator = g.user['name'] 
         
         run_id = generate_run_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
@@ -217,6 +276,7 @@ def run_setup():
     return render_template("run_setup.html", hardware=hardware, procedures=procedures, sel_hw=hw_id_arg)
 
 @bp.route("/run/<int:id>/execute", methods=["GET", "POST"])
+@login_required # <--- Protect
 def run_execute(id):
     """Step 2: The Checklist"""
     db = get_db()
@@ -255,16 +315,18 @@ def run_execute(id):
         
         for s in sections:
             sid = s['id']
+            # NOTE: We can keep this as manual entry for "Sign Off", OR auto-fill with g.user['initials']
+            # For now, let's allow manual override but default to the user if they leave it blank? 
+            # Or just strictly use what they typed.
             initials = request.form.get(f"init_{sid}", "").strip()
+            
             val_data = None
             
             # --- LOGIC 1: DATA TABLE (Matrix) ---
             if s['input_type'] == 'table' and s['substeps']:
-                # Parse the definition to know how many rows we have
                 lines = [line for line in s['substeps'].split('\n') if line.strip()]
                 results = []
                 for i, line in enumerate(lines):
-                    # Inputs are named "table_SID_ROWINDEX"
                     row_val = request.form.get(f"table_{sid}_{i}", "").strip()
                     results.append(row_val)
                 val_data = json.dumps(results)
@@ -293,8 +355,12 @@ def run_execute(id):
         if status in ['Completed', 'Failed', 'Aborted']:
              log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) - Status: {status}"
              now = datetime.utcnow().isoformat(timespec="seconds")
-             db.execute("INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                        (run['hardware_id'], now, "Procedure Run", log_desc))
+             
+             # CHANGED: Auto-tag the operator from session
+             current_op = g.user['initials'] 
+             
+             db.execute("INSERT INTO hardware_log (hardware_id, timestamp, action_type, description, operator) VALUES (?, ?, ?, ?, ?)",
+                        (run['hardware_id'], now, "Procedure Run", log_desc, current_op))
         
         db.commit()
         flash(f"Run {run['run_id']} saved.", "success")
@@ -306,9 +372,8 @@ def run_execute(id):
 
     return render_template("run_execute.html", run=run, sections=sections, values=saved_values)
 
-
-
 @bp.route("/runs")
+@login_required # <--- Protect
 def run_list():
     db = get_db()
     runs = db.execute("""
@@ -319,76 +384,3 @@ def run_list():
         ORDER BY r.timestamp DESC
     """).fetchall()
     return render_template("run_list.html", runs=runs)
-
-
-
-
-# ---------------------------------------------------------------------------
-# Section Management (Delete / Reorder)
-# ---------------------------------------------------------------------------
-
-@bp.route("/<int:id>/sections/<int:section_id>/delete", methods=["POST"])
-def delete_section(id, section_id):
-    db = get_db()
-    db.execute("DELETE FROM procedure_sections WHERE id = ? AND procedure_id = ?", (section_id, id))
-    db.commit()
-    return redirect(url_for('procedures.procedure_sections', id=id))
-
-@bp.route("/<int:id>/sections/<int:section_id>/move/<direction>", methods=["POST"])
-def move_section(id, section_id, direction):
-    db = get_db()
-    
-    # 1. Get the current section
-    current = db.execute("SELECT * FROM procedure_sections WHERE id = ?", (section_id,)).fetchone()
-    if not current:
-        return redirect(url_for('procedures.procedure_sections', id=id))
-    
-    curr_order = current['order_index']
-    
-    # 2. Find the neighbor to swap with
-    if direction == 'up':
-        # Find the section with the largest order_index that is LESS than current
-        neighbor = db.execute("""
-            SELECT * FROM procedure_sections 
-            WHERE procedure_id = ? AND order_index < ? 
-            ORDER BY order_index DESC LIMIT 1
-        """, (id, curr_order)).fetchone()
-        
-    elif direction == 'down':
-        # Find the section with the smallest order_index that is GREATER than current
-        neighbor = db.execute("""
-            SELECT * FROM procedure_sections 
-            WHERE procedure_id = ? AND order_index > ? 
-            ORDER BY order_index ASC LIMIT 1
-        """, (id, curr_order)).fetchone()
-    
-    # 3. Swap them
-    if neighbor:
-        neighbor_order = neighbor['order_index']
-        
-        # We use a temporary value to avoid unique constraint collisions (if any)
-        db.execute("UPDATE procedure_sections SET order_index = -1 WHERE id = ?", (section_id,))
-        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (curr_order, neighbor['id']))
-        db.execute("UPDATE procedure_sections SET order_index = ? WHERE id = ?", (neighbor_order, section_id))
-        db.commit()
-
-    return redirect(url_for('procedures.procedure_sections', id=id))
-
-
-@bp.route("/<int:id>/sections/renumber", methods=["POST"])
-def renumber_sections(id):
-    db = get_db()
-    # 1. Fetch all sections in the current order
-    sections = db.execute("SELECT id FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (id,)).fetchall()
-    
-    # 2. Reset them to 1, 2, 3...
-    for index, row in enumerate(sections):
-        new_num = index + 1
-        db.execute(
-            "UPDATE procedure_sections SET order_index = ?, step_label = ? WHERE id = ?", 
-            (new_num, str(new_num), row['id'])
-        )
-    
-    db.commit()
-    flash("Steps renumbered successfully (1, 2, 3...).", "success")
-    return redirect(url_for('procedures.procedure_sections', id=id))

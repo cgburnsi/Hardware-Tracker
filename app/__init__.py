@@ -19,6 +19,10 @@ def create_app():
     from . import db
     db.init_app(app)
 
+    # Authentication Blueprint
+    from . import auth
+    app.register_blueprint(auth.bp)
+    
     # Register Hardware Blueprint
     from . import hardware
     app.register_blueprint(hardware.bp)

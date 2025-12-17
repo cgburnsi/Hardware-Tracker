@@ -132,7 +132,17 @@
           <div class="app-title">ER64 OPS HUB</div>
           <div class="app-subtitle">Hardware & Traceability</div>
         </div>
-        <div style="font-size:0.85rem; opacity:0.8;">User: Admin</div>
+        
+        <div class="nav-right" style="font-size: 0.9rem;">
+            {% if g.user %}
+              <span style="margin-right: 1rem; color: #444; font-weight: 600;">
+                Operator: {{ g.user['name'] }} ({{ g.user['initials'] }})
+              </span>
+              <a href="{{ url_for('auth.logout') }}" style="color: #d9534f; text-decoration: none; font-weight: bold;">Logout</a>
+            {% else %}
+              <a href="{{ url_for('auth.login') }}" style="color: #0b5f9c; font-weight: bold; text-decoration: none;">LOGIN</a>
+            {% endif %}
+        </div>
       </header>
 
       <div class="layout">

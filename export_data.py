@@ -22,6 +22,7 @@ def export_data():
         "locations",
         "media",
         "port_configs",
+        "personnel",   
         "procedures",
         "procedure_sections",
         "hardware_log",

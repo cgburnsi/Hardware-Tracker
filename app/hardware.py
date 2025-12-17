@@ -1,6 +1,9 @@
 from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from app.db import get_db
+from app.auth import login_required # Add this import at the top
+from flask import g # Make sure 'g' is imported from flask
+
 
 bp = Blueprint('hardware', __name__, url_prefix='/hardware')
 
@@ -202,6 +205,7 @@ def hardware_new():
     return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
 
 @bp.route("/<int:id>/edit", methods=("GET", "POST"))
+@login_required  # <--- NEW: Forces login before running this function
 def hardware_edit(id):
     db = get_db()
     cur = db.execute("SELECT * FROM hardware WHERE id = ?", (id,))
@@ -245,33 +249,69 @@ def hardware_edit(id):
         max_pressure = request.form.get("max_rated_pressure", "").strip()
         max_temp = request.form.get("max_rated_temperature", "").strip()
 
+        # 6. Change Reason (New Field)
+        change_reason = request.form.get("change_reason", "").strip()
+
         if not description:
             flash("Description is required.", "error")
+            return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
+        
+        # NEW: Force the user to enter a reason
+        if not change_reason:
+            flash("A 'Reason for Change' is required to update this item.", "error")
+            # We return the template immediately so they can fix it
             return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
 
         now = datetime.utcnow().isoformat(timespec="seconds")
 
-        # --- HISTORY LOG LOGIC ---
+        # --- ADVANCED HISTORY LOG LOGIC ---
         changes = []
         
-        # Check for meaningful changes
-        # (We use 'or ""' to handle None vs Empty String mismatches safely)
-        old_status = item['status'] or ""
-        old_location = item['location'] or ""
-        old_custodian = item['custodian'] or ""
+        # Map DB column names to their new values from the form
+        fields_to_track = {
+            'status': (status, "Status"),
+            'location': (location, "Location"),
+            'custodian': (custodian, "Custodian"),
+            'work_order_id': (work_order_id, "Work Order"),
+            'repair_id': (repair_id, "Repair Ref"),
+            'calibration_id': (calibration_id, "Calibration"),
+            'cleaning_spec': (cleaning_spec, "Clean Spec"),
+            'ecn': (ecn, "ECN")
+        }
 
-        if status != old_status:
-            changes.append(f"Status: '{old_status}' -> '{status}'")
-        if location != old_location:
-            changes.append(f"Location: '{old_location}' -> '{location}'")
-        if custodian != old_custodian:
-            changes.append(f"Custodian: '{old_custodian}' -> '{custodian}'")
+        for field, (new_val, label) in fields_to_track.items():
+            old_val = str(item[field] or "").strip()
+            new_val = str(new_val or "").strip()
+            
+            if old_val != new_val:
+                if not old_val and new_val:
+                    changes.append(f"{label} set to '{new_val}'")
+                elif old_val and not new_val:
+                    changes.append(f"{label} cleared (was '{old_val}')")
+                else:
+                    changes.append(f"{label}: '{old_val}' → '{new_val}'")
 
-        if changes:
-            log_desc = "; ".join(changes)
+        if changes or change_reason:
+            # Combine the user's note with the automatic system changes
+            log_parts = []
+            if change_reason:
+                log_parts.append(f"NOTE: {change_reason}")
+            if changes:
+                log_parts.append("; ".join(changes))
+            
+            final_log = " | ".join(log_parts)
+            
+            # GET OPERATOR FROM SESSION
+            current_operator = g.user['initials'] # e.g. "CGB"
+            
+            # Label the action type intelligently
+            action_type = "Update"
+            if "Status" in str(changes): action_type = "Status Change"
+            if "Repair" in str(changes) or "Work Order" in str(changes): action_type = "Maintenance"
+
             db.execute(
                 "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                (id, now, "Update", log_desc)
+                (id, now, action_type, final_log)
             )
 
         # --- SAVE UPDATE ---
@@ -303,7 +343,7 @@ def hardware_edit(id):
         flash("Hardware updated.", "success")
         return redirect(url_for("hardware.hardware_detail", id=id))
 
-    # GET Request: Render form with item data AND dropdown lists
+    # GET Request
     return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
 
 

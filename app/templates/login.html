@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 4rem auto; text-align: center; padding: 2rem; border: 1px solid #ccc; border-radius: 8px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+  <h2 style="margin-top:0;">Operator Login</h2>
+  <p style="color:#666; margin-bottom: 2rem;">Enter your 3-digit PIN to begin.</p>
+  
+  <form method="post">
+    <input type="password" name="pin" id="pinInput" 
+           style="font-size: 2rem; letter-spacing: 0.5rem; text-align: center; width: 150px; padding: 0.5rem; border: 2px solid #007bff; border-radius: 4px;" 
+           maxlength="3" autofocus autocomplete="off" required>
+    
+    <div style="margin-top: 1.5rem;">
+      <button type="submit" class="primary-button" style="width: 100%; font-size: 1.2rem; padding: 0.8rem;">UNLOCK SESSION</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

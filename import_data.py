@@ -90,14 +90,34 @@ def import_data():
                 item.get('min_value'), item.get('max_value'),
                 item.get('requires_initials', 0)
             ))
+    
+    # 4B. PERSONNEL (NEW)
+    if 'personnel' in data:
+        print("  - Importing personnel...")
+        for item in data['personnel']:
+            cur.execute("""
+                INSERT OR IGNORE INTO personnel (name, initials, pin_code, role) 
+                VALUES (?, ?, ?, ?)
+            """, (
+                item.get('name'), item.get('initials'), 
+                item.get('pin_code'), item.get('role', 'Operator')
+            ))
+    
 
     # 5. LOGS & RUNS
     if 'hardware_log' in data:
         print("  - Importing hardware logs...")
         for item in data['hardware_log']:
-            cur.execute("INSERT OR IGNORE INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                        (item.get('hardware_id'), item.get('timestamp'), item.get('action_type'), item.get('description')))
-
+            cur.execute("""
+                INSERT OR IGNORE INTO hardware_log 
+                (hardware_id, timestamp, action_type, description, operator) -- Added operator
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                item.get('hardware_id'), item.get('timestamp'), 
+                item.get('action_type'), item.get('description'),
+                item.get('operator') # Added operator
+            ))
+    
     if 'procedure_runs' in data:
         print("  - Importing procedure runs...")
         for item in data['procedure_runs']:

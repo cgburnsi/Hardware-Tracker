@@ -27,7 +27,8 @@
       "max_rated_temperature": null,
       "traveler_path": "",
       "created_at": "2025-12-08T00:18:16",
-      "updated_at": "2025-12-08T00:18:16"
+      "updated_at": "2025-12-08T00:18:16",
+      "parent_id": null
     },
     {
       "id": 2,
@@ -38,7 +39,7 @@
       "manufacturer": "",
       "part_number": "",
       "serial_number": "",
-      "ecn": "",
+      "ecn": "M123453",
       "calibration_id": "",
       "repair_id": "",
       "work_order_id": "",
@@ -56,7 +57,38 @@
       "max_rated_temperature": null,
       "traveler_path": "",
       "created_at": "2025-12-08T01:37:25",
-      "updated_at": "2025-12-08T01:37:25"
+      "updated_at": "2025-12-17T01:03:50",
+      "parent_id": null
+    },
+    {
+      "id": 3,
+      "hardware_id": "H25003",
+      "description": "Small Solenoid Valve",
+      "category": "Valve",
+      "classification": "",
+      "manufacturer": "Flight Works Inc.",
+      "part_number": "S-SV-S-12",
+      "serial_number": "30777",
+      "ecn": "",
+      "calibration_id": "",
+      "repair_id": "",
+      "work_order_id": "",
+      "port_configuration": "",
+      "cv": null,
+      "orifice_diameter": null,
+      "status": "In-Service",
+      "location": "",
+      "custodian": "",
+      "safety_class": "None",
+      "propellant_or_media": "",
+      "cleaning_spec": "",
+      "compliance_specs": "",
+      "max_rated_pressure": null,
+      "max_rated_temperature": null,
+      "traveler_path": "",
+      "created_at": "2025-12-17T00:41:20",
+      "updated_at": "2025-12-17T00:41:20",
+      "parent_id": null
     }
   ],
   "manufacturers": [
@@ -88,6 +120,12 @@
       "id": 5,
       "name": "DigiKey",
       "website": null,
+      "notes": null
+    },
+    {
+      "id": 11,
+      "name": "Flight Works Inc.",
+      "website": "https://www.flightworksinc.com/",
       "notes": null
     }
   ],
@@ -169,6 +207,10 @@
     {
       "id": 5,
       "name": "3/8\" Tube"
+    },
+    {
+      "id": 11,
+      "name": "Flange"
     }
   ],
   "procedures": [
@@ -199,6 +241,90 @@
       "steps": "do stuff to stuff",
       "created_at": "2025-12-16T22:24:09",
       "updated_at": "2025-12-16T22:24:14"
+    },
+    {
+      "id": 3,
+      "proc_id": "P25-003",
+      "title": "a",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "a",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "a",
+      "created_at": "2025-12-16T22:43:13",
+      "updated_at": "2025-12-16T22:43:13"
+    },
+    {
+      "id": 4,
+      "proc_id": "P25-004",
+      "title": "a",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "a",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "a",
+      "created_at": "2025-12-16T22:44:54",
+      "updated_at": "2025-12-16T22:44:54"
+    },
+    {
+      "id": 5,
+      "proc_id": "P25-005",
+      "title": "uu",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "uu",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "uu",
+      "created_at": "2025-12-16T22:50:20",
+      "updated_at": "2025-12-16T22:50:20"
+    },
+    {
+      "id": 6,
+      "proc_id": "P25-006",
+      "title": "uuu",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "uuu",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "uuu",
+      "created_at": "2025-12-16T23:02:27",
+      "updated_at": "2025-12-16T23:02:27"
+    },
+    {
+      "id": 7,
+      "proc_id": "P25-007",
+      "title": "kd",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "kd",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "kd",
+      "created_at": "2025-12-16T23:05:48",
+      "updated_at": "2025-12-16T23:05:48"
+    },
+    {
+      "id": 8,
+      "proc_id": "P25-008",
+      "title": "gg",
+      "type": "SOP",
+      "hardware_id": null,
+      "revision": "A",
+      "purpose": "gg",
+      "hazards": "",
+      "prereqs": "",
+      "steps": "gg",
+      "created_at": "2025-12-16T23:55:33",
+      "updated_at": "2025-12-16T23:55:33"
     }
   ],
   "procedure_sections": [
@@ -210,10 +336,12 @@
       "title": "section 1",
       "body": "a. do this\r\nb. do that.\r\nc. do more",
       "command": null,
+      "substeps": null,
       "input_type": "none",
       "unit": null,
       "min_value": null,
-      "max_value": null
+      "max_value": null,
+      "requires_initials": 0
     },
     {
       "id": 2,
@@ -223,10 +351,12 @@
       "title": "section 2",
       "body": "1. add more to the tank\r\n2. take some out of the tank\r\n3. repoeat steps 34",
       "command": null,
+      "substeps": null,
       "input_type": "none",
       "unit": null,
       "min_value": null,
-      "max_value": null
+      "max_value": null,
+      "requires_initials": 0
     },
     {
       "id": 3,
@@ -236,10 +366,12 @@
       "title": "more section",
       "body": "1. more things to do\r\nmore things to do\r\nmore and more more things",
       "command": null,
+      "substeps": null,
       "input_type": "none",
       "unit": null,
       "min_value": null,
-      "max_value": null
+      "max_value": null,
+      "requires_initials": 0
     },
     {
       "id": 4,
@@ -249,10 +381,12 @@
       "title": "reord something",
       "body": "Here is where you record things",
       "command": null,
+      "substeps": null,
       "input_type": "number",
       "unit": "psi",
       "min_value": null,
-      "max_value": null
+      "max_value": null,
+      "requires_initials": 0
     },
     {
       "id": 5,
@@ -262,10 +396,12 @@
       "title": "record tank pressure",
       "body": "verify tank pressure is correct",
       "command": null,
+      "substeps": null,
       "input_type": "number",
       "unit": "",
       "min_value": 10.0,
-      "max_value": 20.0
+      "max_value": 20.0,
+      "requires_initials": 0
     },
     {
       "id": 6,
@@ -275,10 +411,132 @@
       "title": "Section 1",
       "body": "1. do this\r\n2. do that\r\n3. do those things too",
       "command": "",
+      "substeps": null,
       "input_type": "text",
       "unit": "",
       "min_value": null,
-      "max_value": null
+      "max_value": null,
+      "requires_initials": 0
+    },
+    {
+      "id": 7,
+      "procedure_id": 4,
+      "order_index": 1,
+      "step_label": "1",
+      "title": "something",
+      "body": "stuff you should do goes here",
+      "command": "run_py.py",
+      "substeps": "",
+      "input_type": "none",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 0
+    },
+    {
+      "id": 8,
+      "procedure_id": 5,
+      "order_index": 1,
+      "step_label": "1",
+      "title": "Verify things",
+      "body": "Perform stuff",
+      "command": "",
+      "substeps": "check here\r\ncheck there\r\nchek it",
+      "input_type": "none",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 1
+    },
+    {
+      "id": 9,
+      "procedure_id": 6,
+      "order_index": 1,
+      "step_label": "1",
+      "title": "do the stuff",
+      "body": "why are reading this",
+      "command": "something.py",
+      "substeps": "check that\r\ndo the things\r\nmake the things\r\nunmake the things.",
+      "input_type": "text",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 0
+    },
+    {
+      "id": 10,
+      "procedure_id": 6,
+      "order_index": 2,
+      "step_label": "2",
+      "title": "gkjhkjf",
+      "body": "gkjhg",
+      "command": "something.py",
+      "substeps": "",
+      "input_type": "number",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 1
+    },
+    {
+      "id": 11,
+      "procedure_id": 7,
+      "order_index": 1,
+      "step_label": "1",
+      "title": "kd",
+      "body": "kd",
+      "command": "",
+      "substeps": "VLV | deg | psi|\r\nVLV | .... | ........|\r\nDo this step | ________ | 53.4 F",
+      "input_type": "table",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 1
+    },
+    {
+      "id": 12,
+      "procedure_id": 8,
+      "order_index": 1,
+      "step_label": "1",
+      "title": "Do the stuff",
+      "body": "Here are some instructions",
+      "command": "rs.py",
+      "substeps": "",
+      "input_type": "table",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 1
+    },
+    {
+      "id": 13,
+      "procedure_id": 8,
+      "order_index": 3,
+      "step_label": "3",
+      "title": "more section",
+      "body": "hi there",
+      "command": "",
+      "substeps": "one\r\ntwo\r\nthee",
+      "input_type": "number",
+      "unit": "degC",
+      "min_value": null,
+      "max_value": 100.0,
+      "requires_initials": 1
+    },
+    {
+      "id": 14,
+      "procedure_id": 8,
+      "order_index": 2,
+      "step_label": "2",
+      "title": "advanced steps",
+      "body": "hi",
+      "command": "hi",
+      "substeps": "",
+      "input_type": "none",
+      "unit": "",
+      "min_value": null,
+      "max_value": null,
+      "requires_initials": 0
     }
   ],
   "hardware_log": [
@@ -379,6 +637,27 @@
       "timestamp": "2025-12-16T22:21:39",
       "action_type": "Procedure Run",
       "description": "Procedure Run R25-016 (P25-001) - Status: Completed"
+    },
+    {
+      "id": 15,
+      "hardware_id": 2,
+      "timestamp": "2025-12-17T00:20:46",
+      "action_type": "Update",
+      "description": "NOTE: Calibration | ECN set to 'M123456'"
+    },
+    {
+      "id": 16,
+      "hardware_id": 2,
+      "timestamp": "2025-12-17T00:21:12",
+      "action_type": "Update",
+      "description": "ECN: 'M123456' \u2192 'M123453'"
+    },
+    {
+      "id": 17,
+      "hardware_id": 2,
+      "timestamp": "2025-12-17T01:03:50",
+      "action_type": "Update",
+      "description": "NOTE: somet"
     }
   ],
   "procedure_runs": [
@@ -551,6 +830,86 @@
       "timestamp": "2025-12-16T22:28:39",
       "status": "In-Progress",
       "notes": ""
+    },
+    {
+      "id": 18,
+      "run_id": "R25-018",
+      "procedure_id": 4,
+      "hardware_id": 1,
+      "operator": "f",
+      "timestamp": "2025-12-16T22:45:52",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 19,
+      "run_id": "R25-019",
+      "procedure_id": 4,
+      "hardware_id": 1,
+      "operator": "y",
+      "timestamp": "2025-12-16T22:50:07",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 20,
+      "run_id": "R25-020",
+      "procedure_id": 5,
+      "hardware_id": 1,
+      "operator": "uu",
+      "timestamp": "2025-12-16T22:51:46",
+      "status": "In-Progress",
+      "notes": ""
+    },
+    {
+      "id": 21,
+      "run_id": "R25-021",
+      "procedure_id": 7,
+      "hardware_id": 1,
+      "operator": "sss",
+      "timestamp": "2025-12-16T23:07:48",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 22,
+      "run_id": "R25-022",
+      "procedure_id": 7,
+      "hardware_id": 1,
+      "operator": "sssj",
+      "timestamp": "2025-12-16T23:07:57",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 23,
+      "run_id": "R25-023",
+      "procedure_id": 6,
+      "hardware_id": 1,
+      "operator": "sssj",
+      "timestamp": "2025-12-16T23:44:32",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 24,
+      "run_id": "R25-024",
+      "procedure_id": 1,
+      "hardware_id": 1,
+      "operator": "rr",
+      "timestamp": "2025-12-16T23:46:23",
+      "status": "In-Progress",
+      "notes": null
+    },
+    {
+      "id": 25,
+      "run_id": "R25-025",
+      "procedure_id": 7,
+      "hardware_id": 1,
+      "operator": "rr",
+      "timestamp": "2025-12-16T23:47:27",
+      "status": "In-Progress",
+      "notes": ""
     }
   ],
   "run_values": [
@@ -558,79 +917,106 @@
       "id": 1,
       "run_id": 11,
       "section_id": 1,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 2,
       "run_id": 11,
       "section_id": 2,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 3,
       "run_id": 11,
       "section_id": 3,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 4,
       "run_id": 11,
       "section_id": 4,
-      "value": "88"
+      "value": "88",
+      "initials": null
     },
     {
       "id": 5,
       "run_id": 11,
       "section_id": 5,
-      "value": "16"
+      "value": "16",
+      "initials": null
     },
     {
       "id": 6,
       "run_id": 12,
       "section_id": 2,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 7,
       "run_id": 13,
       "section_id": 1,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 8,
       "run_id": 13,
       "section_id": 3,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 9,
       "run_id": 13,
       "section_id": 4,
-      "value": "55"
+      "value": "55",
+      "initials": null
     },
     {
       "id": 10,
       "run_id": 15,
       "section_id": 2,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 11,
       "run_id": 15,
       "section_id": 3,
-      "value": "true"
+      "value": "true",
+      "initials": null
     },
     {
       "id": 12,
       "run_id": 15,
       "section_id": 5,
-      "value": "77"
+      "value": "77",
+      "initials": null
+    },
+    {
+      "id": 13,
+      "run_id": 17,
+      "section_id": 6,
+      "value": "More things happened.",
+      "initials": null
+    },
+    {
+      "id": 14,
+      "run_id": 20,
+      "section_id": 8,
+      "value": "[\"true\", \"true\", \"true\"]",
+      "initials": ""
     },
     {
       "id": 15,
-      "run_id": 17,
-      "section_id": 6,
-      "value": "More things happened."
+      "run_id": 25,
+      "section_id": 11,
+      "value": "[\"\", \"\", \"\"]",
+      "initials": "hjj"
     }
   ]
 }

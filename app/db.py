@@ -32,6 +32,7 @@ def init_db():
     DROP TABLE IF EXISTS hardware_log;
     DROP TABLE IF EXISTS procedure_runs;
     DROP TABLE IF EXISTS run_values;
+    DROP TABLE IF EXISTS personnel;
 
     -- 2. HARDWARE TABLE
     CREATE TABLE hardware (
@@ -72,7 +73,6 @@ def init_db():
         created_at TEXT,
         updated_at TEXT,
         
-        -- NEW COLUMN:
         parent_id INTEGER, 
         FOREIGN KEY (parent_id) REFERENCES hardware(id)
     );
@@ -84,7 +84,16 @@ def init_db():
     CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE port_configs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     
-    -- 4. PROCEDURES
+    -- 4. AUTHORIZED PERSONNEL (NEW TABLE)
+    CREATE TABLE personnel (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        initials TEXT NOT NULL,
+        pin_code TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'Operator'
+    );
+
+    -- 5. PROCEDURES
     CREATE TABLE procedures (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         proc_id TEXT UNIQUE NOT NULL,
@@ -100,20 +109,18 @@ def init_db():
         updated_at TEXT
     );
     
-    -- 5. SECTIONS (Procedure Steps)
+    -- 6. SECTIONS (Procedure Steps)
     CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,
         
-        -- Display Config
         step_label TEXT,
         title TEXT NOT NULL,
         body TEXT,
         command TEXT,
         substeps TEXT,
         
-        -- Data Config
         input_type TEXT DEFAULT 'none',
         unit TEXT,
         min_value REAL,
@@ -123,17 +130,18 @@ def init_db():
         FOREIGN KEY (procedure_id) REFERENCES procedures(id)
     );
 
-    -- 6. HARDWARE HISTORY LOG
+    -- 7. HARDWARE HISTORY LOG
     CREATE TABLE hardware_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         hardware_id INTEGER NOT NULL,
         timestamp TEXT NOT NULL,
         action_type TEXT,
         description TEXT,
+        operator TEXT,  -- Stores "CGB" etc.
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 7. PROCEDURE RUNS
+    -- 8. PROCEDURE RUNS
     CREATE TABLE procedure_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id TEXT UNIQUE NOT NULL,
@@ -147,7 +155,7 @@ def init_db():
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 8. RUN VALUES
+    -- 9. RUN VALUES
     CREATE TABLE run_values (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
@@ -158,12 +166,17 @@ def init_db():
         FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
     );
 
-    -- 9. SEED DATA
+    -- 10. SEED DATA
     INSERT OR IGNORE INTO manufacturers (name) VALUES ('Swagelok'), ('Parker'), ('McMaster-Carr'), ('Omega'), ('DigiKey');
     INSERT OR IGNORE INTO custodians (name) VALUES ('Lab Manager'), ('Test Engineer'), ('Quality Lead');
     INSERT OR IGNORE INTO locations (name) VALUES ('Flammables Cabinet'), ('Rack A'), ('Rack B'), ('Clean Room');
     INSERT OR IGNORE INTO media (name) VALUES ('N2'), ('He'), ('H2O'), ('H2O2'), ('AF-M315E'), ('Hydrazine');
     INSERT OR IGNORE INTO port_configs (name) VALUES ('1/4" Tube'), ('1/8" Tube'), ('1/4" NPT'), ('1/4" VCR'), ('3/8" Tube');
+    
+    -- Seed Personnel (So you can log in immediately)
+    INSERT INTO personnel (name, initials, pin_code, role) VALUES 
+    ('Chris Burnside', 'CGB', '384', 'Admin'),
+    ('Test Operator',  'TST', '999', 'Technician');
     """
     
     db.executescript(schema)

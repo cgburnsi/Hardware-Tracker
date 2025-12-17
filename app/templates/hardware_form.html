@@ -220,6 +220,30 @@
         </div>
       </div>
     </fieldset>
+    
+    
+    {% if item %}
+    <fieldset class="form-section" style="background-color: #fffdf5; border: 1px solid #f0e68c;">
+      <legend style="color: #9c7f00; font-weight:bold;">Change Log (Required)</legend>
+      <div class="form-row">
+        <label>Reason for Change / Maintenance Note <span style="color:red">*</span></label>
+        
+        <input type="text" 
+               name="change_reason" 
+               required 
+               placeholder="e.g. Returned from calibration; Routine Service..." 
+               style="width:100%; border: 1px solid #f0e68c;">
+               
+        <div style="font-size:0.75rem; color:#8a6d3b; margin-top:0.3rem;">
+          <strong>Mandatory:</strong> You must enter a reason to save changes to this item.
+        </div>
+      </div>
+    </fieldset>
+    {% endif %}
+    
+    
+    
+    
 
     <div class="form-actions">
       <button type="submit" class="primary-button">Save</button>

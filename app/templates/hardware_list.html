@@ -3,49 +3,48 @@
 {% block title %}Hardware Index{% endblock %}
 
 {% block sidebar_filters %}
-  <div class="sidebar-section-title">Filters</div>
+<div class="sidebar-filter-group">
+  <span class="sidebar-section-title">Filters</span>
   <form method="get">
-    <label class="sidebar-label">
-      Category:
+    <input type="hidden" name="q" value="{{ q }}">
+    <div class="filter-field">
+      <span class="filter-field-label">Category</span>
       <select name="category" class="sidebar-select">
         <option value="">(any)</option>
         {% for c in categories %}
           <option value="{{ c }}" {% if c == category %}selected{% endif %}>{{ c }}</option>
         {% endfor %}
       </select>
-    </label>
-    <label class="sidebar-label">
-      Status:
+    </div>
+    <div class="filter-field">
+      <span class="filter-field-label">Status</span>
       <select name="status" class="sidebar-select">
         <option value="">(any)</option>
         {% for s in statuses %}
           <option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
       </select>
-    </label>
-    <button type="submit" class="sidebar-button">Apply Filters</button>
+    </div>
+    <button type="submit" class="sidebar-button">Apply</button>
   </form>
+</div>
 {% endblock %}
 
 {% block content %}
-<style>
-  .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
-  .badge-in-service { background: #d1e7dd; color: #0f5132; }
-  .badge-quarantined { background: #f8d7da; color: #842029; }
-  .badge-new { background: #cfe2ff; color: #084298; }
-  .badge-maintenance { background: #fff3cd; color: #664d03; }
-</style>
 
   <div class="page-title-row">
     <h2 class="page-title">Hardware Index</h2>
     <a href="{{ url_for('hardware.hardware_new') }}" class="primary-button">+ New Hardware</a>
   </div>
 
-  <form method="get" class="search-bar">
+  <form method="get" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
     <input type="hidden" name="category" value="{{ category }}">
     <input type="hidden" name="status" value="{{ status }}">
-    <input class="search-input" type="text" name="q" placeholder="Search by ID, description, or part number…" value="{{ q }}">
-    <button type="submit" class="search-button">Search</button>
+    <input type="text" name="q"
+           placeholder="Search ID, description, part number…"
+           value="{{ q }}"
+           style="flex:1; border:1px solid #ccc; border-radius:4px; background:#fff;">
+    <button type="submit" class="secondary-button">Search</button>
   </form>
 
   <table>

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .status-tile {
+    background: #fff;
+    border: 1px solid var(--border-soft);
+    border-top: 3px solid #ccc;
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+  }
+  .status-tile.tile-in-service   { border-top-color: #28a745; }
+  .status-tile.tile-new          { border-top-color: #0b5f9c; }
+  .status-tile.tile-maintenance  { border-top-color: #e6a817; }
+  .status-tile.tile-quarantined  { border-top-color: #dc3545; }
+  .status-tile.tile-quarantined.has-items {
+    background: #fff5f5;
+    border-color: #f5c6cb;
+    border-top-color: #dc3545;
+  }
+
+  .tile-count {
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #1a1a1a;
+    margin-bottom: 0.25rem;
+  }
+  .tile-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+  }
+  .tile-quarantined.has-items .tile-count { color: #dc3545; }
+  .tile-quarantined.has-items .tile-label { color: #842029; }
+
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #888;
+    margin: 0 0 0.75rem;
+  }
+
+  .meta-row {
+    font-size: 0.82rem;
+    color: #888;
+    margin-bottom: 1.75rem;
+  }
+  .meta-row a { color: var(--accent); text-decoration: none; }
+  .meta-row a:hover { text-decoration: underline; }
+  .meta-sep { margin: 0 0.5rem; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">ER64 Ops Hub</h2>
+  <div style="display:flex; gap:0.5rem;">
+    <a href="{{ url_for('procedures.run_setup') }}" class="primary-button">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Start Run
+    </a>
+    <a href="{{ url_for('hardware.hardware_new') }}" class="secondary-button">+ Add Hardware</a>
+  </div>
+</div>
+
+<p class="meta-row">
+  <a href="{{ url_for('hardware.hardware_list') }}">{{ total_hw }} hardware item{{ 's' if total_hw != 1 }}</a>
+  <span class="meta-sep">·</span>
+  <a href="{{ url_for('procedures.procedure_list') }}">{{ proc_count }} procedure{{ 's' if proc_count != 1 }}</a>
+</p>
+
+<p class="section-title">Hardware Status</p>
+
+<div class="status-grid">
+  {% set in_svc   = status_counts.get('in-service', 0) %}
+  {% set new_hw   = status_counts.get('new', 0) %}
+  {% set maint    = status_counts.get('maintenance', 0) %}
+  {% set quarant  = status_counts.get('quarantined', 0) %}
+
+  <div class="status-tile tile-in-service">
+    <div class="tile-count">{{ in_svc }}</div>
+    <div class="tile-label">In Service</div>
+  </div>
+  <div class="status-tile tile-new">
+    <div class="tile-count">{{ new_hw }}</div>
+    <div class="tile-label">New</div>
+  </div>
+  <div class="status-tile tile-maintenance">
+    <div class="tile-count">{{ maint }}</div>
+    <div class="tile-label">Maintenance</div>
+  </div>
+  <div class="status-tile tile-quarantined {% if quarant > 0 %}has-items{% endif %}">
+    <div class="tile-count">{{ quarant }}</div>
+    <div class="tile-label">Quarantined</div>
+  </div>
+</div>
+
+<p class="section-title">Recent Runs</p>
+
+{% if recent_runs %}
+<div class="section-card" style="margin-bottom:0;">
+  <table>
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>Date</th>
+        <th>Procedure</th>
+        <th>Hardware</th>
+        <th>Operator</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in recent_runs %}
+      <tr>
+        <td>
+          <a href="{{ url_for('procedures.run_execute', run_id=r['run_id']) }}"
+             style="font-weight:700; color:var(--accent); text-decoration:none;">
+            {{ r['run_id'] }}
+          </a>
+        </td>
+        <td style="color:#666; font-size:0.88rem;">{{ r['timestamp'][:10] }}</td>
+        <td style="font-size:0.9rem;">{{ r['title'] }}</td>
+        <td style="font-size:0.9rem;">{{ r['hardware_id'] }}</td>
+        <td style="font-size:0.9rem; color:#555;">{{ r['operator'] }}</td>
+        <td>
+          {% set s = r['status']|lower %}
+          {% if s == 'completed' %}<span class="badge badge-completed">Pass</span>
+          {% elif s == 'failed'    %}<span class="badge badge-failed">Fail</span>
+          {% elif s == 'aborted'   %}<span class="badge badge-aborted">Aborted</span>
+          {% else                  %}<span class="badge badge-in-progress">In Progress</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="background:#fff; border:1px solid var(--border-soft); border-radius:4px; padding:2rem; text-align:center; color:#999; font-size:0.9rem;">
+  No runs recorded yet. <a href="{{ url_for('procedures.run_setup') }}" style="color:var(--accent);">Start the first one.</a>
+</div>
+{% endif %}
+
+{% endblock %}

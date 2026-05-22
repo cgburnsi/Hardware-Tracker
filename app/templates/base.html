@@ -3,13 +3,12 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{% block title %}Hardware Tracker{% endblock %}</title>
+    <title>{% block title %}ER64 Ops Hub{% endblock %}</title>
     <style>
       :root {
         --bg-main: #f7f7f5;
         --bg-header: #f4c842;
-        --bg-sidebar: #2c3e50; /* Darker sidebar for contrast */
-        --text-sidebar: #ecf0f1;
+        --bg-sidebar: #2c3e50;
         --border-soft: #d1d1c8;
         --text-main: #222;
         --accent: #0b5f9c;
@@ -23,156 +22,276 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         background: var(--bg-main);
         color: var(--text-main);
-        /* Prevent bounce on iPad */
         overscroll-behavior-y: none;
       }
 
       .page { display: flex; flex-direction: column; min-height: 100vh; }
 
-      /* --- HEADER --- */
+      /* ── TOPBAR ── */
       .topbar {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0.5rem 1.5rem; background: var(--bg-header);
-        border-bottom: 1px solid #c6a22f; height: 50px;
+        padding: 0 1.5rem; background: var(--bg-header);
+        border-bottom: 2px solid #c6a22f; height: 50px; flex-shrink: 0;
       }
-      .app-title { font-weight: 800; font-size: 1.1rem; letter-spacing: 0.03em; color: #222; }
-      .app-subtitle { font-size: 0.8rem; color: #5d4a18; margin-left: 0.5rem; }
+      .app-title { font-weight: 800; font-size: 1.1rem; letter-spacing: 0.04em; color: #1a1a1a; }
+      .app-subtitle { font-size: 0.78rem; color: #6b5420; margin-left: 0.5rem; font-weight: 500; }
 
-      /* --- SIDEBAR --- */
+      /* ── LAYOUT ── */
       .layout { display: flex; flex: 1; min-height: 0; }
-      
+
+      /* ── SIDEBAR ── */
       .sidebar {
-        width: 250px;
+        width: 210px;
         background: var(--bg-sidebar);
-        color: var(--text-sidebar);
         display: flex; flex-direction: column;
-        padding: 1rem 0;
+        padding: 0.75rem 0 1rem;
         overflow-y: auto;
+        flex-shrink: 0;
       }
 
-      .sidebar-group { margin-bottom: 1.5rem; }
-      
+      .sidebar-group { margin-bottom: 1.1rem; }
+
       .sidebar-label {
-        padding: 0 1.2rem;
-        font-size: 0.75rem;
+        padding: 0 1rem;
+        font-size: 0.66rem;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #95a5a6;
+        letter-spacing: 0.11em;
+        color: #7f8c8d;
         font-weight: 700;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.2rem;
+        display: block;
       }
 
       .nav-link {
         display: flex; align-items: center;
-        padding: 0.6rem 1.2rem;
+        padding: 0.52rem 1rem;
         color: #bdc3c7;
         text-decoration: none;
-        font-size: 0.9rem;
-        transition: all 0.2s;
+        font-size: 0.875rem;
+        transition: background 0.12s, color 0.12s;
         border-left: 3px solid transparent;
       }
-      
-      .nav-link:hover { background: rgba(255,255,255,0.05); color: #fff; }
-      
-      /* Active State (You can add logic to set this class) */
+      .nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
       .nav-link.active {
         background: rgba(255,255,255,0.1);
         color: #fff;
         border-left-color: var(--bg-header);
       }
-      
-      .nav-link-icon { width: 20px; text-align: center; margin-right: 8px; opacity: 0.7; }
+      .nav-link.run-link { color: #f4c842; font-weight: 600; }
+      .nav-link.run-link:hover { color: #fff; }
 
-      /* --- MAIN CONTENT --- */
+      .nav-icon {
+        width: 15px; height: 15px;
+        display: inline-flex; align-items: center; justify-content: center;
+        margin-right: 9px; opacity: 0.6; flex-shrink: 0;
+      }
+      .nav-icon svg { width: 15px; height: 15px; }
+      .nav-link:hover .nav-icon,
+      .nav-link.active .nav-icon,
+      .nav-link.run-link .nav-icon { opacity: 1; }
+
+      /* ── SIDEBAR FILTERS (used by hardware list and others) ── */
+      .sidebar-filter-group {
+        margin-top: 0.5rem;
+        padding: 0 1rem;
+      }
+      .sidebar-section-title {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.11em;
+        color: #7f8c8d;
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+        display: block;
+      }
+      .filter-field { margin-bottom: 0.75rem; }
+      .filter-field-label {
+        font-size: 0.72rem; color: #95a5a6;
+        display: block; margin-bottom: 0.25rem;
+      }
+      .sidebar-select {
+        width: 100%; background: #1e2d3d; color: #ecf0f1;
+        border: 1px solid #3d5166; border-radius: 3px;
+        padding: 0.35rem 0.5rem; font-size: 0.82rem;
+        font-family: inherit;
+      }
+      .sidebar-button {
+        width: 100%; background: var(--accent); color: #fff;
+        border: none; border-radius: 3px;
+        padding: 0.45rem; font-size: 0.82rem; font-weight: 600;
+        cursor: pointer; margin-top: 0.25rem; font-family: inherit;
+      }
+      .sidebar-button:hover { background: var(--accent-hover); }
+
+      /* ── MAIN CONTENT ── */
       .main { flex: 1; padding: 1.5rem 2rem; overflow-y: auto; }
 
-      /* --- UI ELEMENTS --- */
-      .page-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-      .page-title { margin: 0; font-size: 1.5rem; color: #333; }
-      
+      /* ── COMMON UI ── */
+      .page-title-row {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 1.25rem;
+      }
+      .page-title { margin: 0; font-size: 1.4rem; color: #1a1a1a; font-weight: 700; }
+
       .primary-button {
         background: var(--accent); color: #fff; border: none;
         border-radius: 4px; padding: 0.5rem 1rem;
-        font-size: 0.9rem; font-weight: 600; cursor: pointer;
-        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.875rem; font-weight: 600; cursor: pointer;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;
+        font-family: inherit;
       }
-      .primary-button:hover { background: var(--accent-hover); }
+      .primary-button:hover { background: var(--accent-hover); color: #fff; }
 
       .secondary-button {
         background: #fff; color: #444; border: 1px solid #ccc;
         border-radius: 4px; padding: 0.5rem 1rem;
-        font-size: 0.9rem; font-weight: 600; cursor: pointer;
-        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.875rem; font-weight: 600; cursor: pointer;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;
+        font-family: inherit;
       }
-      .secondary-button:hover { background: #f0f0f0; }
+      .secondary-button:hover { background: #f2f2f0; }
 
-      /* --- TOUCH FRIENDLY OVERRIDES --- */
-      /* Make inputs larger for fingers */
+      /* ── TOUCH-FRIENDLY INPUTS ── */
       input[type="text"], input[type="number"], select, textarea {
-        font-size: 16px; /* Prevents iOS zoom */
-        padding: 0.5rem;
+        font-size: 16px; padding: 0.5rem;
       }
-      
-      /* Tables */
-      table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ddd; }
-      th, td { padding: 0.75rem 1rem; border-bottom: 1px solid #eee; text-align: left; }
-      th { background: #f8f9fa; font-weight: 600; color: #555; }
-      tr:hover { background-color: #fcfcfc; }
 
-      /* Flash Messages */
-      .flash-list { list-style: none; padding: 0; margin-bottom: 1rem; }
-      .flash-success { background: #d4edda; color: #155724; padding: 0.75rem; border-radius: 4px; border: 1px solid #c3e6cb; }
-      .flash-error { background: #f8d7da; color: #721c24; padding: 0.75rem; border-radius: 4px; border: 1px solid #f5c6cb; }
+      /* ── TABLES ── */
+      table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden; }
+      th, td { padding: 0.7rem 1rem; border-bottom: 1px solid #eee; text-align: left; }
+      th {
+        background: #f3f3f1; font-size: 0.72rem; font-weight: 700;
+        color: #666; text-transform: uppercase; letter-spacing: 0.05em;
+      }
+      tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: #fafaf8; }
+
+      /* ── STATUS BADGES ── */
+      .badge {
+        display: inline-block; padding: 0.18rem 0.5rem; border-radius: 3px;
+        font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      }
+      .badge-in-service   { background: #d1e7dd; color: #0f5132; }
+      .badge-quarantined  { background: #f8d7da; color: #842029; }
+      .badge-new          { background: #cfe2ff; color: #084298; }
+      .badge-maintenance  { background: #fff3cd; color: #664d03; }
+      .badge-in-progress  { background: #fff3cd; color: #664d03; }
+      .badge-completed    { background: #d1e7dd; color: #0f5132; }
+      .badge-failed       { background: #f8d7da; color: #842029; }
+      .badge-aborted      { background: #e2e3e5; color: #41464b; }
+
+      /* ── FLASH MESSAGES ── */
+      .flash-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+      .flash-success {
+        background: #d4edda; color: #155724; padding: 0.7rem 1rem;
+        border-radius: 4px; border-left: 4px solid #28a745;
+      }
+      .flash-error {
+        background: #f8d7da; color: #721c24; padding: 0.7rem 1rem;
+        border-radius: 4px; border-left: 4px solid #dc3545;
+      }
+
+      /* ── SECTION CARDS (shared across detail pages) ── */
+      .section-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 1.25rem; overflow: hidden; }
+      .section-header {
+        background: #f5f5f3; border-bottom: 1px solid var(--border-soft);
+        padding: 0.55rem 1rem; font-weight: 700; font-size: 0.75rem;
+        color: #555; text-transform: uppercase; letter-spacing: 0.06em;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .section-body { padding: 1rem; }
+      .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
+      .data-item {}
+      .data-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+      .data-value { font-size: 0.95rem; font-weight: 500; color: #222; }
     </style>
   </head>
   <body>
     <div class="page">
       <header class="topbar">
-        <div style="display:flex; align-items:baseline;">
-          <div class="app-title">ER64 OPS HUB</div>
-          <div class="app-subtitle">Hardware & Traceability</div>
+        <div style="display:flex; align-items:baseline; gap:0.4rem;">
+          <span class="app-title">ER64 OPS HUB</span>
+          <span class="app-subtitle">Hardware &amp; Traceability</span>
         </div>
-        <div style="font-size:0.85rem; opacity:0.8;">User: Admin</div>
+        <span style="font-size:0.8rem; color:#6b5420; font-weight:500;">Admin</span>
       </header>
 
       <div class="layout">
         <aside class="sidebar">
-          
+
           <div class="sidebar-group">
-            <div class="sidebar-label">Operations</div>
-            <a href="{{ url_for('procedures.run_setup') }}" class="nav-link" style="color: #f4c842; font-weight:bold;">
-              <span class="nav-link-icon">▶</span> Start Run
-            </a>
-            <a href="{{ url_for('procedures.run_list') }}" class="nav-link">
-              <span class="nav-link-icon">📋</span> Daily Run Log
+            <a href="{{ url_for('index') }}"
+               class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </span>
+              Home
             </a>
           </div>
 
           <div class="sidebar-group">
-            <div class="sidebar-label">Inventory</div>
-            <a href="{{ url_for('hardware.hardware_list') }}" class="nav-link">
-              <span class="nav-link-icon">📦</span> Hardware Index
+            <span class="sidebar-label">Operations</span>
+            <a href="{{ url_for('procedures.run_setup') }}"
+               class="nav-link run-link {% if request.endpoint in ['procedures.run_setup', 'procedures.run_execute'] %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+              </span>
+              Start Run
             </a>
-            <a href="{{ url_for('hardware.hardware_new') }}" class="nav-link">
-              <span class="nav-link-icon">➕</span> Add Hardware
+            <a href="{{ url_for('procedures.run_list') }}"
+               class="nav-link {% if request.endpoint == 'procedures.run_list' %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </span>
+              Run Log
             </a>
           </div>
 
           <div class="sidebar-group">
-            <div class="sidebar-label">Definitions</div>
-            <a href="{{ url_for('procedures.procedure_list') }}" class="nav-link">
-              <span class="nav-link-icon">📄</span> Procedures (SOPs)
+            <span class="sidebar-label">Inventory</span>
+            <a href="{{ url_for('hardware.hardware_list') }}"
+               class="nav-link {% if request.endpoint in ['hardware.hardware_list', 'hardware.hardware_detail', 'hardware.hardware_edit'] %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </span>
+              Hardware
             </a>
-            <a href="{{ url_for('hardware.manufacturer_list') }}" class="nav-link">
-              <span class="nav-link-icon">🏭</span> Manufacturers
+            <a href="{{ url_for('hardware.hardware_new') }}"
+               class="nav-link {% if request.endpoint == 'hardware.hardware_new' %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </span>
+              Add Hardware
             </a>
-            <a href="{{ url_for('hardware.location_list') }}" class="nav-link">
-              <span class="nav-link-icon">📍</span> Locations
+          </div>
+
+          <div class="sidebar-group">
+            <span class="sidebar-label">Definitions</span>
+            <a href="{{ url_for('procedures.procedure_list') }}"
+               class="nav-link {% if request.endpoint in ['procedures.procedure_list', 'procedures.procedure_detail', 'procedures.procedure_new', 'procedures.procedure_edit', 'procedures.procedure_sections'] %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </span>
+              Procedures
+            </a>
+            <a href="{{ url_for('hardware.manufacturer_list') }}"
+               class="nav-link {% if request.endpoint == 'hardware.manufacturer_list' %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+              </span>
+              Manufacturers
+            </a>
+            <a href="{{ url_for('hardware.location_list') }}"
+               class="nav-link {% if request.endpoint == 'hardware.location_list' %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </span>
+              Locations
             </a>
           </div>
 
           {% block sidebar_filters %}{% endblock %}
-          
+
         </aside>
 
         <main class="main">

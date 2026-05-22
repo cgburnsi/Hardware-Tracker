@@ -4,27 +4,9 @@
 
 {% block content %}
 <style>
-  /* Status Badges */
-  .badge { padding: 0.3rem 0.6rem; border-radius: 4px; font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
-  .badge-in-service { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-  .badge-quarantined { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-  .badge-new { background: #cfe2ff; color: #084298; border: 1px solid #b6d4fe; }
-  .badge-maintenance { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
-
-  /* Section Cards */
-  .section-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 1.5rem; overflow: hidden; }
-  .section-header { background: #fcfcfb; border-bottom: 1px solid var(--border-soft); padding: 0.6rem 1rem; font-weight: 600; font-size: 0.85rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center; }
-  .section-body { padding: 1rem; }
-
-  /* Data Grid */
-  .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-  .data-item { margin-bottom: 0.5rem; }
-  .data-label { font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 0.2rem; }
-  .data-value { font-size: 0.95rem; font-weight: 500; color: #222; }
-
-  /* Safety Specifics */
-  .safety-card { border-left: 5px solid #d9534f; }
-  .safety-val { font-weight: 700; color: #d9534f; }
+  .badge { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+  .safety-card { border-left: 4px solid #dc3545; }
+  .safety-val { font-weight: 700; color: #dc3545; }
 </style>
 
   <div class="page-title-row">
@@ -147,19 +129,6 @@
   </div>
   {% endif %}
 
-  <div class="section-card">
-    <div class="section-header">
-      <span>Operational History</span>
-      <a href="#" style="font-size:0.75rem;">View Full Log</a>
-    </div>
-    <div class="section-body">
-      <div style="background: #f9f9f9; padding: 1.5rem; text-align: center; color: #888; border: 1px dashed #ccc; border-radius: 4px;">
-        <div style="font-weight:600; margin-bottom:0.25rem;">No history recorded yet</div>
-        <div style="font-size:0.85rem;">When we build the "Procedure Runner," completed runs will appear here.</div>
-      </div>
-    </div>
-  </div>
-  
   <div class="section-card">
     <div class="section-header">Operational History</div>
     <div class="section-body">

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Hardware Index{% endblock %}
+
+{% block sidebar_filters %}
+<div class="sidebar-filter-group">
+  <span class="sidebar-section-title">Filters</span>
+  <form method="get">
+    <input type="hidden" name="q" value="{{ q }}">
+    <div class="filter-field">
+      <span class="filter-field-label">Category</span>
+      <select name="category" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for c in categories %}
+          <option value="{{ c }}" {% if c == category %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <span class="filter-field-label">Status</span>
+      <select name="status" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for s in statuses %}
+          <option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="sidebar-button">Apply</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block content %}
+
+  <div class="page-title-row">
+    <h2 class="page-title">Hardware Index</h2>
+    <a href="{{ url_for('hardware.hardware_new') }}" class="primary-button">+ New Hardware</a>
+  </div>
+
+  <form method="get" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="text" name="q"
+           placeholder="Search ID, description, part number…"
+           value="{{ q }}"
+           style="flex:1; border:1px solid #ccc; border-radius:4px; background:#fff;">
+    <button type="submit" class="secondary-button">Search</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%">ID</th>
+        <th style="width: 30%">Description</th>
+        <th style="width: 10%">Class</th>
+        <th style="width: 15%">Category</th>
+        <th style="width: 15%">Status</th>
+        <th style="width: 20%">Safety/Media</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>
+            <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}" style="font-weight:700;">
+              {{ item['hardware_id'] }}
+            </a>
+          </td>
+          <td>
+            {{ item['description'] }}
+            {% if item['manufacturer'] %}<div style="font-size:0.75rem; color:#666;">{{ item['manufacturer'] }}</div>{% endif %}
+          </td>
+          <td>
+            {% if item['classification'] == 'Flight' %}<span style="color:#0b5f9c; font-weight:bold;">Flight</span>
+            {% else %}<span style="color:#666;">{{ item['classification'] or '-' }}</span>{% endif %}
+          </td>
+          <td>{{ item['category'] or '-' }}</td>
+          <td>
+            {% set s = item['status']|lower %}
+            {% if 'quarantined' in s %}<span class="badge badge-quarantined">{{ item['status'] }}</span>
+            {% elif 'in-service' in s %}<span class="badge badge-in-service">{{ item['status'] }}</span>
+            {% elif 'new' in s %}<span class="badge badge-new">{{ item['status'] }}</span>
+            {% else %}<span class="badge badge-maintenance">{{ item['status'] }}</span>{% endif %}
+          </td>
+          <td>
+            {% if item['safety_class'] and item['safety_class'] != 'None' %}
+              <span style="color:#d9534f; font-weight:600;">{{ item['safety_class'] }}</span>
+              {% if item['propellant_or_media'] %}<span style="font-size:0.8rem; color:#444;">({{ item['propellant_or_media'] }})</span>{% endif %}
+            {% else %}<span style="color:#999;">-</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" style="text-align:center; padding: 2rem; color:#777;">No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Start New Run{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h2 class="page-title">Start Procedure Run</h2>
+</div>
+
+<form method="post" style="max-width: 600px; background:#fff; padding:1.5rem; border:1px solid #ccc; border-radius:4px;">
+  
+  <div class="form-row">
+    <label>Select Hardware Item</label>
+    <select name="hardware_id" class="sidebar-select" required>
+      <option value="">-- Choose Hardware --</option>
+      {% for h in hardware %}
+        <option value="{{ h['id'] }}" {% if sel_hw and sel_hw|int == h['id'] %}selected{% endif %}>
+          {{ h['hardware_id'] }} - {{ h['description'] }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  
+  <div class="form-row">
+    <label>Select Procedure (SOP)</label>
+    <select name="procedure_id" class="sidebar-select" required>
+      <option value="">-- Choose Procedure --</option>
+      {% for p in procedures %}
+        <option value="{{ p['id'] }}">{{ p['proc_id'] }} - {{ p['title'] }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  
+  <div class="form-row">
+    <label>Operator Name</label>
+    <input type="text" name="operator" required placeholder="e.g. J. Smith" style="width:100%; padding:0.4rem;">
+  </div>
+  
+  <button type="submit" class="primary-button" style="width:100%; margin-top:1rem; padding: 0.6rem;">Begin Run ▶</button>
+</form>
+{% endblock %}

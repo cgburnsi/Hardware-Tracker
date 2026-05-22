@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if item %}Edit {{ item['hardware_id'] }}{% else %}New Hardware{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+  .form-section { border: 1px solid var(--border-soft); background: #fff; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; }
+  .form-section legend { font-weight: 600; color: var(--accent); padding: 0 0.5rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+  .row-split { display: flex; gap: 1.5rem; }
+  .row-split > div { flex: 1; }
+  .sidebar-select { width: 100%; padding: 0.4rem; border: 1px solid #ccc; border-radius: 3px; }
+  
+  /* Flex container for the Dropdown + Button combo */
+  .select-group { display: flex; gap: 0.5rem; }
+  .add-btn { 
+    padding: 0.1rem 0.6rem; 
+    font-size: 1.2rem; 
+    line-height: 1.2rem; 
+    text-decoration: none; 
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+</style>
+
+  <div class="page-title-row">
+    <h2 class="page-title">
+      {% if item %}Edit Hardware: <span style="color:var(--text-muted)">{{ item['hardware_id'] }}</span>
+      {% else %}New Hardware Item{% endif %}
+    </h2>
+  </div>
+
+  <form method="post" style="max-width: 800px;">
+    
+    <fieldset class="form-section">
+      <legend>1. Identity</legend>
+      <div class="form-row">
+        <label>Description *</label>
+        <input type="text" name="description" value="{{ item['description'] if item else '' }}" required placeholder="e.g. 1/4 inch Ball Valve" style="width:100%">
+      </div>
+
+      <div class="row-split">
+        <div class="form-row">
+          <label>Category</label>
+          <select name="category" class="sidebar-select">
+            <option value="">(Select...)</option>
+            {% for cat in ['Valve', 'Regulator', 'Sensor', 'Tank', 'Fitting', 'Tool', 'Electronics'] %}
+              <option value="{{ cat }}" {% if item and item['category'] == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+            <option value="Other" {% if item and item['category'] == 'Other' %}selected{% endif %}>Other</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <label>Manufacturer</label>
+          <div class="select-group">
+            <select name="manufacturer" class="sidebar-select">
+              <option value="">(Select...)</option>
+              {% for m in manufacturers %}
+                <option value="{{ m['name'] }}" {% if item and item['manufacturer'] == m['name'] %}selected{% endif %}>{{ m['name'] }}</option>
+              {% endfor %}
+              {% if item and item['manufacturer'] and item['manufacturer'] not in manufacturers|map(attribute='name') %}
+                <option value="{{ item['manufacturer'] }}" selected>{{ item['manufacturer'] }} (Legacy)</option>
+              {% endif %}
+            </select>
+            <a href="{{ url_for('hardware.manufacturer_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Manufacturers">+</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row-split">
+        <div class="form-row">
+           <label>Part Number</label>
+           <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}" style="width:100%">
+        </div>
+        <div class="form-row">
+           <label>Serial Number</label>
+           <input type="text" name="serial_number" value="{{ item['serial_number'] if item else '' }}" style="width:100%">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>1B. Tracking & Compliance</legend>
+      <div class="row-split">
+        <div class="form-row">
+          <label>ECN (Equipment Control #)</label>
+          <input type="text" name="ecn" value="{{ item['ecn'] if item else '' }}" placeholder="MSFC Asset Tag">
+        </div>
+        <div class="form-row">
+          <label>Current Calibration #</label>
+          <input type="text" name="calibration_id" value="{{ item['calibration_id'] if item else '' }}" placeholder="Cert # or Due Date">
+        </div>
+      </div>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Last Repair / Ticket #</label>
+          <input type="text" name="repair_id" value="{{ item['repair_id'] if item else '' }}">
+        </div>
+        <div class="form-row">
+          <label>Work Order (WO) #</label>
+          <input type="text" name="work_order_id" value="{{ item['work_order_id'] if item else '' }}">
+        </div>
+      </div>
+      <div style="margin-top: 1rem; border-top: 1px dashed #eee; padding-top: 1rem;">
+        <div class="row-split">
+          <div class="form-row">
+            <label>Cleaning Specification</label>
+            <input type="text" name="cleaning_spec" value="{{ item['cleaning_spec'] if item else '' }}" placeholder="e.g. MSFC-SPEC-164, O2 Clean">
+          </div>
+          <div class="form-row">
+            <label>Other Specifications Met</label>
+            <input type="text" name="compliance_specs" value="{{ item['compliance_specs'] if item else '' }}" placeholder="e.g. ASTM G93, Class 100">
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>2. Technical Specs</legend>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Port / Fitting Config</label>
+          <div class="select-group">
+            <select name="port_configuration" class="sidebar-select">
+              <option value="">(Select...)</option>
+              {% for p in port_configs %}
+                <option value="{{ p['name'] }}" {% if item and item['port_configuration'] == p['name'] %}selected{% endif %}>{{ p['name'] }}</option>
+              {% endfor %}
+            </select>
+            <a href="{{ url_for('hardware.port_config_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Configs">+</a>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Cv (Flow Coeff)</label>
+          <input type="number" step="any" name="cv" value="{{ item['cv'] if item else '' }}" style="width:100%" placeholder="0.0">
+        </div>
+        <div class="form-row">
+          <label>Orifice (in)</label>
+          <input type="number" step="any" name="orifice_diameter" value="{{ item['orifice_diameter'] if item else '' }}" style="width:100%" placeholder="0.0">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>3. Status & Location</legend>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Status</label>
+          <select name="status" class="sidebar-select">
+            <option value="In-Service" {% if item and item['status'] == 'In-Service' %}selected{% endif %}>In-Service</option>
+            <option value="New" {% if item and item['status'] == 'New' %}selected{% endif %}>New</option>
+            <option value="Maintenance" {% if item and item['status'] == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+            <option value="Quarantined" {% if item and item['status'] == 'Quarantined' %}selected{% endif %}>Quarantined</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Custodian</label>
+          <div class="select-group">
+            <select name="custodian" class="sidebar-select">
+              <option value="">(Select...)</option>
+              {% for c in custodians %}
+                <option value="{{ c['name'] }}" {% if item and item['custodian'] == c['name'] %}selected{% endif %}>{{ c['name'] }}</option>
+              {% endfor %}
+            </select>
+            <a href="{{ url_for('hardware.custodian_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Custodians">+</a>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Physical Location</label>
+        <div class="select-group">
+          <select name="location" class="sidebar-select">
+            <option value="">(Select...)</option>
+            {% for l in locations %}
+              <option value="{{ l['name'] }}" {% if item and item['location'] == l['name'] %}selected{% endif %}>{{ l['name'] }}</option>
+            {% endfor %}
+          </select>
+          <a href="{{ url_for('hardware.location_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Locations">+</a>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section" style="border-left: 4px solid #d9534f;">
+      <legend style="color:#d9534f;">4. Safety Constraints</legend>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Service Media</label>
+          <div class="select-group">
+            <select name="propellant_or_media" class="sidebar-select">
+              <option value="">(Select...)</option>
+              {% for m in media %}
+                <option value="{{ m['name'] }}" {% if item and item['propellant_or_media'] == m['name'] %}selected{% endif %}>{{ m['name'] }}</option>
+              {% endfor %}
+            </select>
+            <a href="{{ url_for('hardware.media_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Media">+</a>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Hazard Class</label>
+          <select name="safety_class" class="sidebar-select">
+             <option value="None" {% if item and item['safety_class'] == 'None' %}selected{% endif %}>None</option>
+             <option value="Pressure" {% if item and item['safety_class'] == 'Pressure' %}selected{% endif %}>Pressure</option>
+             <option value="Flammable" {% if item and item['safety_class'] == 'Flammable' %}selected{% endif %}>Flammable</option>
+             <option value="Toxic" {% if item and item['safety_class'] == 'Toxic' %}selected{% endif %}>Toxic</option>
+             <option value="Cryo" {% if item and item['safety_class'] == 'Cryo' %}selected{% endif %}>Cryo</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Max Rated Pressure (PSI)</label>
+          <input type="number" step="any" name="max_rated_pressure" value="{{ item['max_rated_pressure'] if item else '' }}">
+        </div>
+        <div class="form-row">
+          <label>Max Rated Temp (°C)</label>
+          <input type="number" step="any" name="max_rated_temperature" value="{{ item['max_rated_temperature'] if item else '' }}">
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="form-actions">
+      <button type="submit" class="primary-button">Save</button>
+      <a href="{{ url_for('hardware.hardware_list') }}" class="secondary-button">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

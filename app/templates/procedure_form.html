@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if item %}Edit {{ item['proc_id'] }}{% else %}New Procedure{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+  /* Form Layout Styles */
+  .form-section { border: 1px solid var(--border-soft); background: #fff; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; }
+  .form-section legend { font-weight: 600; color: var(--accent); padding: 0 0.5rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+  .row-split { display: flex; gap: 1.5rem; }
+  .row-split > div { flex: 1; }
+  .helper-text { font-size: 0.75rem; color: #666; margin-top: 0.2rem; }
+  textarea { width: 100%; border: 1px solid var(--border-soft); border-radius: 3px; padding: 0.5rem; font-family: inherit; font-size: 0.9rem; min-height: 80px; resize: vertical; }
+</style>
+
+  <div class="page-title-row">
+    <h2 class="page-title">
+      {% if item %}Edit Procedure: <span style="color:var(--text-muted)">{{ item['proc_id'] }}</span>
+      {% else %}Draft New Procedure{% endif %}
+    </h2>
+  </div>
+
+  <form method="post" style="max-width: 800px;">
+    
+    <fieldset class="form-section">
+      <legend>1. Identity</legend>
+      <div class="form-row">
+        <label>Procedure Title *</label>
+        <input type="text" name="title" value="{{ item['title'] if item else '' }}" required placeholder="e.g. Valve Cleaning Process">
+      </div>
+      
+      <div class="row-split">
+        <div class="form-row">
+          <label>Procedure Type</label>
+          <select name="type" class="sidebar-select">
+            <option value="SOP" {% if item and item['type'] == 'SOP' %}selected{% endif %}>Standard Operating Procedure (SOP)</option>
+            <option value="Test" {% if item and item['type'] == 'Test' %}selected{% endif %}>Test Procedure</option>
+          </select>
+          <div class="helper-text">SOPs are standard maintenance; Tests are experimental.</div>
+        </div>
+        <div class="form-row">
+          <label>Revision</label>
+          <input type="text" name="revision" value="{{ item['revision'] if item else 'A' }}" style="width:80px;">
+        </div>
+      </div>
+      
+      <div class="form-row">
+        <label>Target Hardware ID (Optional)</label>
+        <input type="text" name="hardware_id" value="{{ item['hardware_id'] if item else '' }}" placeholder="e.g. H25001">
+        <div class="helper-text">If this procedure applies to a specific item, enter its ID here.</div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section" style="border-left: 4px solid #f4c842;">
+      <legend style="color:#d9534f;">2. Safety & Prerequisites</legend>
+      
+      <div class="form-row">
+        <label>Hazards</label>
+        <input type="text" name="hazards" value="{{ item['hazards'] if item else '' }}" placeholder="e.g. High Pressure, Cryogenic, Toxic Fumes">
+      </div>
+      
+      <div class="form-row">
+        <label>Prerequisites / PPE</label>
+        <textarea name="prereqs" placeholder="e.g. Safety Glasses, Lab Coat, Verify Vent Valve Open">{{ item['prereqs'] if item else '' }}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>3. Objective & Overview</legend>
+      
+      <div class="form-row">
+        <label>Purpose / Objective</label>
+        <textarea name="purpose" style="min-height:60px;">{{ item['purpose'] if item else '' }}</textarea>
+      </div>
+
+      <div class="form-row">
+        <label>Summary of Steps</label>
+        <textarea name="steps" style="min-height:150px; font-family:monospace;">{{ item['steps'] if item else '' }}</textarea>
+        <div class="helper-text">
+          You can write a simple text list here. For complex procedures, save this form first, then use the "Manage Steps" tool to add individual sections.
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="form-actions">
+      <button type="submit" class="primary-button">Save Procedure</button>
+      <a href="{{ url_for('procedures.procedure_list') }}" class="secondary-button" style="text-decoration:none; margin-left:1rem;">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item['hardware_id'] }} – Detail{% endblock %}
+
+{% block content %}
+<style>
+  .badge { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+  .safety-card { border-left: 4px solid #dc3545; }
+  .safety-val { font-weight: 700; color: #dc3545; }
+</style>
+
+  <div class="page-title-row">
+    <div>
+      <h2 class="page-title" style="display:inline-block; margin-right: 1rem;">{{ item['hardware_id'] }}</h2>
+      
+      {% set s = item['status']|lower %}
+      {% if 'quarantined' in s %}
+        <span class="badge badge-quarantined">{{ item['status'] }}</span>
+      {% elif 'in-service' in s %}
+        <span class="badge badge-in-service">{{ item['status'] }}</span>
+      {% elif 'new' in s %}
+        <span class="badge badge-new">{{ item['status'] }}</span>
+      {% else %}
+        <span class="badge badge-maintenance">{{ item['status'] }}</span>
+      {% endif %}
+    </div>
+    
+    <div>
+      <a href="{{ url_for('hardware.hardware_edit', id=item['id']) }}" class="secondary-button">Edit Hardware</a>
+      <button class="secondary-button" disabled title="Coming soon">Print Label</button>
+    </div>
+  </div>
+
+  <p style="font-size: 1.1rem; color: #444; margin-top: 0;">{{ item['description'] }}</p>
+
+  <div class="section-card">
+    <div class="section-header">Identity & Specs</div>
+    <div class="section-body">
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="data-label">Category</div>
+          <div class="data-value">{{ item['category'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Classification</div>
+          <div class="data-value">{{ item['classification'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Manufacturer</div>
+          <div class="data-value">{{ item['manufacturer'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Part Number</div>
+          <div class="data-value">{{ item['part_number'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Serial Number</div>
+          <div class="data-value">{{ item['serial_number'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Current Location</div>
+          <div class="data-value">{{ item['location'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Custodian</div>
+          <div class="data-value">{{ item['custodian'] or '–' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">Tracking & Compliance</div>
+    <div class="section-body">
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="data-label">ECN</div>
+          <div class="data-value" style="font-family:monospace;">{{ item['ecn'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Calibration</div>
+          <div class="data-value">{{ item['calibration_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Repair Ref</div>
+          <div class="data-value">{{ item['repair_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Work Order</div>
+          <div class="data-value">{{ item['work_order_id'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Cleaning Spec</div>
+          <div class="data-value" style="color:#0b5f9c; font-weight:600;">{{ item['cleaning_spec'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Other Specs</div>
+          <div class="data-value">{{ item['compliance_specs'] or '–' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  {% if item['safety_class'] and item['safety_class'] != 'None' %}
+  <div class="section-card safety-card">
+    <div class="section-header" style="color:#d9534f; background:#fff5f5;">Safety Constraints</div>
+    <div class="section-body">
+      <div class="data-grid">
+        <div class="data-item">
+          <div class="data-label">Hazard Class</div>
+          <div class="data-value safety-val">{{ item['safety_class'] }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Service Media</div>
+          <div class="data-value">{{ item['propellant_or_media'] or '–' }}</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Max Pressure</div>
+          <div class="data-value">{{ item['max_rated_pressure'] }} PSI</div>
+        </div>
+        <div class="data-item">
+          <div class="data-label">Max Temp</div>
+          <div class="data-value">{{ item['max_rated_temperature'] }} °C</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="section-card">
+    <div class="section-header">Operational History</div>
+    <div class="section-body">
+      
+      {% if logs %}
+        <table style="width:100%; font-size:0.9rem;">
+          <thead>
+            <tr>
+              <th style="text-align:left; width: 140px; color:#999;">Date (UTC)</th>
+              <th style="text-align:left;">Event</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 0.5rem 0; color:#555;">{{ log['timestamp'] }}</td>
+              <td style="padding: 0.5rem 0;">
+                <strong>{{ log['action_type'] }}</strong>: {{ log['description'] }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div style="text-align: center; color: #888; font-style:italic; padding:1rem;">
+          No history recorded yet.
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+{% endblock %}

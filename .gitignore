@@ -1,0 +1,18 @@
+# SQLite database
+instance/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Exports / backups
+backup_data.json
+csv_export/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="page-title-row">
+  <h2 class="page-title">{{ title }}</h2>
+  <button onclick="window.close()" class="secondary-button">Close Window</button>
+</div>
+
+<div style="display: flex; gap: 2rem; align-items: flex-start;">
+  
+  <div style="flex: 1;">
+    <table>
+      <thead><tr><th>Name</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr><td><strong>{{ item['name'] }}</strong></td></tr>
+        {% else %}
+          <tr><td style="color:#777;">No items found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="width: 300px; background: #fff; padding: 1.5rem; border: 1px solid var(--border-soft); border-radius: 4px;">
+    <h4 style="margin-top:0; margin-bottom: 1rem;">Add New Item</h4>
+    <form method="post">
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Name</label>
+        <input type="text" name="name" required style="width:100%; padding:0.4rem; border:1px solid #ccc;">
+      </div>
+      <button type="submit" class="primary-button" style="width:100%;">Add to List</button>
+    </form>
+    <div style="margin-top:1rem; font-size:0.8rem; color:#666;">
+      <strong>Tip:</strong> Refresh the previous page after adding to see it in the dropdown.
+    </div>
+  </div>
+</div>
+{% endblock %}

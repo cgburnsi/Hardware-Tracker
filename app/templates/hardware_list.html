@@ -50,17 +50,32 @@
   <table>
     <thead>
       <tr>
+        <th style="width:52px;"></th>
         <th style="width: 10%">ID</th>
-        <th style="width: 30%">Description</th>
+        <th style="width: 28%">Description</th>
         <th style="width: 10%">Class</th>
-        <th style="width: 15%">Category</th>
-        <th style="width: 15%">Status</th>
-        <th style="width: 20%">Safety/Media</th>
+        <th style="width: 14%">Category</th>
+        <th style="width: 14%">Status</th>
+        <th style="width: 14%">Safety/Media</th>
+        <th style="width: 6%; text-align:center;">Qty</th>
       </tr>
     </thead>
     <tbody>
       {% for item in items %}
         <tr>
+          <td style="padding:0.4rem 0.5rem;">
+            {% if item['image_filename'] %}
+              <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}">
+                <img src="{{ url_for('hardware.serve_image', filename=item['image_filename']) }}"
+                     alt=""
+                     style="width:48px; height:48px; object-fit:cover; border-radius:3px; display:block; border:1px solid #e0e0e0;">
+              </a>
+            {% else %}
+              <div style="width:48px; height:48px; border-radius:3px; background:#f0f0ee; border:1px solid #e0e0e0; display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+              </div>
+            {% endif %}
+          </td>
           <td>
             <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}" style="font-weight:700;">
               {{ item['hardware_id'] }}
@@ -68,17 +83,23 @@
           </td>
           <td>
             {{ item['description'] }}
+            {% if item['classification'] == 'Flight' %}
+              <span style="font-size:0.62rem; font-weight:800; background:#fffbe6; color:#7a5c00; border:1px solid #f0c040; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">FLIGHT</span>
+            {% endif %}
+            {% if item['id'] in kit_ids %}
+              <span style="font-size:0.62rem; font-weight:800; background:#e0f0ff; color:#0b5f9c; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">KIT</span>
+            {% endif %}
             {% if item['manufacturer'] %}<div style="font-size:0.75rem; color:#666;">{{ item['manufacturer'] }}</div>{% endif %}
           </td>
           <td>
-            {% if item['classification'] == 'Flight' %}<span style="color:#0b5f9c; font-weight:bold;">Flight</span>
-            {% else %}<span style="color:#666;">{{ item['classification'] or '-' }}</span>{% endif %}
+            <span style="color:#666;">{{ item['classification'] or '-' }}</span>
           </td>
           <td>{{ item['category'] or '-' }}</td>
           <td>
             {% set s = item['status']|lower %}
             {% if 'quarantined' in s %}<span class="badge badge-quarantined">{{ item['status'] }}</span>
             {% elif 'in-service' in s %}<span class="badge badge-in-service">{{ item['status'] }}</span>
+            {% elif 'in-storage' in s %}<span class="badge badge-in-storage">{{ item['status'] }}</span>
             {% elif 'new' in s %}<span class="badge badge-new">{{ item['status'] }}</span>
             {% else %}<span class="badge badge-maintenance">{{ item['status'] }}</span>{% endif %}
           </td>
@@ -88,9 +109,13 @@
               {% if item['propellant_or_media'] %}<span style="font-size:0.8rem; color:#444;">({{ item['propellant_or_media'] }})</span>{% endif %}
             {% else %}<span style="color:#999;">-</span>{% endif %}
           </td>
+          <td style="text-align:center; font-weight:600;
+                     color:{% if item['quantity'] == 0 %}#dc3545{% elif item['quantity'] != None and item['quantity'] <= 2 %}#b45309{% else %}#333{% endif %};">
+            {{ item['quantity'] if item['quantity'] is not none else 1 }}
+          </td>
         </tr>
       {% else %}
-        <tr><td colspan="6" style="text-align:center; padding: 2rem; color:#777;">No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.</td></tr>
+        <tr><td colspan="8" style="text-align:center; padding: 2rem; color:#777;">No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.</td></tr>
       {% endfor %}
     </tbody>
   </table>

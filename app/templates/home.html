@@ -18,6 +18,7 @@
   }
   .status-tile.tile-in-service   { border-top-color: #28a745; }
   .status-tile.tile-new          { border-top-color: #0b5f9c; }
+  .status-tile.tile-in-storage   { border-top-color: #8fa3b8; }
   .status-tile.tile-maintenance  { border-top-color: #e6a817; }
   .status-tile.tile-quarantined  { border-top-color: #dc3545; }
   .status-tile.tile-quarantined.has-items {
@@ -70,6 +71,7 @@
       Start Run
     </a>
     <a href="{{ url_for('hardware.hardware_new') }}" class="secondary-button">+ Add Hardware</a>
+    <a href="{{ url_for('backup_db') }}" class="secondary-button" title="Download a snapshot of the database">↓ Backup DB</a>
   </div>
 </div>
 
@@ -84,6 +86,7 @@
 <div class="status-grid">
   {% set in_svc   = status_counts.get('in-service', 0) %}
   {% set new_hw   = status_counts.get('new', 0) %}
+  {% set stored   = status_counts.get('in-storage', 0) %}
   {% set maint    = status_counts.get('maintenance', 0) %}
   {% set quarant  = status_counts.get('quarantined', 0) %}
 
@@ -94,6 +97,10 @@
   <div class="status-tile tile-new">
     <div class="tile-count">{{ new_hw }}</div>
     <div class="tile-label">New</div>
+  </div>
+  <div class="status-tile tile-in-storage">
+    <div class="tile-count">{{ stored }}</div>
+    <div class="tile-label">In Storage</div>
   </div>
   <div class="status-tile tile-maintenance">
     <div class="tile-count">{{ maint }}</div>

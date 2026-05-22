@@ -32,13 +32,24 @@
     </h2>
   </div>
 
-  <form method="post" style="max-width: 800px;">
+  <form method="post" enctype="multipart/form-data" style="max-width: 800px;">
     
     <fieldset class="form-section">
       <legend>1. Identity</legend>
       <div class="form-row">
         <label>Description *</label>
         <input type="text" name="description" value="{{ item['description'] if item else '' }}" required placeholder="e.g. 1/4 inch Ball Valve" style="width:100%">
+      </div>
+
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;
+                       background:#fffbe6; border:1px solid #f0c040; border-radius:4px;
+                       padding:0.5rem 0.85rem; font-weight:600; font-size:0.9rem; color:#7a5c00;">
+          <input type="checkbox" name="classification" value="Flight"
+                 {% if item and item['classification'] == 'Flight' %}checked{% endif %}
+                 style="width:1rem; height:1rem; cursor:pointer; accent-color:#c49000;">
+          Flight Hardware
+        </label>
       </div>
 
       <div class="row-split">
@@ -152,6 +163,7 @@
           <select name="status" class="sidebar-select">
             <option value="In-Service" {% if item and item['status'] == 'In-Service' %}selected{% endif %}>In-Service</option>
             <option value="New" {% if item and item['status'] == 'New' %}selected{% endif %}>New</option>
+            <option value="In-Storage" {% if item and item['status'] == 'In-Storage' %}selected{% endif %}>In-Storage</option>
             <option value="Maintenance" {% if item and item['status'] == 'Maintenance' %}selected{% endif %}>Maintenance</option>
             <option value="Quarantined" {% if item and item['status'] == 'Quarantined' %}selected{% endif %}>Quarantined</option>
           </select>
@@ -180,6 +192,13 @@
           </select>
           <a href="{{ url_for('hardware.location_list') }}" class="secondary-button add-btn" target="_blank" title="Manage Locations">+</a>
         </div>
+      </div>
+      <div class="form-row" style="max-width:180px;">
+        <label>Quantity</label>
+        <input type="number" name="quantity" min="0" step="1"
+               value="{{ item['quantity'] if item else 1 }}"
+               style="width:100%;">
+        <div style="font-size:0.78rem; color:#888; margin-top:0.25rem;">For non-serialized stock. Use +/– on the detail page to adjust.</div>
       </div>
     </fieldset>
 
@@ -218,6 +237,27 @@
           <label>Max Rated Temp (°C)</label>
           <input type="number" step="any" name="max_rated_temperature" value="{{ item['max_rated_temperature'] if item else '' }}">
         </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>5. Photo / Drawing</legend>
+      {% if item and item['image_filename'] %}
+        <div style="display:flex; align-items:center; gap:1.5rem; margin-bottom:1rem;">
+          <img src="{{ url_for('hardware.serve_image', filename=item['image_filename']) }}"
+               alt="Current image"
+               style="width:120px; height:120px; object-fit:cover; border-radius:4px; border:1px solid var(--border-soft);">
+          <div>
+            <div style="font-size:0.85rem; color:#555; margin-bottom:0.5rem;">Current image: <code>{{ item['image_filename'] }}</code></div>
+            <div style="font-size:0.82rem; color:#888;">Upload a new file below to replace it, or remove it from the detail page.</div>
+          </div>
+        </div>
+      {% endif %}
+      <div class="form-row">
+        <label>{{ 'Replace Image' if item and item['image_filename'] else 'Upload Image' }}</label>
+        <input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp"
+               style="font-size:0.9rem; padding:0.4rem 0;">
+        <div style="font-size:0.78rem; color:#888; margin-top:0.25rem;">JPG, PNG, GIF, or WebP. Max ~10 MB. Use the detail page to remove a photo.</div>
       </div>
     </fieldset>
 

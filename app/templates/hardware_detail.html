@@ -18,10 +18,17 @@
         <span class="badge badge-quarantined">{{ item['status'] }}</span>
       {% elif 'in-service' in s %}
         <span class="badge badge-in-service">{{ item['status'] }}</span>
+      {% elif 'in-storage' in s %}
+        <span class="badge badge-in-storage">{{ item['status'] }}</span>
       {% elif 'new' in s %}
         <span class="badge badge-new">{{ item['status'] }}</span>
       {% else %}
         <span class="badge badge-maintenance">{{ item['status'] }}</span>
+      {% endif %}
+      {% if item['classification'] == 'Flight' %}
+        <span style="font-size:0.72rem; font-weight:800; background:#fffbe6; color:#7a5c00;
+                     border:1px solid #f0c040; padding:0.25rem 0.6rem; border-radius:3px;
+                     vertical-align:middle; margin-left:0.4rem; letter-spacing:0.03em;">FLIGHT</span>
       {% endif %}
     </div>
     
@@ -32,6 +39,58 @@
   </div>
 
   <p style="font-size: 1.1rem; color: #444; margin-top: 0;">{{ item['description'] }}</p>
+
+  {% if item['classification'] == 'Flight' %}
+  <div style="display:inline-flex; align-items:center; gap:0.6rem; background:#fffbe6;
+              border:1px solid #f0c040; border-left:4px solid #c49000;
+              border-radius:4px; padding:0.55rem 1rem; margin-bottom:1.25rem;
+              font-weight:700; color:#7a5c00; font-size:0.9rem; letter-spacing:0.02em;">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#c49000" stroke-width="2.5">
+      <path d="M12 2L2 19h20L12 2z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="16" r="0.5" fill="#c49000"/>
+    </svg>
+    FLIGHT HARDWARE
+  </div>
+  {% endif %}
+
+  {% if item['image_filename'] %}
+  <div style="margin-bottom:1.25rem; display:flex; align-items:flex-start; gap:1.25rem;">
+    <img src="{{ url_for('hardware.serve_image', filename=item['image_filename']) }}"
+         alt="{{ item['hardware_id'] }}"
+         style="max-width:280px; max-height:280px; object-fit:contain; border:1px solid var(--border-soft); border-radius:4px; background:#fafaf8;">
+    <form method="post" action="{{ url_for('hardware.delete_image', id=item['id']) }}"
+          onsubmit="return confirm('Remove this image?');">
+      <button type="submit" class="secondary-button" style="font-size:0.8rem; color:#888;">Remove image</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="section-card" style="display:flex; align-items:center; gap:2rem; padding:0.9rem 1.25rem; flex-wrap:wrap;">
+    <div>
+      <div style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.2rem;">Quantity on Hand</div>
+      <div style="font-size:2rem; font-weight:700; color:{% if item['quantity'] == 0 %}#dc3545{% elif item['quantity'] <= 2 %}#b45309{% else %}#155724{% endif %}; line-height:1;">
+        {{ item['quantity'] }}
+      </div>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <form method="post" action="{{ url_for('hardware.adjust_qty', id=item['id']) }}" style="margin:0;">
+        <input type="hidden" name="delta" value="-1">
+        <button type="submit" class="secondary-button"
+                style="font-size:1.25rem; font-weight:700; padding:0.2rem 0.75rem; line-height:1;"
+                {% if item['quantity'] == 0 %}disabled{% endif %}>−</button>
+      </form>
+      <form method="post" action="{{ url_for('hardware.adjust_qty', id=item['id']) }}" style="margin:0;">
+        <input type="hidden" name="delta" value="1">
+        <button type="submit" class="secondary-button"
+                style="font-size:1.25rem; font-weight:700; padding:0.2rem 0.75rem; line-height:1;">+</button>
+      </form>
+      <form method="post" action="{{ url_for('hardware.adjust_qty', id=item['id']) }}"
+            style="margin:0; display:flex; gap:0.4rem; align-items:center;">
+        <input type="number" name="delta" placeholder="±qty"
+               style="width:72px; border:1px solid #ccc; border-radius:4px; padding:0.3rem 0.4rem; font-size:0.9rem; text-align:center;">
+        <button type="submit" class="secondary-button" style="white-space:nowrap; font-size:0.85rem;">Adjust</button>
+      </form>
+    </div>
+  </div>
 
   <div class="section-card">
     <div class="section-header">Identity & Specs</div>
@@ -125,6 +184,175 @@
           <div class="data-value">{{ item['max_rated_temperature'] }} °C</div>
         </div>
       </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="section-card">
+    <div class="section-header">Documents</div>
+    <div class="section-body">
+
+      {% if docs %}
+      <table style="margin-bottom:1.25rem;">
+        <thead>
+          <tr>
+            <th style="width:3rem;"></th>
+            <th>File</th>
+            <th>Label</th>
+            <th style="width:10rem;">Uploaded</th>
+            <th style="width:5rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs %}
+          {% set ext = doc['original_name'].rsplit('.', 1)[-1].lower() if '.' in doc['original_name'] else '?' %}
+          <tr>
+            <td style="text-align:center;">
+              {% if ext == 'pdf' %}
+                <span style="font-size:0.65rem; font-weight:800; background:#fee2e2; color:#b91c1c; padding:0.15rem 0.35rem; border-radius:3px;">PDF</span>
+              {% elif ext in ['doc','docx'] %}
+                <span style="font-size:0.65rem; font-weight:800; background:#dbeafe; color:#1d4ed8; padding:0.15rem 0.35rem; border-radius:3px;">{{ ext.upper() }}</span>
+              {% elif ext in ['xls','xlsx','csv'] %}
+                <span style="font-size:0.65rem; font-weight:800; background:#dcfce7; color:#15803d; padding:0.15rem 0.35rem; border-radius:3px;">{{ ext.upper() }}</span>
+              {% elif ext in ['dwg','dxf'] %}
+                <span style="font-size:0.65rem; font-weight:800; background:#fef3c7; color:#b45309; padding:0.15rem 0.35rem; border-radius:3px;">{{ ext.upper() }}</span>
+              {% else %}
+                <span style="font-size:0.65rem; font-weight:800; background:#e5e7eb; color:#374151; padding:0.15rem 0.35rem; border-radius:3px;">{{ ext.upper() }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('hardware.serve_doc', stored_name=doc['stored_name']) }}"
+                 target="_blank"
+                 style="color:var(--accent); text-decoration:none; font-weight:500;">
+                {{ doc['original_name'] }}
+              </a>
+            </td>
+            <td style="color:#666; font-size:0.9rem;">{{ doc['label'] or '—' }}</td>
+            <td style="color:#888; font-size:0.82rem;">{{ doc['uploaded_at'][:10] }}</td>
+            <td>
+              <form method="post" action="{{ url_for('hardware.delete_doc', doc_id=doc['id']) }}"
+                    onsubmit="return confirm('Remove {{ doc['original_name'] }}?');">
+                <button type="submit"
+                        style="background:none; border:none; color:#aaa; cursor:pointer; font-size:0.8rem; padding:0.2rem 0.4rem;"
+                        title="Remove">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post"
+            action="{{ url_for('hardware.upload_doc', id=item['id']) }}"
+            enctype="multipart/form-data"
+            style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if docs %}0.5rem; border-top:1px solid #eee{% else %}0{% endif %};">
+        <div style="flex:2; min-width:180px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">File</label>
+          <input type="file" name="doc"
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.dwg,.dxf,.zip,.png,.jpg,.jpeg"
+                 style="font-size:0.88rem; width:100%;">
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Label <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="label" placeholder="e.g. Schematic, Datasheet"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <button type="submit" class="secondary-button" style="white-space:nowrap;">Upload</button>
+      </form>
+
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">Kit Contents</div>
+    <div class="section-body">
+
+      {% if kit_items %}
+      <table style="margin-bottom:1.25rem; width:100%;">
+        <thead>
+          <tr>
+            <th style="width:3.5rem; text-align:center;">Qty</th>
+            <th>Description</th>
+            <th style="width:7rem;">H-Number</th>
+            <th>Notes</th>
+            <th style="width:3rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ki in kit_items %}
+          <tr>
+            <td style="text-align:center; font-weight:600;">{{ ki['quantity'] }}</td>
+            <td>{{ ki['description'] }}</td>
+            <td>
+              {% if ki['linked_hid'] %}
+                <a href="{{ url_for('hardware.hardware_detail', id=ki['ref_hardware_id']) }}"
+                   style="color:var(--accent); font-weight:600; font-size:0.85rem;">{{ ki['linked_hid'] }}</a>
+              {% else %}
+                <span style="color:#bbb; font-size:0.8rem;">—</span>
+              {% endif %}
+            </td>
+            <td style="color:#666; font-size:0.9rem;">{{ ki['notes'] or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('hardware.kit_delete_item', kit_item_id=ki['id']) }}"
+                    onsubmit="return confirm('Remove this item from the kit?');">
+                <button type="submit"
+                        style="background:none; border:none; color:#aaa; cursor:pointer; font-size:0.8rem; padding:0.2rem 0.4rem;"
+                        title="Remove">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('hardware.kit_add_item', id=item['id']) }}"
+            style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if kit_items %}0.5rem; border-top:1px solid #eee{% else %}0{% endif %};">
+        <div style="flex:3; min-width:160px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Description *</label>
+          <input type="text" name="description" placeholder="e.g. 10kΩ 0402 resistor"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;" required>
+        </div>
+        <div style="flex:0 0 68px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Qty</label>
+          <input type="number" name="quantity" value="1" min="1" step="1"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <div style="flex:1; min-width:100px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">H-Number <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="ref_hardware_id" placeholder="H26001"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem; text-transform:uppercase;">
+        </div>
+        <div style="flex:2; min-width:120px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="notes" placeholder="e.g. populate U1, U3"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <button type="submit" class="secondary-button" style="white-space:nowrap;">Add Item</button>
+      </form>
+
+    </div>
+  </div>
+
+  {% if kit_memberships %}
+  <div class="section-card" style="border-left:3px solid var(--accent);">
+    <div class="section-header">Part of Kits</div>
+    <div class="section-body">
+      <table style="width:100%; font-size:0.9rem;">
+        <tbody>
+          {% for m in kit_memberships %}
+          <tr>
+            <td style="width:7rem; font-weight:700;">
+              <a href="{{ url_for('hardware.hardware_detail', id=m['kit_id']) }}" style="color:var(--accent);">{{ m['kit_hid'] }}</a>
+            </td>
+            <td>{{ m['kit_desc'] }}</td>
+            <td style="width:5rem; text-align:center; color:#555;">qty {{ m['quantity'] }}</td>
+            <td style="color:#888; font-size:0.85rem;">{{ m['notes'] or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
   {% endif %}

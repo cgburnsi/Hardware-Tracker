@@ -1,6 +1,52 @@
+import os
+import uuid
 from datetime import datetime
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from werkzeug.utils import secure_filename
 from app.db import get_db
+
+_ALLOWED_IMAGE_EXT = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+_ALLOWED_DOC_EXT = {
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'txt', 'csv', 'dwg', 'dxf', 'zip', 'png', 'jpg', 'jpeg',
+}
+
+def _upload_folder():
+    folder = os.path.join(current_app.instance_path, 'uploads')
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+def _save_image(file, hardware_id):
+    if not file or not file.filename:
+        return None
+    ext = file.filename.rsplit('.', 1)[-1].lower()
+    if ext not in _ALLOWED_IMAGE_EXT:
+        return None
+    filename = f"{hardware_id}.{ext}"
+    file.save(os.path.join(_upload_folder(), filename))
+    return filename
+
+def _delete_image_file(filename):
+    if filename:
+        path = os.path.join(_upload_folder(), filename)
+        if os.path.exists(path):
+            os.remove(path)
+
+def _doc_folder():
+    folder = os.path.join(current_app.instance_path, 'uploads', 'docs')
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+def _save_doc(file, hardware_id):
+    """Save uploaded document. Returns (stored_name, original_name) or (None, None)."""
+    if not file or not file.filename:
+        return None, None
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in _ALLOWED_DOC_EXT:
+        return None, None
+    stored_name = f"{hardware_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    file.save(os.path.join(_doc_folder(), stored_name))
+    return stored_name, file.filename
 
 bp = Blueprint('hardware', __name__, url_prefix='/hardware')
 
@@ -77,6 +123,9 @@ def hardware_list():
     cats = db.execute("SELECT DISTINCT category FROM hardware WHERE category IS NOT NULL ORDER BY category").fetchall()
     stats = db.execute("SELECT DISTINCT status FROM hardware WHERE status IS NOT NULL ORDER BY status").fetchall()
 
+    # IDs of hardware items that have kit contents
+    kit_ids = {row[0] for row in db.execute("SELECT DISTINCT kit_hardware_id FROM kit_items").fetchall()}
+
     return render_template(
         "hardware_list.html",
         items=items,
@@ -85,6 +134,7 @@ def hardware_list():
         status=status,
         categories=[c["category"] for c in cats if c["category"]],
         statuses=[s["status"] for s in stats if s["status"]],
+        kit_ids=kit_ids,
     )
 
 @bp.route("/manufacturers", methods=["GET", "POST"])
@@ -114,15 +164,39 @@ def hardware_detail(id):
     item = cur.fetchone()
     
     # 2. Get the History Log
-    log_cur = db.execute("SELECT * FROM hardware_log WHERE hardware_id = ? ORDER BY timestamp DESC", (id,))
-    logs = log_cur.fetchall()
+    logs = db.execute(
+        "SELECT * FROM hardware_log WHERE hardware_id = ? ORDER BY timestamp DESC", (id,)
+    ).fetchall()
+
+    # 3. Get attached documents
+    docs = db.execute(
+        "SELECT * FROM hardware_docs WHERE hardware_id = ? ORDER BY uploaded_at DESC", (id,)
+    ).fetchall()
+
+    # 4. Kit contents (parts this item contains)
+    kit_items = db.execute("""
+        SELECT ki.*, h.hardware_id AS linked_hid
+        FROM kit_items ki
+        LEFT JOIN hardware h ON ki.ref_hardware_id = h.id
+        WHERE ki.kit_hardware_id = ?
+        ORDER BY ki.id
+    """, (id,)).fetchall()
+
+    # 5. Kit memberships (kits that contain this item)
+    kit_memberships = db.execute("""
+        SELECT ki.quantity, ki.notes, h.id AS kit_id, h.hardware_id AS kit_hid, h.description AS kit_desc
+        FROM kit_items ki
+        JOIN hardware h ON ki.kit_hardware_id = h.id
+        WHERE ki.ref_hardware_id = ?
+        ORDER BY h.hardware_id
+    """, (id,)).fetchall()
 
     if item is None:
         flash("Hardware not found.", "error")
         return redirect(url_for("hardware.hardware_list"))
-        
-    # Pass 'logs' to the template
-    return render_template("hardware_detail.html", item=item, logs=logs)
+
+    return render_template("hardware_detail.html", item=item, logs=logs, docs=docs,
+                           kit_items=kit_items, kit_memberships=kit_memberships)
 
 @bp.route("/new", methods=("GET", "POST"))
 def hardware_new():
@@ -162,41 +236,51 @@ def hardware_new():
         max_pressure = request.form.get("max_rated_pressure", "").strip()
         max_temp = request.form.get("max_rated_temperature", "").strip()
 
+        # 6. Quantity
+        try:
+            quantity = max(1, int(request.form.get("quantity", "1") or 1))
+        except ValueError:
+            quantity = 1
+
         if not description:
             flash("Description is required.", "error")
             return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
 
         hardware_id = generate_new_hardware_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
+        image_filename = _save_image(request.files.get('image'), hardware_id)
 
         db.execute(
             """
             INSERT INTO hardware (
-                hardware_id, description, category, classification, manufacturer, 
-                part_number, serial_number, 
+                hardware_id, description, category, classification, manufacturer,
+                part_number, serial_number,
                 ecn, calibration_id, repair_id, work_order_id,
                 port_configuration, cv, orifice_diameter,
-                status, custodian, location, 
-                safety_class, propellant_or_media, cleaning_spec, compliance_specs, 
+                status, custodian, location,
+                safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_rated_pressure, max_rated_temperature,
-                traveler_path, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                traveler_path, image_filename, quantity, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 hardware_id, description, category, classification, manufacturer,
-                part_number, serial_number, 
+                part_number, serial_number,
                 ecn, calibration_id, repair_id, work_order_id,
                 port_configuration, cv or None, orifice_diameter or None,
                 status, custodian, location,
-                safety_class, propellant_or_media, cleaning_spec, compliance_specs, 
+                safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_pressure or None, max_temp or None,
-                traveler_path, now, now
+                traveler_path, image_filename, quantity, now, now
             )
+        )
+        row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (hardware_id,)).fetchone()
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (row["id"], now, "Created", f"Item added: {description}" + (f" | S/N: {serial_number}" if serial_number else ""))
         )
         db.commit()
         flash(f"Created hardware {hardware_id}.", "success")
-        
-        row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (hardware_id,)).fetchone()
         return redirect(url_for("hardware.hardware_detail", id=row["id"]))
 
     return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
@@ -245,58 +329,104 @@ def hardware_edit(id):
         max_pressure = request.form.get("max_rated_pressure", "").strip()
         max_temp = request.form.get("max_rated_temperature", "").strip()
 
+        # 6. Quantity
+        try:
+            quantity = max(0, int(request.form.get("quantity", "1") or 1))
+        except ValueError:
+            quantity = item['quantity'] or 1
+
         if not description:
             flash("Description is required.", "error")
             return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
 
         now = datetime.utcnow().isoformat(timespec="seconds")
 
-        # --- HISTORY LOG LOGIC ---
-        changes = []
-        
-        # Check for meaningful changes
-        # (We use 'or ""' to handle None vs Empty String mismatches safely)
-        old_status = item['status'] or ""
-        old_location = item['location'] or ""
-        old_custodian = item['custodian'] or ""
+        # Handle image upload — replace existing if a new file was provided
+        new_image = _save_image(request.files.get('image'), item['hardware_id'])
+        if new_image and new_image != item['image_filename']:
+            _delete_image_file(item['image_filename'])
+            image_filename = new_image
+        else:
+            image_filename = item['image_filename']
 
-        if status != old_status:
-            changes.append(f"Status: '{old_status}' -> '{status}'")
-        if location != old_location:
-            changes.append(f"Location: '{old_location}' -> '{location}'")
-        if custodian != old_custodian:
-            changes.append(f"Custodian: '{old_custodian}' -> '{custodian}'")
+        # --- HISTORY LOG LOGIC ---
+        def _s(v):
+            return "" if v is None else str(v).strip()
+
+        def _eq(db_val, form_val):
+            a, b = _s(db_val), form_val.strip()
+            if a == b:
+                return True
+            try:                          # treat "3000.0" == "3000" as no change
+                return float(a) == float(b)
+            except (ValueError, TypeError):
+                return False
+
+        watched = [
+            ("Description",    item['description'],           description),
+            ("Category",       item['category'],              category),
+            ("Classification", item['classification'],        classification),
+            ("Manufacturer",   item['manufacturer'],          manufacturer),
+            ("Part Number",    item['part_number'],           part_number),
+            ("Serial Number",  item['serial_number'],         serial_number),
+            ("ECN",            item['ecn'],                   ecn),
+            ("Calibration ID", item['calibration_id'],        calibration_id),
+            ("Repair Ref",     item['repair_id'],             repair_id),
+            ("Work Order",     item['work_order_id'],         work_order_id),
+            ("Port Config",    item['port_configuration'],    port_configuration),
+            ("Cv",             item['cv'],                    cv),
+            ("Orifice Dia.",   item['orifice_diameter'],      orifice_diameter),
+            ("Status",         item['status'],                status),
+            ("Location",       item['location'],              location),
+            ("Custodian",      item['custodian'],             custodian),
+            ("Safety Class",   item['safety_class'],          safety_class),
+            ("Media",          item['propellant_or_media'],   propellant_or_media),
+            ("Cleaning Spec",  item['cleaning_spec'],         cleaning_spec),
+            ("Compliance",     item['compliance_specs'],      compliance_specs),
+            ("Max Pressure",   item['max_rated_pressure'],    max_pressure),
+            ("Max Temp",       item['max_rated_temperature'], max_temp),
+            ("Traveler Path",  item['traveler_path'],         traveler_path),
+            ("Quantity",       item['quantity'],               str(quantity)),
+        ]
+
+        changes = [
+            f"{label}: '{_s(old)}' → '{new.strip()}'"
+            for label, old, new in watched
+            if not _eq(old, new)
+        ]
+
+        if new_image:
+            changes.append("Photo: " + ("replaced" if item['image_filename'] else "added"))
 
         if changes:
-            log_desc = "; ".join(changes)
             db.execute(
                 "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                (id, now, "Update", log_desc)
+                (id, now, "Update", "; ".join(changes))
             )
 
         # --- SAVE UPDATE ---
         db.execute(
             """
             UPDATE hardware SET
-                description=?, category=?, classification=?, manufacturer=?, 
-                part_number=?, serial_number=?, 
+                description=?, category=?, classification=?, manufacturer=?,
+                part_number=?, serial_number=?,
                 ecn=?, calibration_id=?, repair_id=?, work_order_id=?,
                 port_configuration=?, cv=?, orifice_diameter=?,
-                status=?, custodian=?, location=?, 
+                status=?, custodian=?, location=?,
                 safety_class=?, propellant_or_media=?, cleaning_spec=?, compliance_specs=?,
                 max_rated_pressure=?, max_rated_temperature=?,
-                traveler_path=?, updated_at=?
+                traveler_path=?, image_filename=?, quantity=?, updated_at=?
             WHERE id=?
             """,
             (
                 description, category, classification, manufacturer,
-                part_number, serial_number, 
+                part_number, serial_number,
                 ecn, calibration_id, repair_id, work_order_id,
                 port_configuration, cv or None, orifice_diameter or None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_pressure or None, max_temp or None,
-                traveler_path, now, id
+                traveler_path, image_filename, quantity, now, id
             )
         )
         db.commit()
@@ -309,7 +439,170 @@ def hardware_edit(id):
 
 
 
-# ... existing code ...
+@bp.route("/image/<path:filename>")
+def serve_image(filename):
+    return send_from_directory(_upload_folder(), filename)
+
+@bp.route("/<int:id>/delete-image", methods=["POST"])
+def delete_image(id):
+    db = get_db()
+    item = db.execute("SELECT image_filename FROM hardware WHERE id = ?", (id,)).fetchone()
+    if item and item['image_filename']:
+        _delete_image_file(item['image_filename'])
+        db.execute("UPDATE hardware SET image_filename = NULL WHERE id = ?", (id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (id, now, "Update", "Photo: removed")
+        )
+        db.commit()
+        flash("Image removed.", "success")
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/<int:id>/adjust-qty", methods=["POST"])
+def adjust_qty(id):
+    db = get_db()
+    item = db.execute("SELECT id, quantity, hardware_id FROM hardware WHERE id = ?", (id,)).fetchone()
+    if not item:
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+
+    try:
+        delta = int(request.form.get("delta", "0"))
+    except ValueError:
+        flash("Invalid adjustment value.", "error")
+        return redirect(url_for("hardware.hardware_detail", id=id))
+
+    current_qty = item['quantity'] or 0
+    new_qty = max(0, current_qty + delta)
+
+    if new_qty == current_qty:
+        flash("Quantity unchanged — cannot go below 0.", "warning")
+        return redirect(url_for("hardware.hardware_detail", id=id))
+
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute("UPDATE hardware SET quantity=?, updated_at=? WHERE id=?", (new_qty, now, id))
+    direction = "added" if delta > 0 else "removed"
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Stock", f"Qty {direction} {abs(delta)}: {current_qty} → {new_qty}")
+    )
+    db.commit()
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/docs/file/<path:stored_name>")
+def serve_doc(stored_name):
+    return send_from_directory(_doc_folder(), stored_name)
+
+@bp.route("/<int:id>/docs/upload", methods=["POST"])
+def upload_doc(id):
+    db = get_db()
+    if not db.execute("SELECT id FROM hardware WHERE id = ?", (id,)).fetchone():
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+
+    label = request.form.get("label", "").strip()
+    stored_name, original_name = _save_doc(request.files.get("doc"), id)
+
+    if not stored_name:
+        flash("Upload failed — check that the file type is supported.", "error")
+        return redirect(url_for("hardware.hardware_detail", id=id))
+
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute(
+        "INSERT INTO hardware_docs (hardware_id, original_name, stored_name, label, uploaded_at) VALUES (?, ?, ?, ?, ?)",
+        (id, original_name, stored_name, label or None, now)
+    )
+    log_desc = f"Document added: {label or original_name}"
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Document", log_desc)
+    )
+    db.commit()
+    flash(f"Uploaded {original_name}.", "success")
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/docs/<int:doc_id>/delete", methods=["POST"])
+def delete_doc(doc_id):
+    db = get_db()
+    doc = db.execute("SELECT * FROM hardware_docs WHERE id = ?", (doc_id,)).fetchone()
+    if doc:
+        path = os.path.join(_doc_folder(), doc['stored_name'])
+        if os.path.exists(path):
+            os.remove(path)
+        db.execute("DELETE FROM hardware_docs WHERE id = ?", (doc_id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        log_desc = f"Document removed: {doc['label'] or doc['original_name']}"
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (doc['hardware_id'], now, "Document", log_desc)
+        )
+        db.commit()
+        flash(f"Removed {doc['original_name']}.", "success")
+        return redirect(url_for("hardware.hardware_detail", id=doc['hardware_id']))
+    return redirect(url_for("hardware.hardware_list"))
+
+
+# --- KIT ROUTES ---
+
+@bp.route("/<int:id>/kit/add", methods=["POST"])
+def kit_add_item(id):
+    db = get_db()
+    if not db.execute("SELECT id FROM hardware WHERE id = ?", (id,)).fetchone():
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+
+    description = request.form.get("description", "").strip()
+    notes = request.form.get("notes", "").strip()
+    ref_hid_str = request.form.get("ref_hardware_id", "").strip().upper()
+    try:
+        quantity = max(1, int(request.form.get("quantity", "1") or 1))
+    except ValueError:
+        quantity = 1
+
+    if not description:
+        flash("Description is required for a kit item.", "error")
+        return redirect(url_for("hardware.hardware_detail", id=id))
+
+    # Resolve optional H-number reference
+    ref_id = None
+    if ref_hid_str:
+        ref_row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (ref_hid_str,)).fetchone()
+        if ref_row:
+            ref_id = ref_row['id']
+        else:
+            flash(f"H-number '{ref_hid_str}' not found — item added without link.", "warning")
+
+    db.execute(
+        "INSERT INTO kit_items (kit_hardware_id, ref_hardware_id, description, quantity, notes) VALUES (?, ?, ?, ?, ?)",
+        (id, ref_id, description, quantity, notes or None)
+    )
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    link_note = f" ({ref_hid_str})" if ref_id else ""
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Kit", f"Added to kit: {quantity}× {description}{link_note}")
+    )
+    db.commit()
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+
+@bp.route("/kit-item/<int:kit_item_id>/delete", methods=["POST"])
+def kit_delete_item(kit_item_id):
+    db = get_db()
+    row = db.execute("SELECT kit_hardware_id FROM kit_items WHERE id = ?", (kit_item_id,)).fetchone()
+    if row:
+        item_row = db.execute("SELECT description, quantity FROM kit_items WHERE id = ?", (kit_item_id,)).fetchone()
+        db.execute("DELETE FROM kit_items WHERE id = ?", (kit_item_id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (row['kit_hardware_id'], now, "Kit", f"Removed from kit: {item_row['quantity']}× {item_row['description']}")
+        )
+        db.commit()
+        return redirect(url_for("hardware.hardware_detail", id=row['kit_hardware_id']))
+    return redirect(url_for("hardware.hardware_list"))
+
 
 # --- GENERIC LIST HELPERS ---
 

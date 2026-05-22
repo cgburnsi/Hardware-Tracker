@@ -1,5 +1,8 @@
+import io
 import os
-from flask import Flask, render_template
+import sqlite3 as _sqlite3
+from datetime import datetime
+from flask import Flask, render_template, send_file
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True)
@@ -30,7 +33,7 @@ def create_app():
         status_rows = conn.execute(
             "SELECT status, COUNT(*) as count FROM hardware GROUP BY status"
         ).fetchall()
-        status_counts = {row['status']: row['count'] for row in status_rows}
+        status_counts = {(row['status'] or '').lower(): row['count'] for row in status_rows}
         total_hw = sum(status_counts.values())
 
         recent_runs = conn.execute("""
@@ -50,5 +53,25 @@ def create_app():
             recent_runs=recent_runs,
             proc_count=proc_count,
         )
+
+    @app.route('/backup-db')
+    def backup_db():
+        db_path = app.config['DATABASE']
+        tmp_path = os.path.join(app.instance_path, '_backup_tmp.db')
+        # sqlite3.backup() gives a consistent snapshot even with concurrent writes
+        src = _sqlite3.connect(db_path)
+        dst = _sqlite3.connect(tmp_path)
+        src.backup(dst)
+        dst.close()
+        src.close()
+        buf = io.BytesIO()
+        with open(tmp_path, 'rb') as f:
+            buf.write(f.read())
+        os.unlink(tmp_path)
+        buf.seek(0)
+        ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        return send_file(buf, as_attachment=True,
+                         download_name=f'hardware_backup_{ts}.db',
+                         mimetype='application/octet-stream')
 
     return app

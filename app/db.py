@@ -21,6 +21,7 @@ def init_db():
     
     schema = """
     -- 1. CLEANUP
+    DROP TABLE IF EXISTS kit_items;
     DROP TABLE IF EXISTS hardware;
     DROP TABLE IF EXISTS procedures;
     DROP TABLE IF EXISTS procedure_sections;
@@ -69,6 +70,8 @@ def init_db():
         max_rated_temperature REAL,
 
         traveler_path TEXT,
+        image_filename TEXT,
+        quantity INTEGER NOT NULL DEFAULT 1,
         created_at TEXT,
         updated_at TEXT
     );
@@ -138,7 +141,30 @@ def init_db():
         FOREIGN KEY (hardware_id) REFERENCES hardware(id)
     );
 
-    -- 8. RUN VALUES (Data Recording)
+    -- 8. HARDWARE DOCUMENTS
+    CREATE TABLE IF NOT EXISTS hardware_docs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hardware_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL UNIQUE,
+        label TEXT,
+        uploaded_at TEXT NOT NULL,
+        FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+    );
+
+    -- 10. KIT CONTENTS
+    CREATE TABLE kit_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kit_hardware_id INTEGER NOT NULL,
+        ref_hardware_id INTEGER,
+        description TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        notes TEXT,
+        FOREIGN KEY (kit_hardware_id) REFERENCES hardware(id),
+        FOREIGN KEY (ref_hardware_id) REFERENCES hardware(id)
+    );
+
+    -- 9. RUN VALUES (Data Recording)
     CREATE TABLE run_values (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
@@ -165,6 +191,45 @@ def init_db_command():
     init_db()
     click.echo('Initialized the database.')
 
+def migrate_db():
+    """Add columns/tables introduced after initial schema — safe to run on existing DBs."""
+    db = get_db()
+    cols = {row[1] for row in db.execute("PRAGMA table_info(hardware)").fetchall()}
+    if 'image_filename' not in cols:
+        db.execute("ALTER TABLE hardware ADD COLUMN image_filename TEXT")
+    if 'quantity' not in cols:
+        db.execute("ALTER TABLE hardware ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hardware_docs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hardware_id INTEGER NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL UNIQUE,
+            label TEXT,
+            uploaded_at TEXT NOT NULL,
+            FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS kit_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kit_hardware_id INTEGER NOT NULL,
+            ref_hardware_id INTEGER,
+            description TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            FOREIGN KEY (kit_hardware_id) REFERENCES hardware(id),
+            FOREIGN KEY (ref_hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    db.commit()
+
 def init_app(app):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
+
+    with app.app_context():
+        try:
+            migrate_db()
+        except Exception:
+            pass  # DB doesn't exist yet — init-db will create it with the full schema

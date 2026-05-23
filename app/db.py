@@ -463,6 +463,17 @@ def migrate_db():
             FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
     """)
+    db.executescript("""
+        INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
+            ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),
+            ('Propellant (ASCENT)', 'Chemical-resistant gloves (nitrile minimum). Chemical splash goggles. Lab coat or chemical-resistant apron. Ensure eyewash station is accessible and unobstructed. Review ASCENT SDS before handling.',   '#e67e22', 2),
+            ('Noise',               'Hearing protection required for operations exceeding 85 dB. Double protection (plugs + muffs) required above 100 dB.',                                                                                     '#f39c12', 3),
+            ('Cryogenic',           'Cryogenic-rated insulated gloves. Full face shield. Avoid synthetic clothing near cryogenic fluids. Ensure adequate ventilation to prevent oxygen displacement.',                                          '#2980b9', 4),
+            ('Flammable/Ignition',  'Eliminate all ignition sources within the test area. Fire extinguisher accessible and recently inspected. No open flames. Ground all conductive components.',                                              '#d35400', 5),
+            ('Electrical/ESD',      'ESD wrist strap required when handling electronics. Insulated tools only. Verify lockout/tagout procedure is complete before working on powered systems.',                                                 '#8e44ad', 6),
+            ('Toxic/Chemical',      'Chemical-resistant gloves. Splash goggles. Fume hood or forced ventilation required. Review SDS for all chemicals present. Know location of nearest emergency shower.',                                   '#27ae60', 7),
+            ('Heavy Lift',          'Back brace recommended for lifts over 35 lbs. Two-person lift required for loads over 50 lbs. Clear path before moving. Use lifting aids (dollies, hoists) where available.',                            '#7f8c8d', 8);
+    """)
     db.commit()
 
 def init_app(app):

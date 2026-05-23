@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block title %}H-{{ '%02d'|format(position) }} — {{ ha.ha_id }} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .badge-rac-high     { background:#f8d7da; color:#842029; }
+  .badge-rac-moderate { background:#fff3cd; color:#664d03; }
+  .badge-rac-low      { background:#d1e7dd; color:#0f5132; }
+  .badge-rac-minimal  { background:#e2e3e5; color:#41464b; }
+
+  .rac-block { display:inline-flex; align-items:center; gap:0.5rem; margin-top:0.25rem; }
+  .rac-code  { font-size:1.4rem; font-weight:800; font-family:monospace; }
+  .rac-rank  { font-size:0.85rem; font-weight:700; padding:0.25rem 0.6rem; border-radius:4px; }
+
+  .control-card { border:1px solid #e2e2df; border-radius:4px; padding:0.75rem; margin-bottom:0.6rem; background:#fafaf8; }
+  .control-type-badge { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; padding:0.15rem 0.45rem; border-radius:3px; background:#e2e8f0; color:#3a4f6a; }
+  .control-type-Elimination   { background:#cfe2ff; color:#084298; }
+  .control-type-Substitution  { background:#d1e7dd; color:#0f5132; }
+  .control-type-Engineering   { background:#fff3cd; color:#664d03; }
+  .control-type-Administrative{ background:#f3e8ff; color:#5b2a8e; }
+  .control-type-PPE           { background:#ffe5d0; color:#7a3200; }
+
+  .note-entry { border-left:3px solid #ddd; padding:0.5rem 0.75rem; margin-bottom:0.6rem; background:#fafaf8; border-radius:0 4px 4px 0; }
+  .note-meta  { font-size:0.75rem; color:#888; margin-bottom:0.3rem; }
+  .note-body  { font-size:0.9rem; white-space:pre-wrap; }
+
+  .add-form-card { border:1px dashed #ccc; border-radius:4px; padding:0.75rem; background:#fff; }
+  .add-form-card label { font-size:0.75rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .add-form-card input, .add-form-card select, .add-form-card textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px; padding:0.4rem 0.5rem;
+    font-size:0.875rem; font-family:inherit; margin-bottom:0.5rem;
+  }
+  .add-form-card textarea { min-height:65px; resize:vertical; }
+  .ctrl-grid { display:grid; grid-template-columns:160px 1fr 1fr; gap:0.5rem; align-items:start; }
+
+  .nav-hazards { display:flex; gap:0.5rem; align-items:center; }
+  .nav-hazards a { color:var(--accent); text-decoration:none; font-size:0.85rem; font-weight:600; padding:0.3rem 0.6rem; border:1px solid #ccc; border-radius:3px; }
+  .nav-hazards a:hover { background:#f2f2f0; }
+  .nav-hazards span { color:#aaa; font-size:0.82rem; }
+</style>
+
+<!-- Breadcrumb + header -->
+<div class="page-title-row" style="flex-wrap:wrap; gap:0.75rem;">
+  <div>
+    <a href="{{ url_for('ha.ha_detail', ha_pk=ha.id) }}" style="color:#888; text-decoration:none; font-size:0.85rem;">← {{ ha.ha_id }} — {{ ha.title }}</a>
+    <h1 class="page-title" style="margin-top:0.25rem;">
+      H-{{ '%02d'|format(position) }}
+      {% if item.closed %}<span class="badge badge-completed" style="font-size:0.72rem; vertical-align:middle;">Closed</span>{% endif %}
+    </h1>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <div class="nav-hazards">
+      {% if prev_id %}<a href="{{ url_for('ha.hazard_detail', ha_pk=ha.id, item_id=prev_id) }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+      {% if next_id %}<a href="{{ url_for('ha.hazard_detail', ha_pk=ha.id, item_id=next_id) }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+    </div>
+    <a href="{{ url_for('ha.hazard_edit', ha_pk=ha.id, item_id=item.id) }}" class="secondary-button">Edit</a>
+    <form method="post" action="{{ url_for('ha.hazard_close', ha_pk=ha.id, item_id=item.id) }}" style="margin:0;">
+      <button type="submit" class="secondary-button">
+        {% if item.closed %}Reopen{% else %}Mark Closed{% endif %}
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('ha.hazard_delete', ha_pk=ha.id, item_id=item.id) }}" onsubmit="return confirm('Delete this hazard?');" style="margin:0;">
+      <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb;">Delete</button>
+    </form>
+  </div>
+</div>
+
+<!-- Hazard description -->
+<div class="section-card">
+  <div class="section-header">Hazard</div>
+  <div class="section-body" style="font-size:1rem; font-weight:500; line-height:1.5; white-space:pre-wrap;">{{ item.hazard_description }}</div>
+</div>
+
+<!-- Cause + Consequence -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.25rem;">
+  <div class="section-card" style="margin-bottom:0;">
+    <div class="section-header">Cause</div>
+    <div class="section-body" style="white-space:pre-wrap; font-size:0.9rem; min-height:3rem;">{{ item.cause or '—' }}</div>
+  </div>
+  <div class="section-card" style="margin-bottom:0;">
+    <div class="section-header">Consequence (Undesired Event)</div>
+    <div class="section-body" style="white-space:pre-wrap; font-size:0.9rem; min-height:3rem;">{{ item.consequence or '—' }}</div>
+  </div>
+</div>
+
+<!-- Initial Risk -->
+<div class="section-card">
+  <div class="section-header">Initial Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(without controls)</span></div>
+  <div class="section-body">
+    {% if item.initial_severity and item.initial_probability %}
+    <div style="display:flex; gap:2rem; flex-wrap:wrap;">
+      <div>
+        <div class="data-label">Severity</div>
+        <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_severity }} — {{ SEVERITY_LABELS.get(item.initial_severity, '') }}</div>
+      </div>
+      <div>
+        <div class="data-label">Probability</div>
+        <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_probability }} — {{ PROBABILITY_LABELS.get(item.initial_probability, '') }}</div>
+      </div>
+      <div>
+        <div class="data-label">RAC / Risk Ranking</div>
+        <div class="rac-block">
+          <span class="rac-code">{{ init_rac }}</span>
+          <span class="rac-rank badge-rac-{{ init_rank|lower }}">{{ init_rank }}</span>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <span style="color:#aaa;">Not yet assessed.</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="section-card" id="controls">
+  <div class="section-header">Controls</div>
+  <div class="section-body">
+    {% if controls %}
+    {% for ctrl in controls %}
+    <div class="control-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem;">
+        <div>
+          {% if ctrl.control_type %}
+          <span class="control-type-badge control-type-{{ ctrl.control_type }}">{{ ctrl.control_type }}</span>
+          {% endif %}
+        </div>
+        <form method="post" action="{{ url_for('ha.control_delete', ha_pk=ha.id, item_id=item.id, ctrl_id=ctrl.id) }}" onsubmit="return confirm('Remove this control?');" style="margin:0;">
+          <button type="submit" style="background:none; border:none; color:#aaa; cursor:pointer; font-size:1rem; padding:0; line-height:1;" title="Remove">✕</button>
+        </form>
+      </div>
+      <div style="font-size:0.9rem; margin-bottom:0.3rem;">{{ ctrl.description }}</div>
+      {% if ctrl.verification %}
+      <div style="font-size:0.8rem; color:#666;">
+        <span style="font-weight:600;">Verification:</span> {{ ctrl.verification }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="color:#aaa; margin:0 0 0.75rem;">No controls documented yet.</p>
+    {% endif %}
+
+    <!-- Add control form -->
+    <div class="add-form-card" style="margin-top:0.75rem;">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Control</div>
+      <form method="post" action="{{ url_for('ha.control_add', ha_pk=ha.id, item_id=item.id) }}">
+        <div class="ctrl-grid">
+          <div>
+            <label>Type</label>
+            <select name="control_type">
+              <option value="">— Select —</option>
+              {% for ct in CONTROL_TYPES %}
+              <option value="{{ ct }}">{{ ct }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Description *</label>
+            <textarea name="description" required placeholder="Specific control action or requirement"></textarea>
+          </div>
+          <div>
+            <label>Verification</label>
+            <textarea name="verification" placeholder="How this control was confirmed in place"></textarea>
+          </div>
+        </div>
+        <button type="submit" class="primary-button" style="padding:0.35rem 0.8rem; font-size:0.82rem;">Add Control</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Final Risk -->
+<div class="section-card">
+  <div class="section-header">Final Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(with existing controls applied)</span></div>
+  <div class="section-body">
+    {% if item.final_severity and item.final_probability %}
+    <div style="display:flex; gap:2rem; flex-wrap:wrap;">
+      <div>
+        <div class="data-label">Severity</div>
+        <div class="data-value" style="margin-top:0.2rem;">{{ item.final_severity }} — {{ SEVERITY_LABELS.get(item.final_severity, '') }}</div>
+      </div>
+      <div>
+        <div class="data-label">Probability</div>
+        <div class="data-value" style="margin-top:0.2rem;">{{ item.final_probability }} — {{ PROBABILITY_LABELS.get(item.final_probability, '') }}</div>
+      </div>
+      <div>
+        <div class="data-label">RAC / Residual Risk</div>
+        <div class="rac-block">
+          <span class="rac-code">{{ final_rac }}</span>
+          <span class="rac-rank badge-rac-{{ final_rank|lower }}">{{ final_rank }}</span>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <span style="color:#aaa;">Not yet assessed.</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Notes / Discussion -->
+<div class="section-card" id="notes">
+  <div class="section-header">Notes &amp; Discussion</div>
+  <div class="section-body">
+    {% if notes %}
+    {% for note in notes %}
+    <div class="note-entry">
+      <div class="note-meta"><strong>{{ note.author }}</strong> &nbsp;·&nbsp; {{ note.created_at[:16].replace('T',' ') }}</div>
+      <div class="note-body">{{ note.body }}</div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="color:#aaa; margin:0 0 0.75rem;">No notes yet.</p>
+    {% endif %}
+
+    <div class="add-form-card" style="margin-top:0.75rem;">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Note</div>
+      <form method="post" action="{{ url_for('ha.note_add', ha_pk=ha.id, item_id=item.id) }}">
+        <div style="display:grid; grid-template-columns:180px 1fr; gap:0.5rem; align-items:start;">
+          <div>
+            <label>Your Name *</label>
+            <input type="text" name="author" required placeholder="Name">
+          </div>
+          <div>
+            <label>Note *</label>
+            <textarea name="body" required placeholder="Discussion, question, or finding related to this hazard"></textarea>
+          </div>
+        </div>
+        <button type="submit" class="primary-button" style="padding:0.35rem 0.8rem; font-size:0.82rem;">Add Note</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

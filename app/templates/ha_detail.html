@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% block title %}{{ ha.ha_id }} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .badge-class-high     { background:#f8d7da; color:#842029; }
+  .badge-class-moderate { background:#fff3cd; color:#664d03; }
+  .badge-class-low      { background:#d1e7dd; color:#0f5132; }
+  .badge-class-minimal  { background:#e2e3e5; color:#41464b; }
+  .badge-rac-high     { background:#f8d7da; color:#842029; }
+  .badge-rac-moderate { background:#fff3cd; color:#664d03; }
+  .badge-rac-low      { background:#d1e7dd; color:#0f5132; }
+  .badge-rac-minimal  { background:#e2e3e5; color:#41464b; }
+
+  .sig-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  .sig-block { border:1px solid #ddd; border-radius:4px; padding:0.75rem; background:#fafaf8; }
+  .sig-role { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.07em; color:#888; font-weight:700; margin-bottom:0.5rem; }
+  .sig-field { margin-bottom:0.4rem; }
+  .sig-field label { font-size:0.72rem; color:#666; display:block; margin-bottom:0.2rem; }
+  .sig-field input { width:100%; padding:0.35rem 0.5rem; border:1px solid #ccc; border-radius:3px; font-size:0.875rem; font-family:inherit; }
+
+  .risk-matrix { border-collapse:collapse; font-size:0.78rem; width:auto; }
+  .risk-matrix th, .risk-matrix td { border:1px solid #ccc; padding:0.3rem 0.5rem; text-align:center; }
+  .risk-matrix th { background:#f3f3f1; font-weight:700; }
+  .rm-high     { background:#f8d7da; color:#842029; font-weight:700; }
+  .rm-moderate { background:#fff3cd; color:#664d03; font-weight:700; }
+  .rm-low      { background:#d1e7dd; color:#0f5132; font-weight:700; }
+  .rm-minimal  { background:#e2e3e5; color:#41464b; font-weight:700; }
+
+  .hazard-row-closed td { opacity:0.55; }
+</style>
+
+{% set cls = (ha.preliminary_classification or '').lower() %}
+
+<div class="page-title-row">
+  <div>
+    <a href="{{ url_for('ha.ha_list') }}" style="color:#888; text-decoration:none; font-size:0.85rem;">← Hazard Analyses</a>
+    <h1 class="page-title" style="margin-top:0.25rem;">
+      {{ ha.ha_id }}
+      {% if ha.preliminary_classification %}
+        <span class="badge badge-class-{{ cls }}" style="font-size:0.75rem; vertical-align:middle;">{{ ha.preliminary_classification }}</span>
+      {% endif %}
+      <span class="badge badge-status-{{ ha.status }}" style="font-size:0.7rem; vertical-align:middle; background:#e2e8f0; color:#3a4f6a;">{{ ha.status }}</span>
+    </h1>
+    <div style="color:#555; font-size:1rem; margin-top:0.1rem;">{{ ha.title }}</div>
+  </div>
+  <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap;">
+    <a href="{{ url_for('ha.hazard_new', ha_pk=ha.id) }}" class="primary-button">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Hazard
+    </a>
+    <a href="{{ url_for('ha.ha_edit', ha_pk=ha.id) }}" class="secondary-button">Edit</a>
+    <form method="post" action="{{ url_for('ha.ha_delete', ha_pk=ha.id) }}" onsubmit="return confirm('Delete this entire hazard analysis?');" style="margin:0;">
+      <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb;">Delete</button>
+    </form>
+  </div>
+</div>
+
+<!-- Overview -->
+<div class="section-card">
+  <div class="section-header">Overview</div>
+  <div class="section-body">
+    <div class="data-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">
+      <div class="data-item"><div class="data-label">Facility / Operation</div><div class="data-value">{{ ha.facility_operation or '—' }}</div></div>
+      <div class="data-item"><div class="data-label">Organization</div><div class="data-value">{{ ha.organization or '—' }}</div></div>
+      <div class="data-item"><div class="data-label">Preliminary Classification</div>
+        <div class="data-value">
+          {% if ha.preliminary_classification %}
+            <span class="badge badge-class-{{ cls }}">{{ ha.preliminary_classification }}</span>
+          {% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="data-item"><div class="data-label">Revision</div><div class="data-value">{{ ha.revision }}</div></div>
+      {% if linked_proc %}
+      <div class="data-item"><div class="data-label">Linked Procedure</div>
+        <div class="data-value">
+          <a href="{{ url_for('procedures.procedure_detail', id=ha.linked_procedure_id) }}" style="color:var(--accent);">{{ linked_proc.proc_id }} — {{ linked_proc.title }}</a>
+        </div>
+      </div>
+      {% endif %}
+      <div class="data-item"><div class="data-label">Created</div><div class="data-value">{{ (ha.created_at or '')[:10] }}</div></div>
+      <div class="data-item"><div class="data-label">Updated</div><div class="data-value">{{ (ha.updated_at or '')[:10] }}</div></div>
+    </div>
+    {% if ha.description %}
+    <div style="margin-top:1rem;">
+      <div class="data-label">Description</div>
+      <div style="margin-top:0.25rem; white-space:pre-wrap; font-size:0.9rem;">{{ ha.description }}</div>
+    </div>
+    {% endif %}
+    {% if ha.scope %}
+    <div style="margin-top:0.75rem;">
+      <div class="data-label">Scope</div>
+      <div style="margin-top:0.25rem; white-space:pre-wrap; font-size:0.9rem;">{{ ha.scope }}</div>
+    </div>
+    {% endif %}
+    {% if ha.assumptions %}
+    <div style="margin-top:0.75rem;">
+      <div class="data-label">Ground Rules &amp; Assumptions</div>
+      <div style="margin-top:0.25rem; white-space:pre-wrap; font-size:0.9rem;">{{ ha.assumptions }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Risk Matrix Reference -->
+<div class="section-card">
+  <div class="section-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';">
+    Risk Matrix Reference
+    <span style="font-size:0.8rem; font-weight:400; color:#888;">MWI 8715.15 Table 4</span>
+  </div>
+  <div class="section-body" style="display:none;">
+    <div style="display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-start;">
+      <div>
+        <table class="risk-matrix">
+          <thead>
+            <tr>
+              <th>Prob ↓ / Sev →</th>
+              <th>1 Catastrophic</th>
+              <th>2 Critical</th>
+              <th>3 Marginal</th>
+              <th>4 Negligible</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for prob, plabel in [('A','Frequent'),('B','Probable'),('C','Occasional'),('D','Remote'),('E','Improbable')] %}
+            <tr>
+              <th>{{ prob }} – {{ plabel }}</th>
+              {% for sev in [1,2,3,4] %}
+              {% set rac_key = sev|string + prob %}
+              {% set ranks = {'1A':'High','1B':'High','1C':'High','1D':'High','1E':'Moderate','2A':'High','2B':'High','2C':'High','2D':'Moderate','2E':'Low','3A':'High','3B':'Moderate','3C':'Moderate','3D':'Low','3E':'Minimal','4A':'Moderate','4B':'Low','4C':'Low','4D':'Minimal','4E':'Minimal'} %}
+              {% set rank = ranks[rac_key] %}
+              <td class="rm-{{ rank|lower }}">{{ rac_key }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:0.82rem; line-height:1.6;">
+        <div><span class="badge badge-rac-high">High</span> — Unacceptable; requires additional controls or EMC approval</div>
+        <div style="margin-top:0.4rem;"><span class="badge badge-rac-moderate">Moderate</span> — Undesirable; requires Dept/Lab/Office Manager approval</div>
+        <div style="margin-top:0.4rem;"><span class="badge badge-rac-low">Low</span> — Acceptable with supervisor approval</div>
+        <div style="margin-top:0.4rem;"><span class="badge badge-rac-minimal">Minimal</span> — Acceptable; no formal approval required</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hazard Summary -->
+<div class="section-card">
+  <div class="section-header">
+    Hazard Summary
+    <a href="{{ url_for('ha.hazard_new', ha_pk=ha.id) }}" class="primary-button" style="padding:0.3rem 0.75rem; font-size:0.78rem;">+ Add Hazard</a>
+  </div>
+  {% if items %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Hazard</th>
+        <th>Initial RAC</th>
+        <th>Final RAC</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr class="{{ 'hazard-row-closed' if item.closed }}">
+        <td style="color:#888; font-size:0.85rem; white-space:nowrap;">H-{{ '%02d'|format(loop.index) }}</td>
+        <td>
+          <a href="{{ url_for('ha.hazard_detail', ha_pk=ha.id, item_id=item.id) }}" style="color:var(--accent); text-decoration:none; font-weight:500;">
+            {{ item.hazard_description | truncate(80) }}
+          </a>
+        </td>
+        <td>
+          {% if item.init_rac %}
+            <span class="badge badge-rac-{{ item.init_rank|lower }}">{{ item.init_rac }} – {{ item.init_rank }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if item.final_rac %}
+            <span class="badge badge-rac-{{ item.final_rank|lower }}">{{ item.final_rac }} – {{ item.final_rank }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if item.closed %}
+            <span class="badge badge-completed">Closed</span>
+          {% else %}
+            <span class="badge badge-in-progress">Open</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="section-body" style="color:#888; text-align:center; padding:2rem;">
+    No hazards identified yet. <a href="{{ url_for('ha.hazard_new', ha_pk=ha.id) }}" style="color:var(--accent);">Add the first one.</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Signatures -->
+<div class="section-card" id="signatures">
+  <div class="section-header">Signatures</div>
+  <div class="section-body">
+    <form method="post" action="{{ url_for('ha.ha_signatures', ha_pk=ha.id) }}">
+      <div class="sig-grid">
+        {% for role, label in [('prepared_by','Prepared By'),('safety_review','Safety Office Review'),('risk_acceptance','Risk Acceptance')] %}
+        {% set s = sig_map.get(role, {}) %}
+        <div class="sig-block">
+          <div class="sig-role">{{ label }}</div>
+          <div class="sig-field">
+            <label>Name</label>
+            <input type="text" name="{{ role }}_name" value="{{ s.get('signer_name','') }}">
+          </div>
+          <div class="sig-field">
+            <label>Organization</label>
+            <input type="text" name="{{ role }}_org" value="{{ s.get('signer_org','') }}">
+          </div>
+          <div class="sig-field">
+            <label>Date</label>
+            <input type="text" name="{{ role }}_date" value="{{ s.get('signed_date','') }}" placeholder="YYYY-MM-DD">
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:1rem;">
+        <button type="submit" class="primary-button">Save Signatures</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -217,6 +217,69 @@ def init_db():
         active      INTEGER DEFAULT 1
     );
 
+    -- 11. HAZARD ANALYSES
+    CREATE TABLE hazard_analyses (
+        id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        ha_id                    TEXT NOT NULL UNIQUE,
+        title                    TEXT NOT NULL,
+        facility_operation       TEXT,
+        organization             TEXT,
+        preliminary_classification TEXT,
+        description              TEXT,
+        scope                    TEXT,
+        assumptions              TEXT,
+        linked_procedure_id      INTEGER REFERENCES procedures(id),
+        revision                 TEXT NOT NULL DEFAULT 'A',
+        status                   TEXT NOT NULL DEFAULT 'draft',
+        parent_id                INTEGER REFERENCES hazard_analyses(id),
+        created_at               TEXT,
+        updated_at               TEXT
+    );
+
+    CREATE TABLE hazard_items (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        ha_id               INTEGER NOT NULL,
+        order_index         INTEGER NOT NULL DEFAULT 0,
+        hazard_description  TEXT NOT NULL,
+        cause               TEXT,
+        consequence         TEXT,
+        initial_severity    INTEGER,
+        initial_probability TEXT,
+        final_severity      INTEGER,
+        final_probability   TEXT,
+        closed              INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
+    );
+
+    CREATE TABLE hazard_controls (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        hazard_item_id  INTEGER NOT NULL,
+        order_index     INTEGER NOT NULL DEFAULT 0,
+        control_type    TEXT,
+        description     TEXT NOT NULL,
+        verification    TEXT,
+        FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
+    );
+
+    CREATE TABLE hazard_notes (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        hazard_item_id  INTEGER NOT NULL,
+        author          TEXT NOT NULL,
+        body            TEXT NOT NULL,
+        created_at      TEXT NOT NULL,
+        FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
+    );
+
+    CREATE TABLE hazard_signatures (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        ha_id        INTEGER NOT NULL,
+        role         TEXT NOT NULL,
+        signer_name  TEXT,
+        signer_org   TEXT,
+        signed_date  TEXT,
+        FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
+    );
+
     -- 9. SEED DATA
     INSERT OR IGNORE INTO manufacturers (name) VALUES ('Swagelok'), ('Parker'), ('McMaster-Carr'), ('Omega'), ('DigiKey');
     INSERT OR IGNORE INTO custodians (name) VALUES ('Lab Manager'), ('Test Engineer'), ('Quality Lead');
@@ -273,6 +336,116 @@ def migrate_db():
             notes TEXT,
             FOREIGN KEY (kit_hardware_id) REFERENCES hardware(id),
             FOREIGN KEY (ref_hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS procedure_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_id INTEGER NOT NULL,
+            order_index INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            input_type TEXT DEFAULT 'none',
+            unit TEXT,
+            min_value REAL,
+            max_value REAL,
+            notes_enabled INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS procedure_comments (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            procedure_id INTEGER NOT NULL,
+            section_id   INTEGER,
+            step_id      INTEGER,
+            target_label TEXT NOT NULL DEFAULT 'General',
+            author_name  TEXT NOT NULL,
+            body         TEXT NOT NULL,
+            created_at   TEXT NOT NULL,
+            resolved     INTEGER NOT NULL DEFAULT 0,
+            resolved_by  TEXT,
+            resolved_at  TEXT,
+            FOREIGN KEY (procedure_id) REFERENCES procedures(id),
+            FOREIGN KEY (section_id)   REFERENCES procedure_sections(id),
+            FOREIGN KEY (step_id)      REFERENCES procedure_steps(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_types (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL UNIQUE,
+            ppe_text    TEXT,
+            color       TEXT DEFAULT '#dc3545',
+            sort_order  INTEGER DEFAULT 0,
+            active      INTEGER DEFAULT 1
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_analyses (
+            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+            ha_id                    TEXT NOT NULL UNIQUE,
+            title                    TEXT NOT NULL,
+            facility_operation       TEXT,
+            organization             TEXT,
+            preliminary_classification TEXT,
+            description              TEXT,
+            scope                    TEXT,
+            assumptions              TEXT,
+            linked_procedure_id      INTEGER REFERENCES procedures(id),
+            revision                 TEXT NOT NULL DEFAULT 'A',
+            status                   TEXT NOT NULL DEFAULT 'draft',
+            parent_id                INTEGER REFERENCES hazard_analyses(id),
+            created_at               TEXT,
+            updated_at               TEXT
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_items (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            ha_id               INTEGER NOT NULL,
+            order_index         INTEGER NOT NULL DEFAULT 0,
+            hazard_description  TEXT NOT NULL,
+            cause               TEXT,
+            consequence         TEXT,
+            initial_severity    INTEGER,
+            initial_probability TEXT,
+            final_severity      INTEGER,
+            final_probability   TEXT,
+            closed              INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_controls (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            hazard_item_id  INTEGER NOT NULL,
+            order_index     INTEGER NOT NULL DEFAULT 0,
+            control_type    TEXT,
+            description     TEXT NOT NULL,
+            verification    TEXT,
+            FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_notes (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            hazard_item_id  INTEGER NOT NULL,
+            author          TEXT NOT NULL,
+            body            TEXT NOT NULL,
+            created_at      TEXT NOT NULL,
+            FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_signatures (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            ha_id        INTEGER NOT NULL,
+            role         TEXT NOT NULL,
+            signer_name  TEXT,
+            signer_org   TEXT,
+            signed_date  TEXT,
+            FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
     """)
     db.commit()

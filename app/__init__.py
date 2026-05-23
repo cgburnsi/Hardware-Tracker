@@ -25,6 +25,9 @@ def create_app():
     from . import procedures
     app.register_blueprint(procedures.bp)
 
+    from . import hazard_analyses
+    app.register_blueprint(hazard_analyses.bp)
+
     @app.route('/')
     def index():
         from .db import get_db

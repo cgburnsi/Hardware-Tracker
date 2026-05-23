@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}{% if ha %}Edit {{ ha.ha_id }}{% else %}New Hazard Analysis{% endif %} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .form-section { margin-bottom:1.5rem; }
+  .form-section-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; margin-bottom:0.75rem; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.75rem; }
+  .form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:0.75rem; }
+  .form-full { margin-bottom:0.75rem; }
+  .form-group label { display:block; font-size:0.78rem; color:#555; margin-bottom:0.3rem; font-weight:600; }
+  .form-group input, .form-group select, .form-group textarea {
+    width:100%; border:1px solid #ccc; border-radius:4px; padding:0.5rem 0.6rem;
+    font-size:0.9rem; font-family:inherit; background:#fff;
+  }
+  .form-group textarea { resize:vertical; min-height:90px; }
+  .class-hint { font-size:0.75rem; color:#888; margin-top:0.2rem; }
+</style>
+
+<div class="page-title-row">
+  <div>
+    <a href="{{ url_for('ha.ha_list') if not ha else url_for('ha.ha_detail', ha_pk=ha.id) }}" style="color:#888; text-decoration:none; font-size:0.85rem;">
+      ← {% if ha %}{{ ha.ha_id }}{% else %}Hazard Analyses{% endif %}
+    </a>
+    <h1 class="page-title" style="margin-top:0.25rem;">
+      {% if ha %}Edit {{ ha.ha_id }}{% else %}New Hazard Analysis{% endif %}
+    </h1>
+  </div>
+</div>
+
+<form method="post" style="max-width:900px;">
+
+  <div class="section-card">
+    <div class="section-header">Identification</div>
+    <div class="section-body">
+      <div class="form-full form-group">
+        <label>Title *</label>
+        <input type="text" name="title" value="{{ ha.title if ha else '' }}" required placeholder="e.g. ASCENT Propellant Loading Operations HA">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Facility / Operation</label>
+          <input type="text" name="facility_operation" value="{{ ha.facility_operation if ha else '' }}" placeholder="e.g. ER64 Propulsion Test Stand">
+        </div>
+        <div class="form-group">
+          <label>Organization</label>
+          <input type="text" name="organization" value="{{ ha.organization if ha else '' }}" placeholder="e.g. ER64 Propulsion Team">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>Preliminary Safety Classification</label>
+          <select name="preliminary_classification">
+            <option value="">— Select —</option>
+            {% for cls in ['High','Moderate','Low','Minimal','Process Safety Management'] %}
+            <option value="{{ cls }}" {% if ha and ha.preliminary_classification == cls %}selected{% endif %}>{{ cls }}</option>
+            {% endfor %}
+          </select>
+          <div class="class-hint">High/Moderate requires a full Hazard Analysis per MWI 8715.15 §5.3</div>
+        </div>
+        <div class="form-group">
+          <label>Revision</label>
+          <input type="text" name="revision" value="{{ ha.revision if ha else 'A' }}" maxlength="10" style="max-width:80px;">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status">
+            {% for s in ['draft','approved','superseded'] %}
+            <option value="{{ s }}" {% if ha and ha.status == s %}selected{% elif not ha and s == 'draft' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      {% if procedures %}
+      <div class="form-full form-group">
+        <label>Linked Procedure (optional)</label>
+        <select name="linked_procedure_id">
+          <option value="">— None —</option>
+          {% for p in procedures %}
+          <option value="{{ p.id }}" {% if ha and ha.linked_procedure_id == p.id %}selected{% endif %}>{{ p.proc_id }} — {{ p.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">Content</div>
+    <div class="section-body">
+      <div class="form-full form-group">
+        <label>Description</label>
+        <textarea name="description" placeholder="Brief description of the facility/operation and why a Hazard Analysis was required.">{{ ha.description if ha else '' }}</textarea>
+      </div>
+      <div class="form-full form-group">
+        <label>Scope</label>
+        <textarea name="scope" placeholder="What is included and excluded from this analysis. Reference drawings or schematics as needed.">{{ ha.scope if ha else '' }}</textarea>
+      </div>
+      <div class="form-full form-group">
+        <label>Ground Rules &amp; Assumptions</label>
+        <textarea name="assumptions" placeholder="List the assumptions that apply to this analysis. One per line.">{{ ha.assumptions if ha else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:0.75rem;">
+    <button type="submit" class="primary-button">{% if ha %}Save Changes{% else %}Create Hazard Analysis{% endif %}</button>
+    <a href="{{ url_for('ha.ha_list') if not ha else url_for('ha.ha_detail', ha_pk=ha.id) }}" class="secondary-button">Cancel</a>
+  </div>
+
+</form>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}{% if item %}Edit Hazard{% else %}Add Hazard{% endif %} — {{ ha.ha_id }} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .form-group { margin-bottom:0.85rem; }
+  .form-group label { display:block; font-size:0.78rem; color:#555; margin-bottom:0.3rem; font-weight:600; }
+  .form-group input, .form-group select, .form-group textarea {
+    width:100%; border:1px solid #ccc; border-radius:4px; padding:0.5rem 0.6rem;
+    font-size:0.9rem; font-family:inherit; background:#fff;
+  }
+  .form-group textarea { resize:vertical; min-height:80px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+
+  .rac-preview {
+    display:inline-block; padding:0.3rem 0.75rem; border-radius:4px;
+    font-size:1rem; font-weight:800; font-family:monospace;
+    background:#e2e3e5; color:#41464b; margin-top:0.35rem;
+    min-width:120px;
+  }
+  .rac-preview.rac-high     { background:#f8d7da; color:#842029; }
+  .rac-preview.rac-moderate { background:#fff3cd; color:#664d03; }
+  .rac-preview.rac-low      { background:#d1e7dd; color:#0f5132; }
+  .rac-preview.rac-minimal  { background:#e2e3e5; color:#41464b; }
+
+  .risk-block { background:#fafaf8; border:1px solid #e2e2df; border-radius:4px; padding:1rem; margin-bottom:1rem; }
+  .risk-block-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; margin-bottom:0.75rem; }
+</style>
+
+<div class="page-title-row">
+  <div>
+    <a href="{{ url_for('ha.ha_detail', ha_pk=ha.id) }}" style="color:#888; text-decoration:none; font-size:0.85rem;">← {{ ha.ha_id }}</a>
+    <h1 class="page-title" style="margin-top:0.25rem;">{% if item %}Edit Hazard{% else %}Add Hazard{% endif %}</h1>
+  </div>
+</div>
+
+<form method="post" style="max-width:860px;">
+
+  <div class="section-card">
+    <div class="section-header">Hazard Description</div>
+    <div class="section-body">
+      <div class="form-group">
+        <label>Hazard *</label>
+        <textarea name="hazard_description" required rows="3"
+          placeholder="Describe the hazardous condition. Be specific — e.g. 'Pressurized system failure releasing propellant' rather than 'propellant hazard'.">{{ item.hazard_description if item else '' }}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cause</label>
+          <textarea name="cause"
+            placeholder="The triggering mechanism or initiating event that leads to the hazard.">{{ item.cause if item else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Consequence (Undesired Event)</label>
+          <textarea name="consequence"
+            placeholder="The result of the hazard — injury, property damage, or environmental impact.">{{ item.consequence if item else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Initial Risk -->
+  <div class="section-card">
+    <div class="section-header">Initial Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(without any controls)</span></div>
+    <div class="section-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Severity</label>
+          <select name="initial_severity" id="init_sev" onchange="updateRac('init_sev','init_prob','init_rac_display')">
+            <option value="">— Select —</option>
+            {% for num, label in SEVERITY_LABELS.items() %}
+            <option value="{{ num }}" {% if item and item.initial_severity == num %}selected{% endif %}>{{ num }} — {{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Probability</label>
+          <select name="initial_probability" id="init_prob" onchange="updateRac('init_sev','init_prob','init_rac_display')">
+            <option value="">— Select —</option>
+            {% for letter, label in PROBABILITY_LABELS.items() %}
+            <option value="{{ letter }}" {% if item and item.initial_probability == letter %}selected{% endif %}>{{ letter }} — {{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">RAC / Risk Ranking</div>
+        <div id="init_rac_display" class="rac-preview">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final Risk -->
+  <div class="section-card">
+    <div class="section-header">Final Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(with existing controls; severity should not change)</span></div>
+    <div class="section-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Severity</label>
+          <select name="final_severity" id="final_sev" onchange="updateRac('final_sev','final_prob','final_rac_display')">
+            <option value="">— Select —</option>
+            {% for num, label in SEVERITY_LABELS.items() %}
+            <option value="{{ num }}" {% if item and item.final_severity == num %}selected{% endif %}>{{ num }} — {{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Probability</label>
+          <select name="final_probability" id="final_prob" onchange="updateRac('final_sev','final_prob','final_rac_display')">
+            <option value="">— Select —</option>
+            {% for letter, label in PROBABILITY_LABELS.items() %}
+            <option value="{{ letter }}" {% if item and item.final_probability == letter %}selected{% endif %}>{{ letter }} — {{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">RAC / Residual Risk</div>
+        <div id="final_rac_display" class="rac-preview">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:0.75rem;">
+    <button type="submit" class="primary-button">{% if item %}Save Changes{% else %}Add Hazard{% endif %}</button>
+    <a href="{{ url_for('ha.ha_detail', ha_pk=ha.id) if not item else url_for('ha.hazard_detail', ha_pk=ha.id, item_id=item.id) }}" class="secondary-button">Cancel</a>
+  </div>
+</form>
+
+<script>
+const RAC_RANK = {
+  '1A':'High','1B':'High','1C':'High','1D':'High','1E':'Moderate',
+  '2A':'High','2B':'High','2C':'High','2D':'Moderate','2E':'Low',
+  '3A':'High','3B':'Moderate','3C':'Moderate','3D':'Low','3E':'Minimal',
+  '4A':'Moderate','4B':'Low','4C':'Low','4D':'Minimal','4E':'Minimal'
+};
+function updateRac(sevId, probId, displayId) {
+  const sev  = document.getElementById(sevId).value;
+  const prob = document.getElementById(probId).value;
+  const el   = document.getElementById(displayId);
+  if (sev && prob) {
+    const key  = sev + prob;
+    const rank = RAC_RANK[key] || '';
+    el.textContent = key + ' — ' + rank;
+    el.className   = 'rac-preview rac-' + rank.toLowerCase();
+  } else {
+    el.textContent = '—';
+    el.className   = 'rac-preview';
+  }
+}
+// Initialize displays if editing an existing item
+document.addEventListener('DOMContentLoaded', function() {
+  updateRac('init_sev',  'init_prob',  'init_rac_display');
+  updateRac('final_sev', 'final_prob', 'final_rac_display');
+});
+</script>
+{% endblock %}

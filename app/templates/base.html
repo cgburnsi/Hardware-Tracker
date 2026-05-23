@@ -180,6 +180,10 @@
       .badge-completed    { background: #d1e7dd; color: #0f5132; }
       .badge-failed       { background: #f8d7da; color: #842029; }
       .badge-aborted      { background: #e2e3e5; color: #41464b; }
+      .badge-rac-high     { background: #f8d7da; color: #842029; }
+      .badge-rac-moderate { background: #fff3cd; color: #664d03; }
+      .badge-rac-low      { background: #d1e7dd; color: #0f5132; }
+      .badge-rac-minimal  { background: #e2e3e5; color: #41464b; }
 
       /* ── FLASH MESSAGES ── */
       .flash-list { list-style: none; padding: 0; margin: 0 0 1rem; }
@@ -263,6 +267,17 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
               </span>
               Add Hardware
+            </a>
+          </div>
+
+          <div class="sidebar-group">
+            <span class="sidebar-label">Safety</span>
+            <a href="{{ url_for('ha.ha_list') }}"
+               class="nav-link {% if request.endpoint and request.endpoint.startswith('ha.') %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              Hazard Analyses
             </a>
           </div>
 

@@ -24,6 +24,7 @@ def init_db():
     DROP TABLE IF EXISTS kit_items;
     DROP TABLE IF EXISTS hardware;
     DROP TABLE IF EXISTS procedures;
+    DROP TABLE IF EXISTS procedure_steps;
     DROP TABLE IF EXISTS procedure_sections;
     DROP TABLE IF EXISTS manufacturers;
     DROP TABLE IF EXISTS custodians;
@@ -87,34 +88,43 @@ def init_db():
     -- 4. PROCEDURES
     CREATE TABLE procedures (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        proc_id TEXT UNIQUE NOT NULL,
+        proc_id TEXT NOT NULL,
         title TEXT NOT NULL,
         type TEXT DEFAULT 'SOP',
         hardware_id TEXT,
-        revision TEXT,
+        revision TEXT NOT NULL DEFAULT 'A',
         purpose TEXT,
         hazards TEXT,
         prereqs TEXT,
-        steps TEXT,
+        parent_id INTEGER REFERENCES procedures(id),
         created_at TEXT,
-        updated_at TEXT
+        updated_at TEXT,
+        UNIQUE(proc_id, revision)
     );
     
-    -- 5. SECTIONS (Procedure Steps)
+    -- 5. SECTIONS (Groupings)
     CREATE TABLE procedure_sections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         procedure_id INTEGER NOT NULL,
         order_index INTEGER NOT NULL,
         title TEXT NOT NULL,
+        description TEXT,
+        FOREIGN KEY (procedure_id) REFERENCES procedures(id)
+    );
+
+    -- 5b. STEPS (Individual items within a section)
+    CREATE TABLE procedure_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_id INTEGER NOT NULL,
+        order_index INTEGER NOT NULL,
+        title TEXT NOT NULL,
         body TEXT,
-        
-        -- DATA CONFIG
         input_type TEXT DEFAULT 'none',
         unit TEXT,
-        min_value REAL,   -- New: Lower limit
-        max_value REAL,   -- New: Upper limit
-        
-        FOREIGN KEY (procedure_id) REFERENCES procedures(id)
+        min_value REAL,
+        max_value REAL,
+        notes_enabled INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
     );
 
     -- 6. HARDWARE HISTORY LOG
@@ -164,14 +174,16 @@ def init_db():
         FOREIGN KEY (ref_hardware_id) REFERENCES hardware(id)
     );
 
-    -- 9. RUN VALUES (Data Recording)
+    -- 9. RUN VALUES (Data Recording per step)
     CREATE TABLE run_values (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id INTEGER NOT NULL,
-        section_id INTEGER NOT NULL,
+        step_id INTEGER NOT NULL,
+        checked INTEGER DEFAULT 0,
         value TEXT,
+        notes TEXT,
         FOREIGN KEY (run_id) REFERENCES procedure_runs(id),
-        FOREIGN KEY (section_id) REFERENCES procedure_sections(id)
+        FOREIGN KEY (step_id) REFERENCES procedure_steps(id)
     );
 
     -- 9. SEED DATA

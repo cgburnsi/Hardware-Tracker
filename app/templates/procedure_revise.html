@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Revise / Branch: {{ source['proc_id'] }}{% endblock %}
+
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Actions</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedures.procedure_detail', id=source['id']) }}">Back to Procedure</a></li>
+    <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+<style>
+  .mode-cards { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+  .mode-card {
+    flex: 1; border: 2px solid #ddd; border-radius: 8px; padding: 1.25rem;
+    cursor: pointer; background: #fafafa; transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .mode-card:hover { border-color: #aab; background: #f4f6f8; }
+  .mode-card.selected { border-color: var(--accent); background: #f0f4ff; }
+  .mode-card input[type=radio] { position: absolute; opacity: 0; pointer-events: none; }
+  .mode-card-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.3rem; color: #222; }
+  .mode-card-sub { font-size: 0.85rem; color: #666; line-height: 1.5; }
+  .mode-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .badge-rev { background: #e8f4fd; color: #0056b3; border: 1px solid #b8daff; }
+  .badge-branch { background: #f0fff4; color: #1a7340; border: 1px solid #b7ebc8; }
+
+  .source-box {
+    background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 0.85rem 1rem; margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 1rem;
+  }
+  .source-id { font-weight: 700; font-size: 1.1rem; color: #333; }
+  .source-meta { font-size: 0.85rem; color: #666; }
+
+  .fields-section { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 1.25rem; margin-bottom: 1rem; }
+  .fields-section legend { font-weight: 600; color: var(--accent); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .id-row { display: flex; gap: 1rem; align-items: flex-end; }
+  .id-locked { background: #f4f4f2; color: #555; border: 1px solid #ddd; padding: 0.45rem 0.6rem; border-radius: 3px; font-weight: 600; font-size: 0.95rem; }
+  .helper { font-size: 0.75rem; color: #888; margin-top: 0.2rem; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">Revise / Branch Procedure</h2>
+</div>
+
+<div style="max-width: 760px;">
+
+  {# Source summary #}
+  <div class="source-box">
+    <div style="font-size: 1.5rem; color: #bbb;">📄</div>
+    <div>
+      <div class="source-id">{{ source['proc_id'] }} Rev {{ source['revision'] }}</div>
+      <div class="source-meta">
+        {{ source['title'] }}
+        {% if source['hardware_id'] %}&nbsp;·&nbsp; HW: {{ source['hardware_id'] }}{% endif %}
+        &nbsp;·&nbsp; {{ section_count }} section{% if section_count != 1 %}s{% endif %},
+        {{ step_count }} step{% if step_count != 1 %}s{% endif %} will be copied
+      </div>
+    </div>
+  </div>
+
+  <form method="post" id="revise-form">
+
+    {# Mode selection #}
+    <div class="mode-cards">
+
+      <div class="mode-card selected" id="card-revision" onclick="selectMode('revision')">
+        <input type="radio" name="mode" value="revision" id="mode-revision" checked>
+        <div class="mode-badge badge-rev">NEW REVISION</div>
+        <div class="mode-card-title">{{ source['proc_id'] }} Rev {{ next_rev }}</div>
+        <div class="mode-card-sub">
+          Same procedure number, next revision letter.<br>
+          Use when correcting or improving an existing procedure.
+        </div>
+      </div>
+
+      <div class="mode-card" id="card-variant" onclick="selectMode('variant')">
+        <input type="radio" name="mode" value="variant" id="mode-variant">
+        <div class="mode-badge badge-branch">BRANCH / VARIANT</div>
+        <div class="mode-card-title">{{ next_proc_id }} Rev A</div>
+        <div class="mode-card-sub">
+          New procedure number, branched from this one.<br>
+          Use for a different hardware type, project, or modified scope.
+        </div>
+      </div>
+
+    </div>
+
+    {# Dynamic fields #}
+    <fieldset class="fields-section">
+      <legend>New Procedure Details</legend>
+
+      <div class="id-row" style="margin-bottom: 1rem;">
+
+        <div id="field-proc-id-revision" style="flex:1;">
+          <label style="display:block; font-size:0.85rem; font-weight:600; color:#555; margin-bottom:0.3rem;">Procedure ID</label>
+          <div class="id-locked">{{ source['proc_id'] }}</div>
+          <input type="hidden" name="proc_id" id="hidden-proc-id" value="{{ source['proc_id'] }}">
+          <div class="helper">Same as source — you're revising the same document.</div>
+        </div>
+
+        <div id="field-proc-id-variant" style="flex:1; display:none;">
+          <label style="display:block; font-size:0.85rem; font-weight:600; color:#555; margin-bottom:0.3rem;">Procedure ID</label>
+          <input type="text" id="input-proc-id" value="{{ next_proc_id }}"
+                 style="width:100%; padding:0.45rem; border:1px solid #ccc; border-radius:3px; font-weight:600;"
+                 oninput="document.getElementById('hidden-proc-id').value = this.value">
+          <div class="helper">New document number — can be edited if needed.</div>
+        </div>
+
+        <div style="flex:1;">
+          <label style="display:block; font-size:0.85rem; font-weight:600; color:#555; margin-bottom:0.3rem;">Revision</label>
+          <input type="text" name="revision" id="input-revision" value="{{ next_rev }}"
+                 style="width:80px; padding:0.45rem; border:1px solid #ccc; border-radius:3px; font-weight:600; text-transform:uppercase;">
+          <div class="helper">Letter or number (e.g. B, C, 2).</div>
+        </div>
+
+      </div>
+
+      <div class="form-row" style="margin-bottom:0.75rem;">
+        <label>Title</label>
+        <input type="text" name="title" value="{{ source['title'] }}" required style="width:100%;">
+      </div>
+
+      <div style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+        <div style="flex:1;" class="form-row">
+          <label>Target Hardware ID</label>
+          <input type="text" name="hardware_id" value="{{ source['hardware_id'] or '' }}" placeholder="e.g. H25001">
+        </div>
+        <div style="width:80px;" class="form-row">
+          <label>Type</label>
+          <div style="padding:0.45rem 0; font-weight:600; color:#555;">{{ source['type'] }}</div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:0.75rem;">
+        <label>Purpose</label>
+        <textarea name="purpose" rows="2" style="width:100%;">{{ source['purpose'] or '' }}</textarea>
+      </div>
+
+      <div class="form-row" style="margin-bottom:0.75rem;">
+        <label>Hazards</label>
+        <input type="text" name="hazards" value="{{ source['hazards'] or '' }}" style="width:100%;">
+      </div>
+
+      <div class="form-row">
+        <label>Prerequisites / PPE</label>
+        <textarea name="prereqs" rows="2" style="width:100%;">{{ source['prereqs'] or '' }}</textarea>
+      </div>
+
+    </fieldset>
+
+    <div style="display:flex; gap:1rem; align-items:center;">
+      <button type="submit" class="primary-button" style="padding:0.75rem 2rem; font-size:1rem;">Create Copy</button>
+      <a href="{{ url_for('procedures.procedure_detail', id=source['id']) }}" class="secondary-button">Cancel</a>
+      <span style="font-size:0.85rem; color:#888; margin-left:0.5rem;">
+        All {{ section_count }} section{% if section_count != 1 %}s{% endif %} and
+        {{ step_count }} step{% if step_count != 1 %}s{% endif %} will be copied.
+      </span>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  const nextRev     = {{ next_rev | tojson }};
+  const nextProcId  = {{ next_proc_id | tojson }};
+  const sourceProcId = {{ source['proc_id'] | tojson }};
+
+  function selectMode(mode) {
+    const isRev = mode === 'revision';
+    document.getElementById('card-revision').classList.toggle('selected', isRev);
+    document.getElementById('card-variant').classList.toggle('selected', !isRev);
+    document.getElementById('mode-revision').checked = isRev;
+    document.getElementById('mode-variant').checked  = !isRev;
+
+    document.getElementById('field-proc-id-revision').style.display = isRev ? 'block' : 'none';
+    document.getElementById('field-proc-id-variant').style.display  = isRev ? 'none' : 'block';
+
+    document.getElementById('hidden-proc-id').value     = isRev ? sourceProcId : document.getElementById('input-proc-id').value;
+    document.getElementById('input-revision').value     = isRev ? nextRev : 'A';
+  }
+</script>
+{% endblock %}

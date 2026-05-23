@@ -2,7 +2,6 @@ import os
 import tempfile
 from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
-from docx import Document
 from app.db import get_db
 
 bp = Blueprint('procedures', __name__, url_prefix='/procedures')
@@ -12,10 +11,8 @@ bp = Blueprint('procedures', __name__, url_prefix='/procedures')
 # ---------------------------------------------------------------------------
 
 def generate_new_procedure_id(db):
-    """Generate next procedure ID PYY-XXX based on current year."""
     now = datetime.now()
     yy = f"{now.year % 100:02d}"
-    
     cur = db.execute(
         "SELECT proc_id FROM procedures WHERE proc_id LIKE ? ORDER BY proc_id DESC LIMIT 1",
         (f"P{yy}-%",)
@@ -26,15 +23,13 @@ def generate_new_procedure_id(db):
     else:
         try:
             seq = int(row["proc_id"].split("-")[1]) + 1
-        except:
+        except Exception:
             seq = 1
     return f"P{yy}-{seq:03d}"
 
 def generate_run_id(db):
-    """Generate next Run ID RYY-XXX based on current year."""
     now = datetime.now()
     yy = f"{now.year % 100:02d}"
-    
     cur = db.execute(
         "SELECT run_id FROM procedure_runs WHERE run_id LIKE ? ORDER BY run_id DESC LIMIT 1",
         (f"R{yy}-%",)
@@ -45,12 +40,31 @@ def generate_run_id(db):
     else:
         try:
             seq = int(row["run_id"].split("-")[1]) + 1
-        except:
+        except Exception:
             seq = 1
     return f"R{yy}-{seq:03d}"
 
+def get_sections_with_steps(db, procedure_id):
+    sections = db.execute(
+        "SELECT * FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index",
+        (procedure_id,)
+    ).fetchall()
+    all_steps = db.execute("""
+        SELECT s.* FROM procedure_steps s
+        JOIN procedure_sections sec ON s.section_id = sec.id
+        WHERE sec.procedure_id = ?
+        ORDER BY s.section_id, s.order_index
+    """, (procedure_id,)).fetchall()
+    steps_by_section = {}
+    for step in all_steps:
+        sid = step['section_id']
+        if sid not in steps_by_section:
+            steps_by_section[sid] = []
+        steps_by_section[sid].append(step)
+    return sections, steps_by_section
+
 # ---------------------------------------------------------------------------
-# Procedure Definitions (SOPs)
+# Procedure Definitions
 # ---------------------------------------------------------------------------
 
 @bp.route("/")
@@ -63,7 +77,7 @@ def procedure_list():
         query += " AND (proc_id LIKE ? OR title LIKE ? OR hardware_id LIKE ?)"
         like = f"%{q}%"
         params.extend([like, like, like])
-    query += " ORDER BY proc_id DESC"
+    query += " ORDER BY proc_id ASC, revision ASC"
     items = db.execute(query, params).fetchall()
     return render_template("procedure_list.html", items=items, q=q)
 
@@ -74,7 +88,17 @@ def procedure_detail(id):
     if item is None:
         flash("Procedure not found.", "error")
         return redirect(url_for("procedures.procedure_list"))
-    return render_template("procedure_detail.html", item=item)
+    sections, steps_by_section = get_sections_with_steps(db, id)
+    parent = None
+    if item['parent_id']:
+        parent = db.execute("SELECT id, proc_id, revision, title FROM procedures WHERE id = ?",
+                            (item['parent_id'],)).fetchone()
+    children = db.execute(
+        "SELECT id, proc_id, revision, title FROM procedures WHERE parent_id = ? ORDER BY proc_id, revision",
+        (id,)
+    ).fetchall()
+    return render_template("procedure_detail.html", item=item, sections=sections,
+                           steps_by_section=steps_by_section, parent=parent, children=children)
 
 @bp.route("/new", methods=["GET", "POST"])
 def procedure_new():
@@ -87,7 +111,6 @@ def procedure_new():
         purpose = request.form.get("purpose", "").strip()
         hazards = request.form.get("hazards", "").strip()
         prereqs = request.form.get("prereqs", "").strip()
-        steps = request.form.get("steps", "").strip()
 
         if not title:
             flash("Title is required.", "error")
@@ -97,10 +120,10 @@ def procedure_new():
         now = datetime.utcnow().isoformat(timespec="seconds")
 
         db.execute(
-            """INSERT INTO procedures 
-            (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, steps, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (proc_id, title, proc_type, hardware_id or None, revision, purpose, hazards, prereqs, steps, now, now)
+            """INSERT INTO procedures
+            (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (proc_id, title, proc_type, hardware_id or None, revision, purpose, hazards, prereqs, now, now)
         )
         db.commit()
         flash(f"Created {proc_type} {proc_id}.", "success")
@@ -114,7 +137,6 @@ def procedure_edit(id):
     db = get_db()
     item = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
     if request.method == "POST":
-        # ... (Same logic as procedure_new basically)
         title = request.form.get("title", "").strip()
         proc_type = request.form.get("type", "SOP").strip()
         hardware_id = request.form.get("hardware_id", "").strip()
@@ -122,82 +144,233 @@ def procedure_edit(id):
         purpose = request.form.get("purpose", "").strip()
         hazards = request.form.get("hazards", "").strip()
         prereqs = request.form.get("prereqs", "").strip()
-        steps = request.form.get("steps", "").strip()
         now = datetime.utcnow().isoformat(timespec="seconds")
 
         db.execute(
-            """UPDATE procedures SET title=?, type=?, hardware_id=?, revision=?, purpose=?, hazards=?, prereqs=?, steps=?, updated_at=? WHERE id=?""",
-            (title, proc_type, hardware_id, revision, purpose, hazards, prereqs, steps, now, id)
+            """UPDATE procedures SET title=?, type=?, hardware_id=?, revision=?,
+               purpose=?, hazards=?, prereqs=?, updated_at=? WHERE id=?""",
+            (title, proc_type, hardware_id, revision, purpose, hazards, prereqs, now, id)
         )
         db.commit()
         flash("Procedure updated.", "success")
         return redirect(url_for("procedures.procedure_detail", id=id))
     return render_template("procedure_form.html", item=item)
 
+# ---------------------------------------------------------------------------
+# Revise / Branch
+# ---------------------------------------------------------------------------
+
+@bp.route("/<int:id>/revise", methods=["GET", "POST"])
+def procedure_revise(id):
+    db = get_db()
+    source = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
+    if source is None:
+        flash("Procedure not found.", "error")
+        return redirect(url_for("procedures.procedure_list"))
+
+    if request.method == "POST":
+        mode = request.form.get("mode")          # "revision" or "variant"
+        title = request.form.get("title", "").strip()
+        revision = request.form.get("revision", "A").strip() or "A"
+        new_proc_id = request.form.get("proc_id", "").strip()
+        hardware_id = request.form.get("hardware_id", "").strip()
+        purpose = request.form.get("purpose", "").strip()
+        hazards = request.form.get("hazards", "").strip()
+        prereqs = request.form.get("prereqs", "").strip()
+        now = datetime.utcnow().isoformat(timespec="seconds")
+
+        db.execute(
+            """INSERT INTO procedures
+               (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, parent_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (new_proc_id, title, source['type'], hardware_id or None,
+             revision, purpose, hazards, prereqs, id, now, now)
+        )
+        db.commit()
+        new_proc = db.execute(
+            "SELECT id FROM procedures WHERE proc_id = ? AND revision = ?", (new_proc_id, revision)
+        ).fetchone()
+
+        # Deep copy sections + steps
+        source_sections, source_steps = get_sections_with_steps(db, id)
+        for sec in source_sections:
+            db.execute(
+                "INSERT INTO procedure_sections (procedure_id, order_index, title, description) VALUES (?, ?, ?, ?)",
+                (new_proc['id'], sec['order_index'], sec['title'], sec['description'])
+            )
+            db.commit()
+            new_sec = db.execute(
+                "SELECT id FROM procedure_sections WHERE procedure_id=? ORDER BY id DESC LIMIT 1",
+                (new_proc['id'],)
+            ).fetchone()
+            for step in source_steps.get(sec['id'], []):
+                db.execute(
+                    """INSERT INTO procedure_steps
+                       (section_id, order_index, title, body, input_type, unit, min_value, max_value, notes_enabled)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (new_sec['id'], step['order_index'], step['title'], step['body'],
+                     step['input_type'], step['unit'], step['min_value'], step['max_value'],
+                     step['notes_enabled'])
+                )
+        db.commit()
+
+        label = "revision" if mode == "revision" else "variant"
+        flash(f"Created {label} {new_proc_id} Rev {revision}.", "success")
+        return redirect(url_for("procedures.procedure_detail", id=new_proc['id']))
+
+    # Suggest next revision letter
+    cur_rev = (source['revision'] or 'A').strip().upper()
+    if len(cur_rev) == 1 and cur_rev.isalpha() and cur_rev < 'Z':
+        next_rev = chr(ord(cur_rev) + 1)
+    else:
+        next_rev = cur_rev + '1'
+
+    next_proc_id = generate_new_procedure_id(db)
+    sections, steps_by_section = get_sections_with_steps(db, id)
+    step_count = sum(len(v) for v in steps_by_section.values())
+
+    return render_template("procedure_revise.html",
+                           source=source, next_rev=next_rev,
+                           next_proc_id=next_proc_id,
+                           section_count=len(sections), step_count=step_count)
+
+# ---------------------------------------------------------------------------
+# Section Editor
+# ---------------------------------------------------------------------------
+
 @bp.route("/<int:id>/sections", methods=["GET", "POST"])
 def procedure_sections(id):
     db = get_db()
     proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
-    
+
     if request.method == "POST":
         title = request.form.get("title", "").strip()
-        body = request.form.get("body", "").strip()
-        
-        input_type = request.form.get("input_type", "none").strip()
-        unit = request.form.get("unit", "").strip()
-        
-        # NEW: Capture Limits (Handle empty strings as None)
-        min_val = request.form.get("min_value", "").strip()
-        max_val = request.form.get("max_value", "").strip()
-        min_val = float(min_val) if min_val else None
-        max_val = float(max_val) if max_val else None
-
+        description = request.form.get("description", "").strip()
         if title:
-            row = db.execute("SELECT COALESCE(MAX(order_index), 0) as max_ord FROM procedure_sections WHERE procedure_id=?", (id,)).fetchone()
-            next_ord = row['max_ord'] + 1
-            
+            row = db.execute(
+                "SELECT COALESCE(MAX(order_index), 0) as m FROM procedure_sections WHERE procedure_id=?", (id,)
+            ).fetchone()
             db.execute(
-                """INSERT INTO procedure_sections 
-                   (procedure_id, order_index, title, body, input_type, unit, min_value, max_value) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (id, next_ord, title, body, input_type, unit, min_val, max_val)
+                "INSERT INTO procedure_sections (procedure_id, order_index, title, description) VALUES (?, ?, ?, ?)",
+                (id, row['m'] + 1, title, description)
             )
             db.commit()
             flash("Section added.", "success")
-            
-    sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id=? ORDER BY order_index", (id,)).fetchall()
-    return render_template("procedure_sections.html", proc=proc, sections=sections)
+
+    sections, steps_by_section = get_sections_with_steps(db, id)
+    return render_template("procedure_sections.html", proc=proc, sections=sections, steps_by_section=steps_by_section)
+
+@bp.route("/<int:id>/sections/<int:sid>/edit", methods=["POST"])
+def section_edit(id, sid):
+    db = get_db()
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    if title:
+        db.execute(
+            "UPDATE procedure_sections SET title=?, description=? WHERE id=? AND procedure_id=?",
+            (title, description, sid, id)
+        )
+        db.commit()
+        flash("Section updated.", "success")
+    return redirect(url_for("procedures.procedure_sections", id=id))
+
+@bp.route("/<int:id>/sections/<int:sid>/delete", methods=["POST"])
+def section_delete(id, sid):
+    db = get_db()
+    db.execute("DELETE FROM procedure_steps WHERE section_id = ?", (sid,))
+    db.execute("DELETE FROM procedure_sections WHERE id = ? AND procedure_id = ?", (sid, id))
+    db.commit()
+    flash("Section deleted.", "success")
+    return redirect(url_for("procedures.procedure_sections", id=id))
+
+# ---------------------------------------------------------------------------
+# Step Editor
+# ---------------------------------------------------------------------------
+
+def _parse_step_form(form):
+    title = form.get("title", "").strip()
+    body = form.get("body", "").strip()
+    input_type = form.get("input_type", "none").strip()
+    unit = form.get("unit", "").strip()
+    min_val = form.get("min_value", "").strip()
+    max_val = form.get("max_value", "").strip()
+    notes_enabled = 1 if form.get("notes_enabled") else 0
+    min_val = float(min_val) if min_val else None
+    max_val = float(max_val) if max_val else None
+    return title, body, input_type, unit, min_val, max_val, notes_enabled
+
+@bp.route("/<int:id>/sections/<int:sid>/steps", methods=["POST"])
+def step_add(id, sid):
+    db = get_db()
+    title, body, input_type, unit, min_val, max_val, notes_enabled = _parse_step_form(request.form)
+    if title:
+        row = db.execute(
+            "SELECT COALESCE(MAX(order_index), 0) as m FROM procedure_steps WHERE section_id=?", (sid,)
+        ).fetchone()
+        db.execute(
+            """INSERT INTO procedure_steps
+               (section_id, order_index, title, body, input_type, unit, min_value, max_value, notes_enabled)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (sid, row['m'] + 1, title, body, input_type, unit, min_val, max_val, notes_enabled)
+        )
+        db.commit()
+        flash("Step added.", "success")
+    return redirect(url_for("procedures.procedure_sections", id=id))
+
+@bp.route("/<int:id>/sections/<int:sid>/steps/<int:step_id>/edit", methods=["POST"])
+def step_edit(id, sid, step_id):
+    db = get_db()
+    title, body, input_type, unit, min_val, max_val, notes_enabled = _parse_step_form(request.form)
+    if title:
+        db.execute(
+            """UPDATE procedure_steps
+               SET title=?, body=?, input_type=?, unit=?, min_value=?, max_value=?, notes_enabled=?
+               WHERE id=? AND section_id=?""",
+            (title, body, input_type, unit, min_val, max_val, notes_enabled, step_id, sid)
+        )
+        db.commit()
+        flash("Step updated.", "success")
+    return redirect(url_for("procedures.procedure_sections", id=id))
+
+@bp.route("/<int:id>/sections/<int:sid>/steps/<int:step_id>/delete", methods=["POST"])
+def step_delete(id, sid, step_id):
+    db = get_db()
+    db.execute("DELETE FROM procedure_steps WHERE id = ? AND section_id = ?", (step_id, sid))
+    db.commit()
+    flash("Step deleted.", "success")
+    return redirect(url_for("procedures.procedure_sections", id=id))
+
+# ---------------------------------------------------------------------------
+# Export (placeholder)
+# ---------------------------------------------------------------------------
 
 @bp.route("/<int:id>/export/docx")
 def procedure_export_docx(id):
-    # (Keep your existing export logic here - omitted for brevity but paste it back in!)
-    # ...
-    return "Export Logic Placeholder (Paste your old function here)"
+    return "Export Logic Placeholder"
 
 # ---------------------------------------------------------------------------
-# PROCEDURE RUNNER (The Execution Engine)
+# Procedure Runner
 # ---------------------------------------------------------------------------
 
 @bp.route("/run/setup", methods=["GET", "POST"])
 def run_setup():
-    """Step 1: Pick Hardware and Procedure"""
     db = get_db()
     hw_id_arg = request.args.get('hardware_id')
-    
+
     if request.method == "POST":
         hw_id = request.form.get("hardware_id")
         proc_id = request.form.get("procedure_id")
         operator = request.form.get("operator")
-        
+
         run_id = generate_run_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
-        
+
         db.execute(
             "INSERT INTO procedure_runs (run_id, procedure_id, hardware_id, operator, timestamp, status) VALUES (?, ?, ?, ?, ?, ?)",
             (run_id, proc_id, hw_id, operator, now, "In-Progress")
         )
         db.commit()
-        
+
         row = db.execute("SELECT id FROM procedure_runs WHERE run_id = ?", (run_id,)).fetchone()
         return redirect(url_for("procedures.run_execute", id=row['id']))
 
@@ -205,91 +378,70 @@ def run_setup():
     procedures = db.execute("SELECT id, proc_id, title FROM procedures ORDER BY proc_id").fetchall()
     return render_template("run_setup.html", hardware=hardware, procedures=procedures, sel_hw=hw_id_arg)
 
-
-
 @bp.route("/run/<int:id>/execute", methods=["GET", "POST"])
 def run_execute(id):
-    """Step 2: The Checklist"""
     db = get_db()
-    
-    # 1. Fetch Run & Procedure Info
+
     run = db.execute("""
-        SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc 
+        SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc
         FROM procedure_runs r
         JOIN procedures p ON r.procedure_id = p.id
         JOIN hardware h ON r.hardware_id = h.id
         WHERE r.id = ?
     """, (id,)).fetchone()
-    
-    # 2. Fetch Sections
-    sections = db.execute("SELECT * FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (run['procedure_id'],)).fetchall()
 
-    # 3. Fetch Existing Values
-    val_rows = db.execute("SELECT section_id, value FROM run_values WHERE run_id = ?", (id,)).fetchall()
-    saved_values = {row['section_id']: row['value'] for row in val_rows}
+    sections, steps_by_section = get_sections_with_steps(db, run['procedure_id'])
+
+    val_rows = db.execute("SELECT * FROM run_values WHERE run_id = ?", (id,)).fetchall()
+    saved_values = {row['step_id']: row for row in val_rows}
 
     if request.method == "POST":
-        notes = request.form.get("notes", "")
-        
-        # --- NEW LOGIC START ---
-        # Determine Status based on WHICH button was clicked ('action')
+        run_notes = request.form.get("notes", "")
         action = request.form.get("action")
-        
-        if action == "save":
-            # If saving progress, ALWAYS stay In-Progress, ignore the radio buttons
-            status = "In-Progress"
-        else:
-            # If finishing, look at the radio button selection ('final_result')
-            status = request.form.get("final_result", "Completed")
-        # --- NEW LOGIC END ---
+        status = "In-Progress" if action == "save" else request.form.get("final_result", "Completed")
 
-        # A. Update Main Run Record
-        db.execute("UPDATE procedure_runs SET status = ?, notes = ? WHERE id = ?", (status, notes, id))
-        
-        # B. Save Step Values
-        db.execute("DELETE FROM run_values WHERE run_id = ?", (id,))
-        
-        for s in sections:
-            sid = s['id']
-            if request.form.get(f"check_{sid}"):
-                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, "true"))
-            
-            val_data = request.form.get(f"val_{sid}")
-            if val_data:
-                db.execute("INSERT INTO run_values (run_id, section_id, value) VALUES (?, ?, ?)", (id, sid, val_data))
+        db.execute("UPDATE procedure_runs SET status=?, notes=? WHERE id=?", (status, run_notes, id))
+        db.execute("DELETE FROM run_values WHERE run_id=?", (id,))
 
-        # C. Log to Hardware History (Only if finished)
+        for section in sections:
+            for step in steps_by_section.get(section['id'], []):
+                step_id = step['id']
+                checked = 1 if request.form.get(f"check_{step_id}") else 0
+                val_data = request.form.get(f"val_{step_id}", "").strip()
+                step_notes = request.form.get(f"notes_{step_id}", "").strip()
+                if checked or val_data or step_notes:
+                    db.execute(
+                        "INSERT INTO run_values (run_id, step_id, checked, value, notes) VALUES (?, ?, ?, ?, ?)",
+                        (id, step_id, checked, val_data or None, step_notes or None)
+                    )
+
         if status in ['Completed', 'Failed', 'Aborted']:
-             log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) - Status: {status}"
-             now = datetime.utcnow().isoformat(timespec="seconds")
-             db.execute("INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-                        (run['hardware_id'], now, "Procedure Run", log_desc))
-        
+            log_desc = f"Procedure Run {run['run_id']} ({run['proc_id']}) - Status: {status}"
+            now = datetime.utcnow().isoformat(timespec="seconds")
+            db.execute(
+                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+                (run['hardware_id'], now, "Procedure Run", log_desc)
+            )
+
         db.commit()
         flash(f"Run {run['run_id']} saved.", "success")
-        
+
         if status == 'In-Progress':
             return redirect(url_for("procedures.run_list"))
         else:
             return redirect(url_for("hardware.hardware_detail", id=run['hardware_id']))
 
-    return render_template("run_execute.html", run=run, sections=sections, values=saved_values)
+    return render_template("run_execute.html", run=run, sections=sections,
+                           steps_by_section=steps_by_section, saved_values=saved_values)
 
 @bp.route("/runs")
 def run_list():
     db = get_db()
-    
-    # Fetch all runs with details
     runs = db.execute("""
-        SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc 
+        SELECT r.*, p.title as proc_title, p.proc_id, h.hardware_id, h.description as hw_desc
         FROM procedure_runs r
         JOIN procedures p ON r.procedure_id = p.id
         JOIN hardware h ON r.hardware_id = h.id
         ORDER BY r.timestamp DESC
     """).fetchall()
-    
     return render_template("run_list.html", runs=runs)
-
-# ... existing code ...
-
-

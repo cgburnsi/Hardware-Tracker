@@ -33,11 +33,19 @@
       {% for item in items %}
         <tr>
           <td>
+            {% if item['parent_id'] %}
+              <span style="color:#ccc; margin-right:0.2rem; font-size:0.85rem;">↳</span>
+            {% endif %}
             <a href="{{ url_for('procedures.procedure_detail', id=item['id']) }}" style="font-weight:700;">
               {{ item['proc_id'] }}
             </a>
           </td>
-          <td>{{ item['title'] }}</td>
+          <td>
+            {{ item['title'] }}
+            {% if item['parent_id'] %}
+              <span style="display:inline-block; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:700; background:#f0f4ff; color:#3a5cc7; border:1px solid #c0ccee; margin-left:0.4rem; vertical-align:middle;">DERIVED</span>
+            {% endif %}
+          </td>
           <td>{{ item['hardware_id'] or '–' }}</td>
           <td>{{ item['revision'] or 'A' }}</td>
           <td>

@@ -12,7 +12,6 @@
   .detail-row { display: flex; margin-bottom: 0.5rem; font-size: 0.95rem; }
   .detail-label { width: 140px; color: #666; flex-shrink: 0; }
   
-  .steps-box { background:#f9f9f9; padding:1rem; border:1px solid #ddd; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 0.9rem; }
 </style>
 
   <div class="page-title-row">
@@ -20,9 +19,10 @@
       <h2 class="page-title" style="display:inline-block; margin-right:1rem;">{{ item['proc_id'] }}</h2>
       <span style="color:#666; font-size:1rem; font-weight: bold;">Rev {{ item['revision'] }}</span>
     </div>
-    <div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <a href="{{ url_for('procedures.procedure_export_docx', id=item['id']) }}" class="secondary-button">Export .docx</a>
-      <a href="{{ url_for('procedures.procedure_edit', id=item['id']) }}" class="primary-button">Edit Details</a>
+      <a href="{{ url_for('procedures.procedure_edit', id=item['id']) }}" class="secondary-button">Edit Details</a>
+      <a href="{{ url_for('procedures.procedure_revise', id=item['id']) }}" class="primary-button">Revise / Branch</a>
     </div>
   </div>
 
@@ -69,21 +69,100 @@
 
   <div class="section-card">
     <div class="section-header">
-      <span>Procedure Steps</span>
-      <a href="{{ url_for('procedures.procedure_sections', id=item['id']) }}" class="secondary-button" style="padding: 0.1rem 0.5rem; font-size: 0.75rem;">
+      <span>Procedure Steps ({{ sections|length }} section{% if sections|length != 1 %}s{% endif %})</span>
+      <a href="{{ url_for('procedures.procedure_sections', id=item['id']) }}" class="secondary-button" style="padding:0.1rem 0.5rem; font-size:0.75rem;">
         Edit Sections / Steps
       </a>
     </div>
-    <div class="section-body">
-      {% if item['steps'] %}
-        <div class="steps-box">{{ item['steps'] }}</div>
+    <div class="section-body" style="padding:0.5rem 0;">
+      {% if sections %}
+        {% for sec in sections %}
+        {% set sec_steps = steps_by_section.get(sec['id'], []) %}
+
+        <div style="margin-bottom:0.5rem;">
+          <div style="background:#eef2f7; padding:0.45rem 1rem; font-weight:600; color:#2c3e50; font-size:0.9rem; border-top: 1px solid #dde3ec; border-bottom: 1px solid #dde3ec;">
+            {{ loop.index }}. {{ sec['title'] }}
+            <span style="color:#aaa; font-weight:400; font-size:0.8rem; margin-left:0.5rem;">({{ sec_steps|length }} step{% if sec_steps|length != 1 %}s{% endif %})</span>
+          </div>
+          {% if sec['description'] %}
+            <div style="padding:0.35rem 1rem 0; font-size:0.82rem; color:#777;">{{ sec['description'] }}</div>
+          {% endif %}
+
+          {% for step in sec_steps %}
+          <div style="display:flex; gap:1rem; padding:0.55rem 1rem; border-bottom:1px solid #f4f4f4;">
+            <div style="color:#ccc; font-size:0.8rem; font-weight:600; min-width:2.5rem; padding-top:2px;">{{ loop.index }}</div>
+            <div style="flex:1;">
+              <span style="font-weight:500; color:#333;">{{ step['title'] }}</span>
+              {% if step['input_type'] == 'number' %}
+                <span style="display:inline-block; background:#e3f2fd; color:#0d47a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #bbdefb;">NUM: {{ step['unit'] or '–' }}</span>
+              {% elif step['input_type'] == 'text' %}
+                <span style="display:inline-block; background:#e8f5e9; color:#1b5e20; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #c8e6c9;">TEXT</span>
+              {% elif step['input_type'] == 'bool' %}
+                <span style="display:inline-block; background:#fff3e0; color:#e65100; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #ffe0b2;">CHECK</span>
+              {% endif %}
+              {% if step['body'] %}
+                <div style="color:#666; font-size:0.85rem; white-space:pre-wrap; margin-top:0.15rem;">{{ step['body'] }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% else %}
+            <div style="padding:0.5rem 1rem; color:#aaa; font-style:italic; font-size:0.85rem;">No steps in this section.</div>
+          {% endfor %}
+        </div>
+
+        {% endfor %}
       {% else %}
-        <div style="color:#888; font-style:italic; text-align: center; padding: 1rem;">
-          No simple steps text defined. 
-          <br>Click "Edit Sections" to add detailed steps.
+        <div style="color:#888; font-style:italic; text-align:center; padding:1.5rem;">
+          No sections defined yet. Click "Edit Sections / Steps" to add them.
         </div>
       {% endif %}
     </div>
   </div>
+
+  {# Lineage panel — only shown if this procedure has a parent or children #}
+  {% if parent or children %}
+  <div class="section-card" style="border-left: 3px solid #6c9e6c;">
+    <div class="section-header" style="background:#f4faf4;">
+      <span>Procedure Lineage</span>
+    </div>
+    <div class="section-body">
+
+      {% if parent %}
+      <div style="margin-bottom:0.75rem;">
+        <div style="font-size:0.78rem; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.3rem;">Derived From</div>
+        <a href="{{ url_for('procedures.procedure_detail', id=parent['id']) }}"
+           style="display:inline-flex; align-items:center; gap:0.5rem; padding:0.4rem 0.75rem; background:#f4f4f2; border:1px solid #ddd; border-radius:4px; text-decoration:none; color:#333; font-size:0.9rem;">
+          <span style="color:#aaa;">↑</span>
+          <strong>{{ parent['proc_id'] }}</strong> Rev {{ parent['revision'] }}
+          <span style="color:#888;">— {{ parent['title'] }}</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {% if children %}
+      <div>
+        <div style="font-size:0.78rem; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.4rem;">Revisions &amp; Variants</div>
+        <div style="display:flex; flex-direction:column; gap:0.3rem;">
+          {% for child in children %}
+          {% set is_revision = (child['proc_id'] == item['proc_id']) %}
+          <a href="{{ url_for('procedures.procedure_detail', id=child['id']) }}"
+             style="display:flex; align-items:center; gap:0.6rem; padding:0.4rem 0.75rem; background:#f8f8f6; border:1px solid #e0e0e0; border-radius:4px; text-decoration:none; color:#333; font-size:0.9rem;">
+            <span style="color:#aaa;">↳</span>
+            <span style="display:inline-block; padding:0.1rem 0.4rem; border-radius:3px; font-size:0.7rem; font-weight:700;
+              {% if is_revision %}background:#e8f4fd; color:#0056b3; border:1px solid #b8daff;
+              {% else %}background:#f0fff4; color:#1a7340; border:1px solid #b7ebc8;{% endif %}">
+              {{ 'REVISION' if is_revision else 'VARIANT' }}
+            </span>
+            <strong>{{ child['proc_id'] }}</strong> Rev {{ child['revision'] }}
+            <span style="color:#888;">— {{ child['title'] }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
 
 {% endblock %}

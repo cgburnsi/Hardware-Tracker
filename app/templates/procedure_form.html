@@ -69,19 +69,21 @@
 
     <fieldset class="form-section">
       <legend>3. Objective & Overview</legend>
-      
+
       <div class="form-row">
         <label>Purpose / Objective</label>
         <textarea name="purpose" style="min-height:60px;">{{ item['purpose'] if item else '' }}</textarea>
       </div>
 
-      <div class="form-row">
-        <label>Summary of Steps</label>
-        <textarea name="steps" style="min-height:150px; font-family:monospace;">{{ item['steps'] if item else '' }}</textarea>
-        <div class="helper-text">
-          You can write a simple text list here. For complex procedures, save this form first, then use the "Manage Steps" tool to add individual sections.
-        </div>
+      {% if item %}
+      <div class="helper-text" style="margin-top:0.5rem; padding:0.6rem; background:#f4f4f2; border-radius:3px;">
+        Steps are managed on the procedure detail page. Use "Edit Sections / Steps" to add, edit, or reorder steps.
       </div>
+      {% else %}
+      <div class="helper-text" style="margin-top:0.5rem; padding:0.6rem; background:#f4f4f2; border-radius:3px;">
+        Save this form first, then use "Edit Sections / Steps" on the detail page to add individual steps.
+      </div>
+      {% endif %}
     </fieldset>
 
     <div class="form-actions">

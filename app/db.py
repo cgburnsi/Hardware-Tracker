@@ -315,6 +315,11 @@ def migrate_db():
         db.execute("ALTER TABLE hardware ADD COLUMN image_filename TEXT")
     if 'quantity' not in cols:
         db.execute("ALTER TABLE hardware ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
+    proc_cols = {row[1] for row in db.execute("PRAGMA table_info(procedures)").fetchall()}
+    if 'parent_id' not in proc_cols:
+        db.execute("ALTER TABLE procedures ADD COLUMN parent_id INTEGER REFERENCES procedures(id)")
+    if 'status' not in proc_cols:
+        db.execute("ALTER TABLE procedures ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'")
     db.execute("""
         CREATE TABLE IF NOT EXISTS hardware_docs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

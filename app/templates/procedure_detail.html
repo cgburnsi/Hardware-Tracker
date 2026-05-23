@@ -110,54 +110,73 @@
 
   <div class="section-card">
     <div class="section-header">
-      <span>Procedure Steps ({{ sections|length }} section{% if sections|length != 1 %}s{% endif %})</span>
-      <a href="{{ url_for('procedures.procedure_sections', id=item['id']) }}" class="secondary-button" style="padding:0.1rem 0.5rem; font-size:0.75rem;">
-        Edit Sections / Steps
-      </a>
+      <span>Sections ({{ sections|length }})</span>
     </div>
-    <div class="section-body" style="padding:0.5rem 0;">
-      {% if sections %}
+    {% if sections %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:2.5rem;">#</th>
+          <th>Title</th>
+          <th style="text-align:center; width:5rem;">Steps</th>
+          <th style="text-align:center; width:7rem;">Comments</th>
+          <th style="width:5rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
         {% for sec in sections %}
         {% set sec_steps = steps_by_section.get(sec['id'], []) %}
-
-        <div style="margin-bottom:0.5rem;">
-          <div style="background:#eef2f7; padding:0.45rem 1rem; font-weight:600; color:#2c3e50; font-size:0.9rem; border-top: 1px solid #dde3ec; border-bottom: 1px solid #dde3ec;">
-            {{ loop.index }}. {{ sec['title'] }}
-            <span style="color:#aaa; font-weight:400; font-size:0.8rem; margin-left:0.5rem;">({{ sec_steps|length }} step{% if sec_steps|length != 1 %}s{% endif %})</span>
-          </div>
-          {% if sec['description'] %}
-            <div style="padding:0.35rem 1rem 0; font-size:0.82rem; color:#777;">{{ sec['description'] }}</div>
-          {% endif %}
-
-          {% for step in sec_steps %}
-          <div style="display:flex; gap:1rem; padding:0.55rem 1rem; border-bottom:1px solid #f4f4f4;">
-            <div style="color:#ccc; font-size:0.8rem; font-weight:600; min-width:2.5rem; padding-top:2px;">{{ loop.index }}</div>
-            <div style="flex:1;">
-              <span style="font-weight:500; color:#333;">{{ step['title'] }}</span>
-              {% if step['input_type'] == 'number' %}
-                <span style="display:inline-block; background:#e3f2fd; color:#0d47a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #bbdefb;">NUM: {{ step['unit'] or '–' }}</span>
-              {% elif step['input_type'] == 'text' %}
-                <span style="display:inline-block; background:#e8f5e9; color:#1b5e20; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #c8e6c9;">TEXT</span>
-              {% elif step['input_type'] == 'bool' %}
-                <span style="display:inline-block; background:#fff3e0; color:#e65100; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600; margin-left:0.35rem; border:1px solid #ffe0b2;">CHECK</span>
-              {% endif %}
-              {% if step['body'] %}
-                <div style="color:#666; font-size:0.85rem; white-space:pre-wrap; margin-top:0.15rem;">{{ step['body'] }}</div>
-              {% endif %}
-            </div>
-          </div>
-          {% else %}
-            <div style="padding:0.5rem 1rem; color:#aaa; font-style:italic; font-size:0.85rem;">No steps in this section.</div>
-          {% endfor %}
-        </div>
-
+        {% set open_c = open_by_section.get(sec['id'], 0) %}
+        <tr>
+          <td style="color:#aaa; font-size:0.85rem;">{{ loop.index }}</td>
+          <td>
+            <a href="{{ url_for('procedures.section_detail', id=item['id'], sid=sec['id']) }}"
+               style="font-weight:600; color:var(--accent); text-decoration:none;">{{ sec['title'] }}</a>
+            {% if sec['description'] %}
+            <div style="font-size:0.8rem; color:#888; margin-top:0.1rem;">{{ sec['description'] | truncate(80) }}</div>
+            {% endif %}
+          </td>
+          <td style="text-align:center; color:#555;">{{ sec_steps|length }}</td>
+          <td style="text-align:center;">
+            {% if open_c %}
+              <span style="background:#fff3cd; color:#664d03; font-size:0.72rem; font-weight:700; padding:0.15rem 0.4rem; border-radius:3px;">{{ open_c }} open</span>
+            {% else %}
+              <span style="color:#ccc; font-size:0.85rem;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('procedures.section_detail', id=item['id'], sid=sec['id']) }}"
+               style="font-size:0.82rem; color:var(--accent); text-decoration:none; font-weight:600;">View →</a>
+          </td>
+        </tr>
         {% endfor %}
-      {% else %}
-        <div style="color:#888; font-style:italic; text-align:center; padding:1.5rem;">
-          No sections defined yet. Click "Edit Sections / Steps" to add them.
-        </div>
-      {% endif %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:1.5rem; color:#aaa; text-align:center; font-style:italic;">
+      No sections yet. Add the first one below.
     </div>
+    {% endif %}
+
+    <!-- Add section inline -->
+    {% if status != 'approved' %}
+    <div style="padding:0.75rem 1rem; border-top:1px solid #eee; background:#fafaf8;">
+      <form method="post" action="{{ url_for('procedures.section_new', id=item['id']) }}"
+            style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+        <div style="flex:2; min-width:180px;">
+          <label style="font-size:0.72rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">New Section Title</label>
+          <input type="text" name="title" placeholder="e.g. Pre-Pressurization Checks" required
+                 style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+        <div style="flex:3; min-width:200px;">
+          <label style="font-size:0.72rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Description (optional)</label>
+          <input type="text" name="description" placeholder="Brief note about this section"
+                 style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+        <button type="submit" class="primary-button" style="padding:0.42rem 0.9rem; font-size:0.85rem; white-space:nowrap;">+ Add Section</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
 
   {# Review Comments #}

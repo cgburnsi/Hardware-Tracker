@@ -271,6 +271,7 @@ def procedure_revise(id):
 
 @bp.route("/<int:id>/sections", methods=["GET", "POST"])
 def procedure_sections(id):
+    # Legacy all-in-one editor — kept as a fallback, unlinked from the main UI.
     db = get_db()
     proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
 
@@ -303,6 +304,72 @@ def procedure_sections(id):
                            steps_by_section=steps_by_section,
                            open_by_section=open_by_section, open_by_step=open_by_step)
 
+# ---------------------------------------------------------------------------
+# Per-Section Detail (redesigned workflow)
+# ---------------------------------------------------------------------------
+
+@bp.route("/<int:id>/sections/new", methods=["POST"])
+def section_new(id):
+    db = get_db()
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    if not title:
+        flash("Section title is required.", "error")
+        return redirect(url_for("procedures.procedure_detail", id=id))
+    row = db.execute(
+        "SELECT COALESCE(MAX(order_index), 0) as m FROM procedure_sections WHERE procedure_id=?", (id,)
+    ).fetchone()
+    db.execute(
+        "INSERT INTO procedure_sections (procedure_id, order_index, title, description) VALUES (?, ?, ?, ?)",
+        (id, row['m'] + 1, title, description)
+    )
+    db.commit()
+    new_sec = db.execute(
+        "SELECT id FROM procedure_sections WHERE procedure_id=? ORDER BY id DESC LIMIT 1", (id,)
+    ).fetchone()
+    flash("Section added.", "success")
+    return redirect(url_for("procedures.section_detail", id=id, sid=new_sec['id']))
+
+@bp.route("/<int:id>/sections/<int:sid>")
+def section_detail(id, sid):
+    db = get_db()
+    proc = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
+    if proc is None:
+        flash("Procedure not found.", "error")
+        return redirect(url_for("procedures.procedure_list"))
+    section = db.execute(
+        "SELECT * FROM procedure_sections WHERE id = ? AND procedure_id = ?", (sid, id)
+    ).fetchone()
+    if section is None:
+        flash("Section not found.", "error")
+        return redirect(url_for("procedures.procedure_detail", id=id))
+
+    all_sections = db.execute(
+        "SELECT id, title FROM procedure_sections WHERE procedure_id = ? ORDER BY order_index", (id,)
+    ).fetchall()
+    sec_ids = [s['id'] for s in all_sections]
+    pos_idx  = sec_ids.index(sid) if sid in sec_ids else -1
+    position = pos_idx + 1
+    total    = len(sec_ids)
+    prev_sid = sec_ids[pos_idx - 1] if pos_idx > 0 else None
+    next_sid = sec_ids[pos_idx + 1] if 0 <= pos_idx < total - 1 else None
+
+    steps = db.execute(
+        "SELECT * FROM procedure_steps WHERE section_id = ? ORDER BY order_index", (sid,)
+    ).fetchall()
+    comments = db.execute(
+        "SELECT * FROM procedure_comments WHERE procedure_id=? AND section_id=? ORDER BY resolved ASC, created_at DESC",
+        (id, sid)
+    ).fetchall()
+    open_count = sum(1 for c in comments if not c['resolved'])
+
+    return render_template("procedure_section_detail.html",
+        proc=proc, section=section, steps=steps,
+        comments=comments, open_count=open_count,
+        position=position, total=total,
+        prev_sid=prev_sid, next_sid=next_sid,
+    )
+
 @bp.route("/<int:id>/sections/<int:sid>/edit", methods=["POST"])
 def section_edit(id, sid):
     db = get_db()
@@ -315,7 +382,7 @@ def section_edit(id, sid):
         )
         db.commit()
         flash("Section updated.", "success")
-    return redirect(url_for("procedures.procedure_sections", id=id))
+    return redirect(url_for("procedures.section_detail", id=id, sid=sid))
 
 @bp.route("/<int:id>/sections/<int:sid>/delete", methods=["POST"])
 def section_delete(id, sid):
@@ -324,7 +391,7 @@ def section_delete(id, sid):
     db.execute("DELETE FROM procedure_sections WHERE id = ? AND procedure_id = ?", (sid, id))
     db.commit()
     flash("Section deleted.", "success")
-    return redirect(url_for("procedures.procedure_sections", id=id))
+    return redirect(url_for("procedures.procedure_detail", id=id))
 
 # ---------------------------------------------------------------------------
 # Step Editor
@@ -358,7 +425,7 @@ def step_add(id, sid):
         )
         db.commit()
         flash("Step added.", "success")
-    return redirect(url_for("procedures.procedure_sections", id=id))
+    return redirect(url_for("procedures.section_detail", id=id, sid=sid))
 
 @bp.route("/<int:id>/sections/<int:sid>/steps/<int:step_id>/edit", methods=["POST"])
 def step_edit(id, sid, step_id):
@@ -373,7 +440,7 @@ def step_edit(id, sid, step_id):
         )
         db.commit()
         flash("Step updated.", "success")
-    return redirect(url_for("procedures.procedure_sections", id=id))
+    return redirect(url_for("procedures.section_detail", id=id, sid=sid))
 
 @bp.route("/<int:id>/sections/<int:sid>/steps/<int:step_id>/delete", methods=["POST"])
 def step_delete(id, sid, step_id):
@@ -381,7 +448,28 @@ def step_delete(id, sid, step_id):
     db.execute("DELETE FROM procedure_steps WHERE id = ? AND section_id = ?", (step_id, sid))
     db.commit()
     flash("Step deleted.", "success")
-    return redirect(url_for("procedures.procedure_sections", id=id))
+    return redirect(url_for("procedures.section_detail", id=id, sid=sid))
+
+@bp.route("/<int:id>/sections/<int:sid>/steps/<int:step_id>/move", methods=["POST"])
+def step_move(id, sid, step_id):
+    db = get_db()
+    direction = request.form.get("direction")
+    steps = db.execute(
+        "SELECT id, order_index FROM procedure_steps WHERE section_id=? ORDER BY order_index", (sid,)
+    ).fetchall()
+    ids = [s['id'] for s in steps]
+    idx = ids.index(step_id) if step_id in ids else -1
+    if direction == "up" and idx > 0:
+        a, b = steps[idx], steps[idx - 1]
+        db.execute("UPDATE procedure_steps SET order_index=? WHERE id=?", (b['order_index'], a['id']))
+        db.execute("UPDATE procedure_steps SET order_index=? WHERE id=?", (a['order_index'], b['id']))
+        db.commit()
+    elif direction == "down" and 0 <= idx < len(steps) - 1:
+        a, b = steps[idx], steps[idx + 1]
+        db.execute("UPDATE procedure_steps SET order_index=? WHERE id=?", (b['order_index'], a['id']))
+        db.execute("UPDATE procedure_steps SET order_index=? WHERE id=?", (a['order_index'], b['id']))
+        db.commit()
+    return redirect(url_for("procedures.section_detail", id=id, sid=sid))
 
 # ---------------------------------------------------------------------------
 # Export (placeholder)
@@ -499,6 +587,9 @@ def comment_add(id):
         )
         db.commit()
         flash("Comment added.", "success")
+    next_url = request.form.get("next_url", "")
+    if next_url:
+        return redirect(next_url + "#comments")
     return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
 
 @bp.route("/<int:id>/comments/<int:cid>/resolve", methods=["POST"])

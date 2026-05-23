@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Section {{ position }} — {{ proc['proc_id'] }} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  /* Section header edit form */
+  .sec-edit-details summary {
+    font-size:0.8rem; color:var(--accent); cursor:pointer; font-weight:600;
+    list-style:none; display:inline-flex; align-items:center; gap:0.25rem;
+  }
+  .sec-edit-details summary::-webkit-details-marker { display:none; }
+  .sec-edit-details[open] summary { color:#555; }
+  .sec-edit-form {
+    margin-top:0.75rem; padding:0.75rem; background:#f5f5f3;
+    border:1px solid #ddd; border-radius:4px;
+    display:grid; grid-template-columns:1fr 1fr auto; gap:0.5rem; align-items:end;
+  }
+  .sec-edit-form label { font-size:0.72rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .sec-edit-form input {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit;
+  }
+
+  /* Step cards */
+  .step-card {
+    border:1px solid #e2e2df; border-radius:4px; margin-bottom:0.5rem;
+    background:#fff; overflow:hidden;
+  }
+  .step-card:last-of-type { margin-bottom:0; }
+  .step-display {
+    display:flex; align-items:flex-start; gap:0.75rem;
+    padding:0.65rem 0.75rem;
+  }
+  .step-num {
+    font-size:0.78rem; font-weight:700; color:#bbb;
+    min-width:1.6rem; padding-top:2px; flex-shrink:0;
+  }
+  .step-main { flex:1; min-width:0; }
+  .step-title { font-weight:600; color:#222; font-size:0.95rem; }
+  .step-body  { color:#666; font-size:0.85rem; white-space:pre-wrap; margin-top:0.2rem; line-height:1.5; }
+  .input-badge {
+    display:inline-block; padding:0.1rem 0.35rem; border-radius:3px;
+    font-size:0.68rem; font-weight:700; margin-left:0.4rem; vertical-align:middle;
+  }
+  .badge-num  { background:#e3f2fd; color:#0d47a1; border:1px solid #bbdefb; }
+  .badge-text { background:#e8f5e9; color:#1b5e20; border:1px solid #c8e6c9; }
+  .badge-bool { background:#fff3e0; color:#e65100; border:1px solid #ffe0b2; }
+  .step-limits { font-size:0.78rem; color:#888; margin-top:0.15rem; }
+
+  /* Step action buttons */
+  .step-actions {
+    display:flex; gap:0.25rem; flex-shrink:0; align-items:flex-start;
+    padding-top:1px;
+  }
+  .step-actions form { margin:0; }
+  .step-btn {
+    border:1px solid #ddd; background:#fff; border-radius:3px;
+    padding:0.2rem 0.4rem; font-size:0.78rem; cursor:pointer; color:#666;
+    font-family:inherit; line-height:1.4;
+  }
+  .step-btn:hover { background:#f2f2f0; }
+  .step-btn.del { color:#842029; border-color:#f5c6cb; }
+  .step-btn.del:hover { background:#f8d7da; }
+
+  /* Inline edit (details/summary) */
+  .step-edit-details { border-top:1px solid #eee; }
+  .step-edit-details summary {
+    padding:0.4rem 0.75rem; font-size:0.78rem; color:var(--accent);
+    cursor:pointer; font-weight:600; list-style:none;
+    display:inline-flex; align-items:center; gap:0.25rem;
+    background:#fafaf8;
+  }
+  .step-edit-details summary::-webkit-details-marker { display:none; }
+  .step-edit-form {
+    padding:0.75rem; background:#fafaf8; border-top:1px solid #eee;
+    display:grid; gap:0.5rem;
+  }
+  .step-edit-form label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .step-edit-form input, .step-edit-form select, .step-edit-form textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit; background:#fff;
+  }
+  .step-edit-form textarea { min-height:70px; resize:vertical; }
+  .edit-row   { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; }
+  .edit-row-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.5rem; }
+
+  /* Add step form */
+  .add-step-card {
+    border:1px dashed #ccc; border-radius:4px; padding:0.85rem;
+    background:#fff; margin-top:0.75rem;
+  }
+  .add-step-card label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .add-step-card input, .add-step-card select, .add-step-card textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit; background:#fff;
+  }
+  .add-step-card textarea { min-height:65px; resize:vertical; }
+
+  /* Comments */
+  .comment-card { border:1px solid #e8e8e8; border-radius:4px; padding:0.75rem; margin-bottom:0.5rem; background:#fff; }
+  .comment-card.resolved { opacity:0.6; background:#f9f9f9; }
+  .comment-meta { font-size:0.75rem; color:#999; margin-bottom:0.3rem; }
+  .comment-body { font-size:0.9rem; white-space:pre-wrap; color:#333; line-height:1.5; }
+  .comment-resolved-label { font-size:0.72rem; color:#6c9e6c; font-weight:600; margin-top:0.3rem; }
+  .add-comment-form { border:1px dashed #ccc; border-radius:4px; padding:0.75rem; background:#fff; margin-top:0.75rem; }
+  .add-comment-form label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .add-comment-form input, .add-comment-form textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit;
+  }
+  .add-comment-form textarea { min-height:65px; resize:vertical; }
+
+  .nav-sections { display:flex; gap:0.4rem; align-items:center; }
+  .nav-sections a { color:var(--accent); text-decoration:none; font-size:0.82rem; font-weight:600; padding:0.28rem 0.55rem; border:1px solid #ccc; border-radius:3px; }
+  .nav-sections a:hover { background:#f2f2f0; }
+  .nav-sections span { color:#ccc; font-size:0.82rem; padding:0.28rem 0.55rem; border:1px solid #eee; border-radius:3px; }
+</style>
+
+<!-- Breadcrumb + header -->
+<div class="page-title-row" style="flex-wrap:wrap; gap:0.75rem; align-items:flex-start;">
+  <div>
+    <a href="{{ url_for('procedures.procedure_detail', id=proc['id']) }}"
+       style="color:#888; text-decoration:none; font-size:0.85rem;">← {{ proc['proc_id'] }} Rev {{ proc['revision'] }} — {{ proc['title'] }}</a>
+    <h1 class="page-title" style="margin-top:0.25rem;">
+      Section {{ position }} of {{ total }}: {{ section['title'] }}
+    </h1>
+  </div>
+  <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap;">
+    <div class="nav-sections">
+      {% if prev_sid %}<a href="{{ url_for('procedures.section_detail', id=proc['id'], sid=prev_sid) }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+      {% if next_sid %}<a href="{{ url_for('procedures.section_detail', id=proc['id'], sid=next_sid) }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('procedures.section_delete', id=proc['id'], sid=section['id']) }}"
+          onsubmit="return confirm('Delete this section and all its steps?');" style="margin:0;">
+      <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb;">Delete Section</button>
+    </form>
+  </div>
+</div>
+
+<!-- Section metadata + inline edit -->
+<div class="section-card">
+  <div class="section-header">Section Info</div>
+  <div class="section-body" style="padding-bottom:0.5rem;">
+    {% if section['description'] %}
+    <div style="color:#555; font-size:0.9rem; margin-bottom:0.75rem; white-space:pre-wrap;">{{ section['description'] }}</div>
+    {% endif %}
+    <details class="sec-edit-details">
+      <summary>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit section title / description
+      </summary>
+      <form method="post" action="{{ url_for('procedures.section_edit', id=proc['id'], sid=section['id']) }}" class="sec-edit-form">
+        <div>
+          <label>Title *</label>
+          <input type="text" name="title" value="{{ section['title'] }}" required>
+        </div>
+        <div>
+          <label>Description</label>
+          <input type="text" name="description" value="{{ section['description'] or '' }}">
+        </div>
+        <button type="submit" class="primary-button" style="padding:0.4rem 0.8rem; font-size:0.85rem; white-space:nowrap;">Save</button>
+      </form>
+    </details>
+  </div>
+</div>
+
+<!-- Steps -->
+<div class="section-card">
+  <div class="section-header">Steps ({{ steps|length }})</div>
+  <div class="section-body">
+    {% if steps %}
+    {% for step in steps %}
+    <div class="step-card">
+      <div class="step-display">
+        <div class="step-num">{{ loop.index }}</div>
+        <div class="step-main">
+          <div class="step-title">
+            {{ step['title'] }}
+            {% if step['input_type'] == 'number' %}
+              <span class="input-badge badge-num">NUM{{ ': ' + step['unit'] if step['unit'] }}</span>
+              {% if step['min_value'] is not none or step['max_value'] is not none %}
+              <span class="step-limits">
+                [{{ step['min_value'] if step['min_value'] is not none else '—' }} – {{ step['max_value'] if step['max_value'] is not none else '—' }}{{ ' ' + step['unit'] if step['unit'] }}]
+              </span>
+              {% endif %}
+            {% elif step['input_type'] == 'text' %}
+              <span class="input-badge badge-text">TEXT</span>
+            {% elif step['input_type'] == 'bool' %}
+              <span class="input-badge badge-bool">CHECK</span>
+            {% endif %}
+          </div>
+          {% if step['body'] %}
+          <div class="step-body">{{ step['body'] }}</div>
+          {% endif %}
+        </div>
+        <div class="step-actions">
+          <!-- Move up -->
+          {% if not loop.first %}
+          <form method="post" action="{{ url_for('procedures.step_move', id=proc['id'], sid=section['id'], step_id=step['id']) }}">
+            <input type="hidden" name="direction" value="up">
+            <button type="submit" class="step-btn" title="Move up">↑</button>
+          </form>
+          {% endif %}
+          <!-- Move down -->
+          {% if not loop.last %}
+          <form method="post" action="{{ url_for('procedures.step_move', id=proc['id'], sid=section['id'], step_id=step['id']) }}">
+            <input type="hidden" name="direction" value="down">
+            <button type="submit" class="step-btn" title="Move down">↓</button>
+          </form>
+          {% endif %}
+          <!-- Delete -->
+          <form method="post" action="{{ url_for('procedures.step_delete', id=proc['id'], sid=section['id'], step_id=step['id']) }}"
+                onsubmit="return confirm('Delete this step?');">
+            <button type="submit" class="step-btn del" title="Delete step">✕</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Inline edit -->
+      <details class="step-edit-details">
+        <summary>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </summary>
+        <form method="post" action="{{ url_for('procedures.step_edit', id=proc['id'], sid=section['id'], step_id=step['id']) }}" class="step-edit-form">
+          <div class="edit-row">
+            <div>
+              <label>Step Title *</label>
+              <input type="text" name="title" value="{{ step['title'] }}" required>
+            </div>
+            <div>
+              <label>Input Type</label>
+              <select name="input_type">
+                {% for val, lbl in [('none','None (check-off only)'),('number','Number / Measurement'),('text','Text Entry'),('bool','Pass / Fail')] %}
+                <option value="{{ val }}" {% if step['input_type'] == val %}selected{% endif %}>{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label>Body / Instructions</label>
+            <textarea name="body">{{ step['body'] or '' }}</textarea>
+          </div>
+          <div class="edit-row-4">
+            <div>
+              <label>Unit</label>
+              <input type="text" name="unit" value="{{ step['unit'] or '' }}" placeholder="e.g. PSI">
+            </div>
+            <div>
+              <label>Min Value</label>
+              <input type="number" step="any" name="min_value" value="{{ step['min_value'] if step['min_value'] is not none else '' }}">
+            </div>
+            <div>
+              <label>Max Value</label>
+              <input type="number" step="any" name="max_value" value="{{ step['max_value'] if step['max_value'] is not none else '' }}">
+            </div>
+            <div style="display:flex; align-items:flex-end; padding-bottom:0.1rem;">
+              <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.8rem;">
+                <input type="checkbox" name="notes_enabled" {% if step['notes_enabled'] %}checked{% endif %} style="width:auto;">
+                Allow notes
+              </label>
+            </div>
+          </div>
+          <div>
+            <button type="submit" class="primary-button" style="padding:0.38rem 0.8rem; font-size:0.82rem;">Save Step</button>
+          </div>
+        </form>
+      </details>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="color:#aaa; margin:0 0 0.75rem; font-style:italic;">No steps yet. Add the first one below.</p>
+    {% endif %}
+
+    <!-- Add step -->
+    <div class="add-step-card">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Step</div>
+      <form method="post" action="{{ url_for('procedures.step_add', id=proc['id'], sid=section['id']) }}">
+        <div class="edit-row" style="margin-bottom:0.5rem;">
+          <div>
+            <label>Step Title *</label>
+            <input type="text" name="title" required placeholder="e.g. Verify all isolation valves are closed">
+          </div>
+          <div>
+            <label>Input Type</label>
+            <select name="input_type">
+              <option value="none">None (check-off only)</option>
+              <option value="number">Number / Measurement</option>
+              <option value="text">Text Entry</option>
+              <option value="bool">Pass / Fail</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:0.5rem;">
+          <label>Body / Instructions</label>
+          <textarea name="body" placeholder="Additional detail, warning, or note for this step"></textarea>
+        </div>
+        <div class="edit-row-4" style="margin-bottom:0.6rem;">
+          <div><label>Unit</label><input type="text" name="unit" placeholder="PSI, V, °C…"></div>
+          <div><label>Min Value</label><input type="number" step="any" name="min_value"></div>
+          <div><label>Max Value</label><input type="number" step="any" name="max_value"></div>
+          <div style="display:flex; align-items:flex-end; padding-bottom:0.1rem;">
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.8rem;">
+              <input type="checkbox" name="notes_enabled" style="width:auto;"> Allow notes
+            </label>
+          </div>
+        </div>
+        <button type="submit" class="primary-button" style="padding:0.4rem 0.9rem; font-size:0.85rem;">Add Step</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Comments -->
+<div class="section-card" id="comments">
+  <div class="section-header">
+    Comments for This Section
+    {% if open_count %}
+    <span style="background:#fff3cd; color:#664d03; font-size:0.72rem; padding:0.1rem 0.4rem; border-radius:3px; font-weight:700;">{{ open_count }} open</span>
+    {% endif %}
+  </div>
+  <div class="section-body">
+    {% set open_comments = comments | selectattr('resolved', 'equalto', 0) | list %}
+    {% set resolved_comments = comments | selectattr('resolved', 'equalto', 1) | list %}
+
+    {% if open_comments %}
+    {% for c in open_comments %}
+    <div class="comment-card">
+      <div class="comment-meta"><strong>{{ c['author_name'] }}</strong> &nbsp;·&nbsp; {{ c['created_at'][:16].replace('T',' ') }}</div>
+      <div class="comment-body">{{ c['body'] }}</div>
+      <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.4rem;">
+        <form method="post" action="{{ url_for('procedures.comment_resolve', id=proc['id'], cid=c['id']) }}" style="margin:0; display:flex; gap:0.4rem; align-items:center;">
+          <input type="text" name="resolved_by" placeholder="Your name" required
+                 style="padding:0.25rem 0.5rem; border:1px solid #ccc; border-radius:3px; font-size:0.8rem; width:130px;">
+          <button type="submit" style="border:none; background:none; cursor:pointer; color:#6c9e6c; font-size:0.8rem; font-weight:600;">✓ Resolve</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% elif not resolved_comments %}
+    <p style="color:#aaa; font-style:italic; font-size:0.9rem; margin:0 0 0.75rem;">No comments yet.</p>
+    {% endif %}
+
+    {% if resolved_comments %}
+    <div style="margin-top:{% if open_comments %}1rem{% else %}0{% endif %};">
+      <button type="button" onclick="document.getElementById('res-comments').style.display=document.getElementById('res-comments').style.display==='none'?'block':'none'"
+              style="border:none; background:none; cursor:pointer; font-size:0.8rem; color:#aaa; padding:0; font-weight:600;">
+        {{ resolved_comments|length }} resolved ▾
+      </button>
+      <div id="res-comments" style="display:none; margin-top:0.5rem;">
+        {% for c in resolved_comments %}
+        <div class="comment-card resolved">
+          <div class="comment-meta"><strong>{{ c['author_name'] }}</strong> &nbsp;·&nbsp; {{ c['created_at'][:16].replace('T',' ') }}</div>
+          <div class="comment-body">{{ c['body'] }}</div>
+          <div class="comment-resolved-label">✓ Resolved by {{ c['resolved_by'] }} · {{ c['resolved_at'][:16].replace('T',' ') }}</div>
+          <form method="post" action="{{ url_for('procedures.comment_reopen', id=proc['id'], cid=c['id']) }}" style="margin-top:0.3rem;">
+            <button type="submit" style="border:none; background:none; cursor:pointer; font-size:0.75rem; color:#aaa; padding:0;">↩ Reopen</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="add-comment-form" style="margin-top:{% if comments %}1rem{% else %}0{% endif %};">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Comment</div>
+      <form method="post" action="{{ url_for('procedures.comment_add', id=proc['id']) }}">
+        <input type="hidden" name="section_id" value="{{ section['id'] }}">
+        <input type="hidden" name="target_label" value="Section {{ position }}: {{ section['title'] }}">
+        <input type="hidden" name="next_url" value="{{ url_for('procedures.section_detail', id=proc['id'], sid=section['id']) }}">
+        <div style="display:grid; grid-template-columns:180px 1fr; gap:0.5rem; align-items:start;">
+          <div>
+            <label>Your Name *</label>
+            <input type="text" name="author_name" required placeholder="Name">
+          </div>
+          <div>
+            <label>Comment *</label>
+            <textarea name="body" required placeholder="Question, concern, or suggested change"></textarea>
+          </div>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <button type="submit" class="primary-button" style="padding:0.38rem 0.8rem; font-size:0.82rem;">Post Comment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

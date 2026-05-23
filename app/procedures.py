@@ -97,8 +97,24 @@ def procedure_detail(id):
         "SELECT id, proc_id, revision, title FROM procedures WHERE parent_id = ? ORDER BY proc_id, revision",
         (id,)
     ).fetchall()
+    comments = db.execute(
+        "SELECT * FROM procedure_comments WHERE procedure_id=? ORDER BY resolved ASC, created_at DESC",
+        (id,)
+    ).fetchall()
+    # Open comment counts keyed by section_id and step_id for the editor badges
+    open_by_section = {}
+    open_by_step = {}
+    for c in comments:
+        if not c['resolved']:
+            if c['section_id']:
+                open_by_section[c['section_id']] = open_by_section.get(c['section_id'], 0) + 1
+            if c['step_id']:
+                open_by_step[c['step_id']] = open_by_step.get(c['step_id'], 0) + 1
+    open_count = sum(1 for c in comments if not c['resolved'])
     return render_template("procedure_detail.html", item=item, sections=sections,
-                           steps_by_section=steps_by_section, parent=parent, children=children)
+                           steps_by_section=steps_by_section, parent=parent, children=children,
+                           comments=comments, open_count=open_count,
+                           open_by_section=open_by_section, open_by_step=open_by_step)
 
 def _form_context(db):
     """Shared context data for the procedure form."""
@@ -273,7 +289,19 @@ def procedure_sections(id):
             flash("Section added.", "success")
 
     sections, steps_by_section = get_sections_with_steps(db, id)
-    return render_template("procedure_sections.html", proc=proc, sections=sections, steps_by_section=steps_by_section)
+    open_comments = db.execute(
+        "SELECT section_id, step_id FROM procedure_comments WHERE procedure_id=? AND resolved=0", (id,)
+    ).fetchall()
+    open_by_section = {}
+    open_by_step = {}
+    for c in open_comments:
+        if c['section_id']:
+            open_by_section[c['section_id']] = open_by_section.get(c['section_id'], 0) + 1
+        if c['step_id']:
+            open_by_step[c['step_id']] = open_by_step.get(c['step_id'], 0) + 1
+    return render_template("procedure_sections.html", proc=proc, sections=sections,
+                           steps_by_section=steps_by_section,
+                           open_by_section=open_by_section, open_by_step=open_by_step)
 
 @bp.route("/<int:id>/sections/<int:sid>/edit", methods=["POST"])
 def section_edit(id, sid):
@@ -448,6 +476,63 @@ def run_execute(id):
 
     return render_template("run_execute.html", run=run, sections=sections,
                            steps_by_section=steps_by_section, saved_values=saved_values)
+
+# ---------------------------------------------------------------------------
+# Review Comments
+# ---------------------------------------------------------------------------
+
+@bp.route("/<int:id>/comments", methods=["POST"])
+def comment_add(id):
+    db = get_db()
+    author_name  = request.form.get("author_name", "").strip()
+    body         = request.form.get("body", "").strip()
+    target_label = request.form.get("target_label", "General").strip()
+    section_id   = request.form.get("section_id") or None
+    step_id      = request.form.get("step_id") or None
+    if author_name and body:
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            """INSERT INTO procedure_comments
+               (procedure_id, section_id, step_id, target_label, author_name, body, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (id, section_id, step_id, target_label, author_name, body, now)
+        )
+        db.commit()
+        flash("Comment added.", "success")
+    return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
+
+@bp.route("/<int:id>/comments/<int:cid>/resolve", methods=["POST"])
+def comment_resolve(id, cid):
+    db = get_db()
+    resolved_by = request.form.get("resolved_by", "").strip() or "Author"
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute(
+        "UPDATE procedure_comments SET resolved=1, resolved_by=?, resolved_at=? WHERE id=? AND procedure_id=?",
+        (resolved_by, now, cid, id)
+    )
+    db.commit()
+    return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
+
+@bp.route("/<int:id>/comments/<int:cid>/reopen", methods=["POST"])
+def comment_reopen(id, cid):
+    db = get_db()
+    db.execute(
+        "UPDATE procedure_comments SET resolved=0, resolved_by=NULL, resolved_at=NULL WHERE id=? AND procedure_id=?",
+        (cid, id)
+    )
+    db.commit()
+    return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
+
+@bp.route("/<int:id>/set-status", methods=["POST"])
+def procedure_set_status(id):
+    db = get_db()
+    new_status = request.form.get("status", "").strip()
+    if new_status in ("draft", "in_review", "approved"):
+        db.execute("UPDATE procedures SET status=? WHERE id=?", (new_status, id))
+        db.commit()
+        labels = {"draft": "returned to Draft", "in_review": "sent for Review", "approved": "marked Approved"}
+        flash(f"Procedure {labels.get(new_status, new_status)}.", "success")
+    return redirect(url_for("procedures.procedure_detail", id=id))
 
 # ---------------------------------------------------------------------------
 # Hazard Type Settings

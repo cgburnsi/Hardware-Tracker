@@ -26,6 +26,7 @@ def init_db():
     DROP TABLE IF EXISTS procedures;
     DROP TABLE IF EXISTS procedure_steps;
     DROP TABLE IF EXISTS procedure_sections;
+    DROP TABLE IF EXISTS procedure_comments;
     DROP TABLE IF EXISTS hazard_types;
     DROP TABLE IF EXISTS manufacturers;
     DROP TABLE IF EXISTS custodians;
@@ -98,9 +99,28 @@ def init_db():
         hazards TEXT,
         prereqs TEXT,
         parent_id INTEGER REFERENCES procedures(id),
+        status TEXT NOT NULL DEFAULT 'draft',
         created_at TEXT,
         updated_at TEXT,
         UNIQUE(proc_id, revision)
+    );
+
+    -- 4b. PROCEDURE COMMENTS (review annotations)
+    CREATE TABLE procedure_comments (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        procedure_id INTEGER NOT NULL,
+        section_id   INTEGER,
+        step_id      INTEGER,
+        target_label TEXT NOT NULL DEFAULT 'General',
+        author_name  TEXT NOT NULL,
+        body         TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        resolved     INTEGER NOT NULL DEFAULT 0,
+        resolved_by  TEXT,
+        resolved_at  TEXT,
+        FOREIGN KEY (procedure_id) REFERENCES procedures(id),
+        FOREIGN KEY (section_id)   REFERENCES procedure_sections(id),
+        FOREIGN KEY (step_id)      REFERENCES procedure_steps(id)
     );
     
     -- 5. SECTIONS (Groupings)

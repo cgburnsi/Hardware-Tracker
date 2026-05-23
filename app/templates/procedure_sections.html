@@ -46,6 +46,7 @@
   .data-field.active { opacity: 1; }
 
   .add-section-box { background: #f4f4f2; border: 2px dashed #ccc; padding: 1.5rem; border-radius: 6px; margin-top: 1rem; }
+  .comment-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.3rem; height: 1.3rem; padding: 0 0.3rem; background: #e67e22; color: #fff; border-radius: 10px; font-size: 0.68rem; font-weight: 700; vertical-align: middle; margin-left: 0.3rem; line-height: 1; }
   .no-steps { text-align: center; color: #aaa; font-style: italic; font-size: 0.85rem; padding: 0.75rem; }
   textarea { width: 100%; border: 1px solid var(--border-soft); padding: 0.5rem; border-radius: 3px; font-family: inherit; }
 </style>
@@ -67,7 +68,11 @@
     {# Section header #}
     <div class="section-header-bar">
       <span class="section-num">{{ loop.index }}</span>
-      <span class="section-title-text">{{ sec['title'] }}</span>
+      <span class="section-title-text">
+        {{ sec['title'] }}
+        {% set sec_open = open_by_section.get(sec['id'], 0) %}
+        {% if sec_open > 0 %}<span class="comment-badge" title="{{ sec_open }} open comment{{ 's' if sec_open != 1 else '' }}">{{ sec_open }}</span>{% endif %}
+      </span>
       <button type="button" class="btn-sm" onclick="toggleEl('sec-edit-{{ sec['id'] }}')">Edit</button>
       <form method="post" action="{{ url_for('procedures.section_delete', id=proc['id'], sid=sec['id']) }}"
             onsubmit="return confirm('Delete this section and all its steps?');" style="display:inline; margin:0;">
@@ -107,6 +112,8 @@
         <div class="step-body-col">
           <div class="step-title-text">
             {{ step['title'] }}
+            {% set step_open = open_by_step.get(step['id'], 0) %}
+            {% if step_open > 0 %}<span class="comment-badge" title="{{ step_open }} open comment{{ 's' if step_open != 1 else '' }}">{{ step_open }}</span>{% endif %}
             {% if step['input_type'] == 'number' %}
               <span class="tag tag-num">NUM: {{ step['unit'] or '–' }}</span>
               {% if step['min_value'] is not none or step['max_value'] is not none %}

@@ -4,24 +4,65 @@
 
 {% block content %}
 <style>
-  /* Reuse the nice card styles from Hardware Detail */
   .section-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 1.5rem; overflow: hidden; }
   .section-header { background: #fcfcfb; border-bottom: 1px solid var(--border-soft); padding: 0.6rem 1rem; font-weight: 600; font-size: 0.85rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center; }
   .section-body { padding: 1rem; }
-  
   .detail-row { display: flex; margin-bottom: 0.5rem; font-size: 0.95rem; }
   .detail-label { width: 140px; color: #666; flex-shrink: 0; }
-  
+
+  /* Status banner */
+  .status-banner { display:flex; align-items:center; gap:1rem; padding:0.65rem 1rem; border-radius:6px; margin-bottom:1.25rem; font-size:0.9rem; flex-wrap:wrap; }
+  .status-banner.draft     { background:#f4f4f2; border:1px solid #ddd; color:#555; }
+  .status-banner.in_review { background:#fff8e1; border:1px solid #f4c842; color:#7a5c00; }
+  .status-banner.approved  { background:#f0fff4; border:1px solid #6c9e6c; color:#1a5c1a; }
+  .status-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  /* Comments */
+  .comment-card { border:1px solid #e8e8e8; border-radius:6px; padding:0.9rem; margin-bottom:0.75rem; background:#fff; }
+  .comment-card.resolved { opacity:0.6; background:#f9f9f9; }
+  .comment-meta { font-size:0.78rem; color:#999; margin-bottom:0.35rem; }
+  .comment-target { display:inline-block; background:#eef2f7; color:#3a5cc7; font-size:0.72rem; font-weight:600; padding:0.1rem 0.4rem; border-radius:3px; margin-right:0.4rem; }
+  .comment-body { color:#333; font-size:0.92rem; line-height:1.5; white-space:pre-wrap; }
+  .comment-resolved-label { font-size:0.75rem; color:#6c9e6c; font-weight:600; margin-top:0.3rem; }
+  .add-comment-form { background:#f9f9f7; border:1px dashed #ccc; border-radius:6px; padding:1rem; margin-top:1rem; }
 </style>
+
+  {# Status banner #}
+  {% set status = item['status'] or 'draft' %}
+  <div class="status-banner {{ status }}">
+    <span class="status-dot" style="
+      {% if status == 'draft'     %}background:#aaa;
+      {% elif status == 'in_review' %}background:#f4c842;
+      {% else %}background:#6c9e6c;{% endif %}"></span>
+    <span style="font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">
+      {% if status == 'draft' %}Draft
+      {% elif status == 'in_review' %}In Review{% if open_count %} — {{ open_count }} open comment{% if open_count != 1 %}s{% endif %}{% endif %}
+      {% else %}Approved{% endif %}
+    </span>
+    <span style="flex:1;"></span>
+    {% if status == 'draft' %}
+      <form method="post" action="{{ url_for('procedures.procedure_set_status', id=item['id']) }}" style="margin:0;">
+        <input type="hidden" name="status" value="in_review">
+        <button type="submit" class="primary-button" style="padding:0.35rem 0.9rem; font-size:0.85rem;">Send for Review</button>
+      </form>
+    {% elif status == 'in_review' %}
+      <form method="post" action="{{ url_for('procedures.procedure_set_status', id=item['id']) }}" style="margin:0;">
+        <input type="hidden" name="status" value="draft">
+        <button type="submit" class="secondary-button" style="padding:0.35rem 0.9rem; font-size:0.85rem;">Back to Draft</button>
+      </form>
+    {% endif %}
+  </div>
 
   <div class="page-title-row">
     <div>
       <h2 class="page-title" style="display:inline-block; margin-right:1rem;">{{ item['proc_id'] }}</h2>
-      <span style="color:#666; font-size:1rem; font-weight: bold;">Rev {{ item['revision'] }}</span>
+      <span style="color:#666; font-size:1rem; font-weight:bold;">Rev {{ item['revision'] }}</span>
     </div>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <a href="{{ url_for('procedures.procedure_export_docx', id=item['id']) }}" class="secondary-button">Export .docx</a>
+      {% if status != 'approved' %}
       <a href="{{ url_for('procedures.procedure_edit', id=item['id']) }}" class="secondary-button">Edit Details</a>
+      {% endif %}
       <a href="{{ url_for('procedures.procedure_revise', id=item['id']) }}" class="primary-button">Revise / Branch</a>
     </div>
   </div>
@@ -119,6 +160,114 @@
     </div>
   </div>
 
+  {# Review Comments #}
+  <div class="section-card" id="comments">
+    <div class="section-header">
+      <span>Review Comments
+        {% if open_count %}<span style="background:#f4c842; color:#7a5c00; font-size:0.72rem; padding:0.1rem 0.4rem; border-radius:3px; margin-left:0.4rem; font-weight:700;">{{ open_count }} open</span>{% endif %}
+      </span>
+    </div>
+    <div class="section-body" style="padding:0.75rem 1rem;">
+
+      {# Open comments #}
+      {% set open_comments = comments | selectattr('resolved', 'equalto', 0) | list %}
+      {% set resolved_comments = comments | selectattr('resolved', 'equalto', 1) | list %}
+
+      {% if open_comments %}
+        {% for c in open_comments %}
+        <div class="comment-card">
+          <div class="comment-meta">
+            <span class="comment-target">{{ c['target_label'] }}</span>
+            <strong>{{ c['author_name'] }}</strong> &nbsp;·&nbsp; {{ c['created_at'][:16] | replace('T',' ') }}
+          </div>
+          <div class="comment-body">{{ c['body'] }}</div>
+          <div style="margin-top:0.6rem; display:flex; align-items:center; gap:0.5rem;">
+            <form method="post" action="{{ url_for('procedures.comment_resolve', id=item['id'], cid=c['id']) }}" style="margin:0; display:flex; align-items:center; gap:0.4rem;">
+              <input type="text" name="resolved_by" placeholder="Your name" required
+                     style="padding:0.25rem 0.5rem; border:1px solid #ccc; border-radius:3px; font-size:0.8rem; width:130px;">
+              <button type="submit" style="border:none; background:none; cursor:pointer; color:#6c9e6c; font-size:0.8rem; font-weight:600; padding:0.25rem 0.4rem;">✓ Resolve</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% elif not resolved_comments %}
+        <div style="color:#aaa; font-style:italic; font-size:0.9rem; padding:0.5rem 0;">No comments yet.</div>
+      {% endif %}
+
+      {# Resolved comments (collapsed) #}
+      {% if resolved_comments %}
+      <div style="margin-top:{% if open_comments %}1rem{% else %}0{% endif %};">
+        <button type="button" onclick="toggleEl('resolved-comments')"
+                style="border:none; background:none; cursor:pointer; font-size:0.8rem; color:#aaa; padding:0; font-weight:600;">
+          {{ resolved_comments | length }} resolved comment{% if resolved_comments | length != 1 %}s{% endif %} ▾
+        </button>
+        <div id="resolved-comments" style="display:none; margin-top:0.5rem;">
+          {% for c in resolved_comments %}
+          <div class="comment-card resolved">
+            <div class="comment-meta">
+              <span class="comment-target">{{ c['target_label'] }}</span>
+              <strong>{{ c['author_name'] }}</strong> &nbsp;·&nbsp; {{ c['created_at'][:16] | replace('T',' ') }}
+            </div>
+            <div class="comment-body">{{ c['body'] }}</div>
+            <div class="comment-resolved-label">✓ Resolved by {{ c['resolved_by'] }} at {{ c['resolved_at'][:16] | replace('T',' ') }}</div>
+            <form method="post" action="{{ url_for('procedures.comment_reopen', id=item['id'], cid=c['id']) }}" style="margin:0; margin-top:0.4rem;">
+              <button type="submit" style="border:none; background:none; cursor:pointer; font-size:0.75rem; color:#aaa; padding:0;">↩ Reopen</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Add comment form #}
+      <div class="add-comment-form" style="margin-top:{% if comments %}1rem{% else %}0{% endif %};">
+        <div style="font-weight:600; font-size:0.85rem; color:#555; margin-bottom:0.75rem;">Add a Comment</div>
+        <form method="post" action="{{ url_for('procedures.comment_add', id=item['id']) }}">
+
+          <div style="display:flex; gap:0.75rem; margin-bottom:0.6rem; flex-wrap:wrap;">
+            <div style="flex:1; min-width:150px;">
+              <label style="font-size:0.78rem; color:#666; display:block; margin-bottom:0.2rem;">Your Name *</label>
+              <input type="text" name="author_name" required placeholder="e.g. J. Smith"
+                     style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px; font-size:0.9rem;">
+            </div>
+            <div style="flex:2; min-width:200px;">
+              <label style="font-size:0.78rem; color:#666; display:block; margin-bottom:0.2rem;">Regarding</label>
+              <select name="target_label" id="target-select"
+                      style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px; font-size:0.9rem;"
+                      onchange="syncTarget(this)">
+                <option value="General">General / Whole Procedure</option>
+                {% for sec in sections %}
+                  <option value="Section {{ loop.index }}: {{ sec['title'] }}"
+                          data-section-id="{{ sec['id'] }}">
+                    Section {{ loop.index }}: {{ sec['title'] }}
+                  </option>
+                  {% for step in steps_by_section.get(sec['id'], []) %}
+                  <option value="Section {{ loop.index }} › Step {{ loop.index }}: {{ step['title'] }}"
+                          data-section-id="{{ sec['id'] }}" data-step-id="{{ step['id'] }}">
+                    &nbsp;&nbsp;&nbsp;Step {{ loop.index }}: {{ step['title'] }}
+                  </option>
+                  {% endfor %}
+                {% endfor %}
+              </select>
+              <input type="hidden" name="section_id" id="hidden-section-id" value="">
+              <input type="hidden" name="step_id"    id="hidden-step-id"    value="">
+            </div>
+          </div>
+
+          <div style="margin-bottom:0.6rem;">
+            <label style="font-size:0.78rem; color:#666; display:block; margin-bottom:0.2rem;">Comment *</label>
+            <textarea name="body" required rows="3"
+                      placeholder="Describe your comment or concern..."
+                      style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:3px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+          </div>
+
+          <button type="submit" class="primary-button" style="padding:0.4rem 1rem; font-size:0.85rem;">Post Comment</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
   {# Lineage panel — only shown if this procedure has a parent or children #}
   {% if parent or children %}
   <div class="section-card" style="border-left: 3px solid #6c9e6c;">
@@ -165,4 +314,15 @@
   </div>
   {% endif %}
 
+<script>
+  function toggleEl(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+  function syncTarget(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('hidden-section-id').value = opt.dataset.sectionId || '';
+    document.getElementById('hidden-step-id').value    = opt.dataset.stepId    || '';
+  }
+</script>
 {% endblock %}

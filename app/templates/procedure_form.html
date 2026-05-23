@@ -4,91 +4,228 @@
   {% if item %}Edit {{ item['proc_id'] }}{% else %}New Procedure{% endif %}
 {% endblock %}
 
+{% block sidebar_filters %}
+  <div class="sidebar-section-title">Actions</div>
+  <ul class="nav-links">
+    <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
+    <li><a href="{{ url_for('procedures.hazard_settings') }}">Manage Hazard Types</a></li>
+  </ul>
+{% endblock %}
+
 {% block content %}
 <style>
-  /* Form Layout Styles */
   .form-section { border: 1px solid var(--border-soft); background: #fff; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px; }
   .form-section legend { font-weight: 600; color: var(--accent); padding: 0 0.5rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
   .row-split { display: flex; gap: 1.5rem; }
   .row-split > div { flex: 1; }
   .helper-text { font-size: 0.75rem; color: #666; margin-top: 0.2rem; }
   textarea { width: 100%; border: 1px solid var(--border-soft); border-radius: 3px; padding: 0.5rem; font-family: inherit; font-size: 0.9rem; min-height: 80px; resize: vertical; }
+
+  /* Hazard checklist */
+  .hazard-grid { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1rem; }
+  .hazard-chip {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.45rem 0.75rem; border-radius: 20px;
+    border: 2px solid #ddd; background: #f9f9f9;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .hazard-chip input[type=checkbox] { display: none; }
+  .hazard-chip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .hazard-chip.selected { background: #fff; font-weight: 700; }
+
+  .ppe-box { background: #fffdf5; border: 1px solid #f4c842; border-radius: 4px; padding: 0.75rem; margin-bottom: 0.5rem; }
+  .ppe-box-title { font-size: 0.75rem; font-weight: 700; color: #9a7a00; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+  .ppe-item { display: flex; gap: 0.4rem; align-items: flex-start; font-size: 0.85rem; color: #555; margin-bottom: 0.2rem; }
+  .ppe-item::before { content: "▸"; color: #f4c842; flex-shrink: 0; }
+
+  .no-hazards-msg { color: #aaa; font-style: italic; font-size: 0.85rem; padding: 0.5rem 0; }
 </style>
 
-  <div class="page-title-row">
-    <h2 class="page-title">
-      {% if item %}Edit Procedure: <span style="color:var(--text-muted)">{{ item['proc_id'] }}</span>
-      {% else %}Draft New Procedure{% endif %}
-    </h2>
+<div class="page-title-row">
+  <h2 class="page-title">
+    {% if item %}Edit Procedure: <span style="color:var(--text-muted)">{{ item['proc_id'] }} Rev {{ item['revision'] }}</span>
+    {% else %}Draft New Procedure{% endif %}
+  </h2>
+</div>
+
+{# Store hazard PPE data for JS #}
+<script>
+const HAZARD_PPE = {
+  {% for h in hazard_types %}
+  {{ h['name'] | tojson }}: {{ h['ppe_text'] | tojson }}{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+</script>
+
+<form method="post" style="max-width: 800px;">
+
+  {# ── 1. Identity ── #}
+  <fieldset class="form-section">
+    <legend>1. Identity</legend>
+
+    <div class="form-row">
+      <label>Procedure Title *</label>
+      <input type="text" name="title" value="{{ item['title'] if item else '' }}" required
+             placeholder="e.g. Valve Cleaning Procedure">
+    </div>
+
+    <div class="row-split">
+      <div class="form-row">
+        <label>Procedure Type</label>
+        <select name="type" class="sidebar-select">
+          <option value="SOP"  {% if item and item['type'] == 'SOP'  %}selected{% endif %}>Standard Operating Procedure (SOP)</option>
+          <option value="Test" {% if item and item['type'] == 'Test' %}selected{% endif %}>Test Procedure</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Target Hardware *</label>
+      {% if hardware %}
+        <select name="hardware_id" class="sidebar-select" required>
+          <option value="">— Select hardware —</option>
+          {% for hw in hardware %}
+            <option value="{{ hw['hardware_id'] }}"
+              {% if item and item['hardware_id'] == hw['hardware_id'] %}selected{% endif %}>
+              {{ hw['hardware_id'] }} — {{ hw['description'] }}
+            </option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <div style="color:#d9534f; font-size:0.9rem; padding:0.4rem 0;">
+          No hardware items exist yet.
+          <a href="{{ url_for('hardware.hardware_new') }}" style="font-weight:600;">Add hardware first →</a>
+        </div>
+        <input type="hidden" name="hardware_id" value="">
+      {% endif %}
+      <div class="helper-text">The hardware item this procedure is performed on.</div>
+    </div>
+  </fieldset>
+
+  {# ── 2. Safety & Prerequisites ── #}
+  <fieldset class="form-section" style="border-left: 4px solid #f4c842;">
+    <legend style="color:#d9534f;">2. Safety &amp; Prerequisites</legend>
+
+    {% if hazard_types %}
+    <div class="form-row" style="margin-bottom:0.75rem;">
+      <label>Hazards Present</label>
+      <div class="hazard-grid" id="hazard-grid">
+        {% set selected_hazards = (item['hazards'] or '').split(', ') if item else [] %}
+        {% for h in hazard_types %}
+        {% set is_checked = h['name'] in selected_hazards %}
+        <label class="hazard-chip {% if is_checked %}selected{% endif %}"
+               style="{% if is_checked %}border-color: {{ h['color'] }};{% endif %}"
+               id="chip-{{ h['id'] }}">
+          <input type="checkbox" name="hazards" value="{{ h['name'] }}"
+                 {% if is_checked %}checked{% endif %}
+                 onchange="updateHazardChip(this, '{{ h['color'] }}'); updatePPE()">
+          <span class="dot" style="background: {{ h['color'] }};"></span>
+          {{ h['name'] }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="ppe-preview" style="margin-bottom:0.75rem; display:none;">
+      <div class="ppe-box">
+        <div class="ppe-box-title">Generated PPE Requirements</div>
+        <div id="ppe-list"></div>
+      </div>
+    </div>
+    {% else %}
+      <div style="color:#aaa; font-size:0.85rem; margin-bottom:0.75rem;">
+        No hazard types configured. <a href="{{ url_for('procedures.hazard_settings') }}">Add hazard types →</a>
+      </div>
+    {% endif %}
+
+    <div class="form-row">
+      <label>Full PPE &amp; Prerequisites</label>
+      <textarea name="prereqs" id="prereqs-field" rows="4"
+                placeholder="Full list of required PPE, equipment checks, and prerequisites...">{{ item['prereqs'] if item else '' }}</textarea>
+      <div class="helper-text">Auto-populated from hazard selection above — edit freely to add detail or remove items.</div>
+    </div>
+
+  </fieldset>
+
+  {# ── 3. Objective ── #}
+  <fieldset class="form-section">
+    <legend>3. Objective</legend>
+
+    <div class="form-row">
+      <label>Purpose / Objective</label>
+      <textarea name="purpose" rows="3">{{ item['purpose'] if item else '' }}</textarea>
+    </div>
+
+    {% if item %}
+    <div class="helper-text" style="padding:0.5rem; background:#f4f4f2; border-radius:3px;">
+      Steps are managed on the procedure detail page — use "Edit Sections / Steps" to add or modify them.
+    </div>
+    {% else %}
+    <div class="helper-text" style="padding:0.5rem; background:#f4f4f2; border-radius:3px;">
+      Save this form first, then use "Edit Sections / Steps" on the detail page to build out the procedure steps.
+    </div>
+    {% endif %}
+  </fieldset>
+
+  <div class="form-actions">
+    <button type="submit" class="primary-button" {% if not hardware %}disabled title="Add hardware first"{% endif %}>
+      Save Procedure
+    </button>
+    <a href="{{ url_for('procedures.procedure_list') }}" class="secondary-button" style="text-decoration:none; margin-left:1rem;">Cancel</a>
   </div>
 
-  <form method="post" style="max-width: 800px;">
-    
-    <fieldset class="form-section">
-      <legend>1. Identity</legend>
-      <div class="form-row">
-        <label>Procedure Title *</label>
-        <input type="text" name="title" value="{{ item['title'] if item else '' }}" required placeholder="e.g. Valve Cleaning Process">
-      </div>
-      
-      <div class="row-split">
-        <div class="form-row">
-          <label>Procedure Type</label>
-          <select name="type" class="sidebar-select">
-            <option value="SOP" {% if item and item['type'] == 'SOP' %}selected{% endif %}>Standard Operating Procedure (SOP)</option>
-            <option value="Test" {% if item and item['type'] == 'Test' %}selected{% endif %}>Test Procedure</option>
-          </select>
-          <div class="helper-text">SOPs are standard maintenance; Tests are experimental.</div>
-        </div>
-        <div class="form-row">
-          <label>Revision</label>
-          <input type="text" name="revision" value="{{ item['revision'] if item else 'A' }}" style="width:80px;">
-        </div>
-      </div>
-      
-      <div class="form-row">
-        <label>Target Hardware ID (Optional)</label>
-        <input type="text" name="hardware_id" value="{{ item['hardware_id'] if item else '' }}" placeholder="e.g. H25001">
-        <div class="helper-text">If this procedure applies to a specific item, enter its ID here.</div>
-      </div>
-    </fieldset>
+</form>
 
-    <fieldset class="form-section" style="border-left: 4px solid #f4c842;">
-      <legend style="color:#d9534f;">2. Safety & Prerequisites</legend>
-      
-      <div class="form-row">
-        <label>Hazards</label>
-        <input type="text" name="hazards" value="{{ item['hazards'] if item else '' }}" placeholder="e.g. High Pressure, Cryogenic, Toxic Fumes">
-      </div>
-      
-      <div class="form-row">
-        <label>Prerequisites / PPE</label>
-        <textarea name="prereqs" placeholder="e.g. Safety Glasses, Lab Coat, Verify Vent Valve Open">{{ item['prereqs'] if item else '' }}</textarea>
-      </div>
-    </fieldset>
+<script>
+  function updateHazardChip(checkbox, color) {
+    const chip = checkbox.closest('.hazard-chip');
+    if (checkbox.checked) {
+      chip.classList.add('selected');
+      chip.style.borderColor = color;
+    } else {
+      chip.classList.remove('selected');
+      chip.style.borderColor = '#ddd';
+    }
+  }
 
-    <fieldset class="form-section">
-      <legend>3. Objective & Overview</legend>
+  function updatePPE() {
+    const checked = Array.from(document.querySelectorAll('input[name="hazards"]:checked'))
+                         .map(cb => cb.value);
+    const preview = document.getElementById('ppe-preview');
+    const list    = document.getElementById('ppe-list');
+    const field   = document.getElementById('prereqs-field');
 
-      <div class="form-row">
-        <label>Purpose / Objective</label>
-        <textarea name="purpose" style="min-height:60px;">{{ item['purpose'] if item else '' }}</textarea>
-      </div>
+    if (checked.length === 0) {
+      preview.style.display = 'none';
+      return;
+    }
 
-      {% if item %}
-      <div class="helper-text" style="margin-top:0.5rem; padding:0.6rem; background:#f4f4f2; border-radius:3px;">
-        Steps are managed on the procedure detail page. Use "Edit Sections / Steps" to add, edit, or reorder steps.
-      </div>
-      {% else %}
-      <div class="helper-text" style="margin-top:0.5rem; padding:0.6rem; background:#f4f4f2; border-radius:3px;">
-        Save this form first, then use "Edit Sections / Steps" on the detail page to add individual steps.
-      </div>
-      {% endif %}
-    </fieldset>
+    preview.style.display = 'block';
+    list.innerHTML = checked.map(name => {
+      const text = HAZARD_PPE[name] || '';
+      return `<div class="ppe-item">${text}</div>`;
+    }).join('');
 
-    <div class="form-actions">
-      <button type="submit" class="primary-button">Save Procedure</button>
-      <a href="{{ url_for('procedures.procedure_list') }}" class="secondary-button" style="text-decoration:none; margin-left:1rem;">Cancel</a>
-    </div>
-  </form>
+    // Only auto-fill prereqs if it's currently empty or was previously auto-generated
+    const combined = checked.map(name => HAZARD_PPE[name] || name).join('\n\n');
+    if (!field.dataset.manuallyEdited) {
+      field.value = combined;
+    }
+  }
+
+  // Mark prereqs as manually edited if user types in it
+  document.getElementById('prereqs-field')?.addEventListener('input', function() {
+    this.dataset.manuallyEdited = 'true';
+  });
+
+  // Run on load to show preview for pre-checked hazards
+  document.addEventListener('DOMContentLoaded', () => {
+    updatePPE();
+    // Don't overwrite existing prereqs on edit — mark as already set
+    const field = document.getElementById('prereqs-field');
+    if (field && field.value.trim()) field.dataset.manuallyEdited = 'true';
+  });
+</script>
 {% endblock %}

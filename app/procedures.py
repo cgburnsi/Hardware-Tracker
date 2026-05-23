@@ -100,61 +100,76 @@ def procedure_detail(id):
     return render_template("procedure_detail.html", item=item, sections=sections,
                            steps_by_section=steps_by_section, parent=parent, children=children)
 
+def _form_context(db):
+    """Shared context data for the procedure form."""
+    hardware = db.execute(
+        "SELECT hardware_id, description FROM hardware ORDER BY hardware_id"
+    ).fetchall()
+    hazard_types = db.execute(
+        "SELECT * FROM hazard_types WHERE active=1 ORDER BY sort_order"
+    ).fetchall()
+    return hardware, hazard_types
+
 @bp.route("/new", methods=["GET", "POST"])
 def procedure_new():
     db = get_db()
+    hardware, hazard_types = _form_context(db)
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        proc_type = request.form.get("type", "SOP").strip()
-        revision = request.form.get("revision", "").strip() or "A"
+        title      = request.form.get("title", "").strip()
+        proc_type  = request.form.get("type", "SOP").strip()
         hardware_id = request.form.get("hardware_id", "").strip()
-        purpose = request.form.get("purpose", "").strip()
-        hazards = request.form.get("hazards", "").strip()
-        prereqs = request.form.get("prereqs", "").strip()
+        purpose    = request.form.get("purpose", "").strip()
+        hazards    = ", ".join(request.form.getlist("hazards"))
+        prereqs    = request.form.get("prereqs", "").strip()
 
         if not title:
             flash("Title is required.", "error")
-            return render_template("procedure_form.html", item=None)
+            return render_template("procedure_form.html", item=None,
+                                   hardware=hardware, hazard_types=hazard_types)
+        if not hardware_id:
+            flash("Target hardware is required.", "error")
+            return render_template("procedure_form.html", item=None,
+                                   hardware=hardware, hazard_types=hazard_types)
 
         proc_id = generate_new_procedure_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
-
         db.execute(
             """INSERT INTO procedures
-            (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (proc_id, title, proc_type, hardware_id or None, revision, purpose, hazards, prereqs, now, now)
+               (proc_id, title, type, hardware_id, revision, purpose, hazards, prereqs, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'A', ?, ?, ?, ?, ?)""",
+            (proc_id, title, proc_type, hardware_id, purpose, hazards, prereqs, now, now)
         )
         db.commit()
         flash(f"Created {proc_type} {proc_id}.", "success")
-        row = db.execute("SELECT id FROM procedures WHERE proc_id = ?", (proc_id,)).fetchone()
+        row = db.execute("SELECT id FROM procedures WHERE proc_id = ? AND revision = 'A'", (proc_id,)).fetchone()
         return redirect(url_for("procedures.procedure_detail", id=row["id"]))
 
-    return render_template("procedure_form.html", item=None)
+    return render_template("procedure_form.html", item=None,
+                           hardware=hardware, hazard_types=hazard_types)
 
 @bp.route("/<int:id>/edit", methods=["GET", "POST"])
 def procedure_edit(id):
     db = get_db()
     item = db.execute("SELECT * FROM procedures WHERE id = ?", (id,)).fetchone()
+    hardware, hazard_types = _form_context(db)
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        proc_type = request.form.get("type", "SOP").strip()
+        title       = request.form.get("title", "").strip()
+        proc_type   = request.form.get("type", "SOP").strip()
         hardware_id = request.form.get("hardware_id", "").strip()
-        revision = request.form.get("revision", "").strip()
-        purpose = request.form.get("purpose", "").strip()
-        hazards = request.form.get("hazards", "").strip()
-        prereqs = request.form.get("prereqs", "").strip()
+        purpose     = request.form.get("purpose", "").strip()
+        hazards     = ", ".join(request.form.getlist("hazards"))
+        prereqs     = request.form.get("prereqs", "").strip()
         now = datetime.utcnow().isoformat(timespec="seconds")
-
         db.execute(
-            """UPDATE procedures SET title=?, type=?, hardware_id=?, revision=?,
+            """UPDATE procedures SET title=?, type=?, hardware_id=?,
                purpose=?, hazards=?, prereqs=?, updated_at=? WHERE id=?""",
-            (title, proc_type, hardware_id, revision, purpose, hazards, prereqs, now, id)
+            (title, proc_type, hardware_id, purpose, hazards, prereqs, now, id)
         )
         db.commit()
         flash("Procedure updated.", "success")
         return redirect(url_for("procedures.procedure_detail", id=id))
-    return render_template("procedure_form.html", item=item)
+    return render_template("procedure_form.html", item=item,
+                           hardware=hardware, hazard_types=hazard_types)
 
 # ---------------------------------------------------------------------------
 # Revise / Branch
@@ -433,6 +448,53 @@ def run_execute(id):
 
     return render_template("run_execute.html", run=run, sections=sections,
                            steps_by_section=steps_by_section, saved_values=saved_values)
+
+# ---------------------------------------------------------------------------
+# Hazard Type Settings
+# ---------------------------------------------------------------------------
+
+@bp.route("/hazards", methods=["GET", "POST"])
+def hazard_settings():
+    db = get_db()
+    if request.method == "POST":
+        name       = request.form.get("name", "").strip()
+        ppe_text   = request.form.get("ppe_text", "").strip()
+        color      = request.form.get("color", "#dc3545").strip()
+        sort_order = request.form.get("sort_order", "0").strip()
+        if name:
+            db.execute(
+                "INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES (?, ?, ?, ?)",
+                (name, ppe_text, color, int(sort_order) if sort_order.isdigit() else 0)
+            )
+            db.commit()
+            flash(f"Hazard type '{name}' added.", "success")
+    hazards = db.execute("SELECT * FROM hazard_types ORDER BY sort_order, name").fetchall()
+    return render_template("hazard_settings.html", hazards=hazards)
+
+@bp.route("/hazards/<int:hid>/edit", methods=["POST"])
+def hazard_edit(hid):
+    db = get_db()
+    name       = request.form.get("name", "").strip()
+    ppe_text   = request.form.get("ppe_text", "").strip()
+    color      = request.form.get("color", "#dc3545").strip()
+    sort_order = request.form.get("sort_order", "0").strip()
+    active     = 1 if request.form.get("active") else 0
+    if name:
+        db.execute(
+            "UPDATE hazard_types SET name=?, ppe_text=?, color=?, sort_order=?, active=? WHERE id=?",
+            (name, ppe_text, color, int(sort_order) if sort_order.isdigit() else 0, active, hid)
+        )
+        db.commit()
+        flash("Hazard type updated.", "success")
+    return redirect(url_for("procedures.hazard_settings"))
+
+@bp.route("/hazards/<int:hid>/delete", methods=["POST"])
+def hazard_delete(hid):
+    db = get_db()
+    db.execute("DELETE FROM hazard_types WHERE id = ?", (hid,))
+    db.commit()
+    flash("Hazard type deleted.", "success")
+    return redirect(url_for("procedures.hazard_settings"))
 
 @bp.route("/runs")
 def run_list():

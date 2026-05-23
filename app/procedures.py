@@ -101,7 +101,6 @@ def procedure_detail(id):
         "SELECT * FROM procedure_comments WHERE procedure_id=? ORDER BY resolved ASC, created_at DESC",
         (id,)
     ).fetchall()
-    # Open comment counts keyed by section_id and step_id for the editor badges
     open_by_section = {}
     open_by_step = {}
     for c in comments:
@@ -111,10 +110,14 @@ def procedure_detail(id):
             if c['step_id']:
                 open_by_step[c['step_id']] = open_by_step.get(c['step_id'], 0) + 1
     open_count = sum(1 for c in comments if not c['resolved'])
+    hazard_types = db.execute(
+        "SELECT * FROM hazard_types WHERE active=1 ORDER BY sort_order"
+    ).fetchall()
     return render_template("procedure_detail.html", item=item, sections=sections,
                            steps_by_section=steps_by_section, parent=parent, children=children,
                            comments=comments, open_count=open_count,
-                           open_by_section=open_by_section, open_by_step=open_by_step)
+                           open_by_section=open_by_section, open_by_step=open_by_step,
+                           hazard_types=hazard_types)
 
 def _form_context(db):
     """Shared context data for the procedure form."""
@@ -602,6 +605,9 @@ def comment_resolve(id, cid):
         (resolved_by, now, cid, id)
     )
     db.commit()
+    next_url = request.form.get("next_url", "")
+    if next_url:
+        return redirect(next_url + "#comments")
     return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
 
 @bp.route("/<int:id>/comments/<int:cid>/reopen", methods=["POST"])
@@ -612,6 +618,9 @@ def comment_reopen(id, cid):
         (cid, id)
     )
     db.commit()
+    next_url = request.form.get("next_url", "")
+    if next_url:
+        return redirect(next_url + "#comments")
     return redirect(url_for("procedures.procedure_detail", id=id) + "#comments")
 
 @bp.route("/<int:id>/set-status", methods=["POST"])

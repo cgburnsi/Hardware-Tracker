@@ -94,7 +94,14 @@
       {% if item['hazards'] %}
       <div class="detail-row">
         <div class="detail-label" style="color:#d9534f; font-weight:bold;">Hazards</div>
-        <div style="color:#d9534f; font-weight:500;">{{ item['hazards'] }}</div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.35rem; align-items:center;">
+          {% for hname in item['hazards'].split(',') %}
+            {% set hname = hname.strip() %}
+            {% set found = namespace(color='#d9534f') %}
+            {% for ht in hazard_types %}{% if ht['name'] == hname %}{% set found.color = ht['color'] %}{% endif %}{% endfor %}
+            <span style="display:inline-block; padding:0.2rem 0.5rem; border-radius:3px; font-size:0.75rem; font-weight:700; color:#fff; background:{{ found.color }};">{{ hname }}</span>
+          {% endfor %}
+        </div>
       </div>
       {% endif %}
       

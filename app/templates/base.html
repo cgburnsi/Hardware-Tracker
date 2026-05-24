@@ -235,7 +235,7 @@
           </div>
 
           <div class="nav-item">
-            <span class="nav-top-link {% if request.endpoint and request.endpoint.startswith('hardware.') and request.endpoint not in ['hardware.manufacturer_list','hardware.location_list','hardware.hardware_new','hardware.stats','hardware.category_fields_config','hardware.category_fields_add','hardware.category_fields_edit','hardware.category_fields_delete','hardware.category_fields_move','hardware.category_fields_json','hardware.quick_add'] %}active{% endif %}">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint.startswith('hardware.') and request.endpoint not in ['hardware.manufacturer_list','hardware.location_list','hardware.hardware_new','hardware.stats','hardware.category_fields_config','hardware.category_fields_add','hardware.category_fields_edit','hardware.category_fields_delete','hardware.category_fields_move','hardware.category_fields_json','hardware.quick_add','hardware.work_order_add','hardware.work_order_delete','hardware.ctn_list','hardware.ecn_list','hardware.calibration_id_list','hardware.repair_id_list','hardware.part_number_list','hardware.other_specs_list','hardware.a50_number_list'] %}active{% endif %}">
               Hardware <span class="nav-drop-arrow">▼</span>
             </span>
             <div class="nav-drop">
@@ -284,7 +284,7 @@
           </div>
 
           <div class="nav-item">
-            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete','hardware.manufacturer_list','hardware.location_list','hardware.stats','hardware.category_fields_config'] %}active{% endif %}">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete','hardware.manufacturer_list','hardware.location_list','hardware.stats','hardware.category_fields_config','hardware.ctn_list','hardware.ecn_list','hardware.calibration_id_list','hardware.repair_id_list','hardware.part_number_list','hardware.other_specs_list','hardware.a50_number_list'] %}active{% endif %}">
               Configuration <span class="nav-drop-arrow">▼</span>
             </span>
             <div class="nav-drop">
@@ -295,6 +295,36 @@
               <a href="{{ url_for('hardware.location_list') }}"
                  class="{% if request.endpoint == 'hardware.location_list' %}active{% endif %}">
                 Locations
+              </a>
+              <div class="nav-drop-divider"></div>
+              <a href="{{ url_for('hardware.ctn_list') }}"
+                 class="{% if request.endpoint == 'hardware.ctn_list' %}active{% endif %}">
+                CTN Numbers
+              </a>
+              <a href="{{ url_for('hardware.ecn_list') }}"
+                 class="{% if request.endpoint == 'hardware.ecn_list' %}active{% endif %}">
+                ECN Numbers
+              </a>
+              <a href="{{ url_for('hardware.calibration_id_list') }}"
+                 class="{% if request.endpoint == 'hardware.calibration_id_list' %}active{% endif %}">
+                Calibration IDs
+              </a>
+              <a href="{{ url_for('hardware.repair_id_list') }}"
+                 class="{% if request.endpoint == 'hardware.repair_id_list' %}active{% endif %}">
+                Repair / Ticket IDs
+              </a>
+              <a href="{{ url_for('hardware.part_number_list') }}"
+                 class="{% if request.endpoint == 'hardware.part_number_list' %}active{% endif %}">
+                Part Numbers
+              </a>
+              <a href="{{ url_for('hardware.other_specs_list') }}"
+                 class="{% if request.endpoint == 'hardware.other_specs_list' %}active{% endif %}">
+                Other Specifications
+              </a>
+              <div class="nav-drop-divider"></div>
+              <a href="{{ url_for('hardware.a50_number_list') }}"
+                 class="{% if request.endpoint == 'hardware.a50_number_list' %}active{% endif %}">
+                A50 Work Orders
               </a>
               <div class="nav-drop-divider"></div>
               <a href="{{ url_for('procedures.hazard_settings') }}"

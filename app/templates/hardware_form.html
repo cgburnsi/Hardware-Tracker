@@ -101,7 +101,19 @@
         <div class="row-split">
           <div class="form-row">
             <label>Part Number</label>
-            <input type="text" name="part_number" value="{{ item['part_number'] if item else '' }}">
+            <div class="select-group">
+              <select name="part_number">
+                <option value="">(Select...)</option>
+                {% for p in part_numbers %}
+                  <option value="{{ p['name'] }}" {% if item and item['part_number'] == p['name'] %}selected{% endif %}>{{ p['name'] }}</option>
+                {% endfor %}
+                {% if item and item['part_number'] and item['part_number'] not in part_numbers|map(attribute='name') %}
+                  <option value="{{ item['part_number'] }}" selected>{{ item['part_number'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new part number"
+                      onclick="openQuickAdd('part_numbers', this.closest('.select-group').querySelector('select'), 'Part Number')">+</button>
+            </div>
           </div>
           <div class="form-row">
             <label>Serial Number</label>
@@ -119,23 +131,71 @@
 
         <div class="row-split">
           <div class="form-row">
-            <label>ECN (Equipment Control #)</label>
-            <input type="text" name="ecn" value="{{ item['ecn'] if item else '' }}" placeholder="MSFC Asset Tag">
+            <label>CTN # <span style="font-weight:400; text-transform:none;">(Lab tracking #)</span></label>
+            <div class="select-group">
+              <select name="ctn">
+                <option value="">(Select...)</option>
+                {% for c in ctns %}
+                  <option value="{{ c['name'] }}" {% if item and item['ctn'] == c['name'] %}selected{% endif %}>{{ c['name'] }}</option>
+                {% endfor %}
+                {% if item and item['ctn'] and item['ctn'] not in ctns|map(attribute='name') %}
+                  <option value="{{ item['ctn'] }}" selected>{{ item['ctn'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new CTN"
+                      onclick="openQuickAdd('ctns', this.closest('.select-group').querySelector('select'), 'CTN #')">+</button>
+            </div>
           </div>
           <div class="form-row">
-            <label>Current Calibration #</label>
-            <input type="text" name="calibration_id" value="{{ item['calibration_id'] if item else '' }}" placeholder="Cert # or Due Date">
+            <label>ECN (Equipment Control #)</label>
+            <div class="select-group">
+              <select name="ecn">
+                <option value="">(Select...)</option>
+                {% for e in ecns %}
+                  <option value="{{ e['name'] }}" {% if item and item['ecn'] == e['name'] %}selected{% endif %}>{{ e['name'] }}</option>
+                {% endfor %}
+                {% if item and item['ecn'] and item['ecn'] not in ecns|map(attribute='name') %}
+                  <option value="{{ item['ecn'] }}" selected>{{ item['ecn'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new ECN"
+                      onclick="openQuickAdd('ecns', this.closest('.select-group').querySelector('select'), 'ECN #')">+</button>
+            </div>
           </div>
         </div>
 
         <div class="row-split">
           <div class="form-row">
-            <label>Last Repair / Ticket #</label>
-            <input type="text" name="repair_id" value="{{ item['repair_id'] if item else '' }}">
+            <label>Current Calibration #</label>
+            <div class="select-group">
+              <select name="calibration_id">
+                <option value="">(Select...)</option>
+                {% for c in calibration_ids %}
+                  <option value="{{ c['name'] }}" {% if item and item['calibration_id'] == c['name'] %}selected{% endif %}>{{ c['name'] }}</option>
+                {% endfor %}
+                {% if item and item['calibration_id'] and item['calibration_id'] not in calibration_ids|map(attribute='name') %}
+                  <option value="{{ item['calibration_id'] }}" selected>{{ item['calibration_id'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new calibration ID"
+                      onclick="openQuickAdd('calibration_ids', this.closest('.select-group').querySelector('select'), 'Calibration #')">+</button>
+            </div>
           </div>
           <div class="form-row">
-            <label>Work Order (WO) #</label>
-            <input type="text" name="work_order_id" value="{{ item['work_order_id'] if item else '' }}">
+            <label>Last Repair / Ticket #</label>
+            <div class="select-group">
+              <select name="repair_id">
+                <option value="">(Select...)</option>
+                {% for r in repair_ids %}
+                  <option value="{{ r['name'] }}" {% if item and item['repair_id'] == r['name'] %}selected{% endif %}>{{ r['name'] }}</option>
+                {% endfor %}
+                {% if item and item['repair_id'] and item['repair_id'] not in repair_ids|map(attribute='name') %}
+                  <option value="{{ item['repair_id'] }}" selected>{{ item['repair_id'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new repair/ticket ID"
+                      onclick="openQuickAdd('repair_ids', this.closest('.select-group').querySelector('select'), 'Repair / Ticket #')">+</button>
+            </div>
           </div>
         </div>
 
@@ -144,11 +204,35 @@
         <div class="row-split">
           <div class="form-row">
             <label>Cleaning Specification</label>
-            <input type="text" name="cleaning_spec" value="{{ item['cleaning_spec'] if item else '' }}" placeholder="e.g. MSFC-SPEC-164, O2 Clean">
+            <div class="select-group">
+              <select name="cleaning_spec">
+                <option value="">(Select...)</option>
+                {% for cs in cleaning_specs %}
+                  <option value="{{ cs['name'] }}" {% if item and item['cleaning_spec'] == cs['name'] %}selected{% endif %}>{{ cs['name'] }}</option>
+                {% endfor %}
+                {% if item and item['cleaning_spec'] and item['cleaning_spec'] not in cleaning_specs|map(attribute='name') %}
+                  <option value="{{ item['cleaning_spec'] }}" selected>{{ item['cleaning_spec'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new cleaning spec"
+                      onclick="openQuickAdd('cleaning_specs', this.closest('.select-group').querySelector('select'), 'Cleaning Spec')">+</button>
+            </div>
           </div>
           <div class="form-row">
             <label>Other Specifications Met</label>
-            <input type="text" name="compliance_specs" value="{{ item['compliance_specs'] if item else '' }}" placeholder="e.g. ASTM G93, Class 100">
+            <div class="select-group">
+              <select name="compliance_specs">
+                <option value="">(Select...)</option>
+                {% for s in other_specs %}
+                  <option value="{{ s['name'] }}" {% if item and item['compliance_specs'] == s['name'] %}selected{% endif %}>{{ s['name'] }}</option>
+                {% endfor %}
+                {% if item and item['compliance_specs'] and item['compliance_specs'] not in other_specs|map(attribute='name') %}
+                  <option value="{{ item['compliance_specs'] }}" selected>{{ item['compliance_specs'] }}</option>
+                {% endif %}
+              </select>
+              <button type="button" class="secondary-button add-btn" title="Add new specification"
+                      onclick="openQuickAdd('other_specs', this.closest('.select-group').querySelector('select'), 'Other Spec')">+</button>
+            </div>
           </div>
         </div>
 

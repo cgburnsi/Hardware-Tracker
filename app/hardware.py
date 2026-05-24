@@ -87,6 +87,13 @@ def get_dropdown_data(db):
         'media': db.execute("SELECT name FROM media ORDER BY name").fetchall(),
         'port_configs': db.execute("SELECT name FROM port_configs ORDER BY name").fetchall(),
         'categories': db.execute("SELECT name FROM categories ORDER BY name").fetchall(),
+        'cleaning_specs': db.execute("SELECT name FROM cleaning_specs ORDER BY name").fetchall(),
+        'ctns': db.execute("SELECT name FROM ctns ORDER BY name").fetchall(),
+        'ecns': db.execute("SELECT name FROM ecns ORDER BY name").fetchall(),
+        'calibration_ids': db.execute("SELECT name FROM calibration_ids ORDER BY name").fetchall(),
+        'repair_ids': db.execute("SELECT name FROM repair_ids ORDER BY name").fetchall(),
+        'part_numbers': db.execute("SELECT name FROM part_numbers ORDER BY name").fetchall(),
+        'other_specs': db.execute("SELECT name FROM other_specs ORDER BY name").fetchall(),
     }
 
 # ---------------------------------------------------------------------------
@@ -296,9 +303,15 @@ def hardware_detail(id):
     ).fetchall() if item['category'] else []
     specs = json.loads(item['specs_json']) if item['specs_json'] else {}
 
+    work_orders = db.execute(
+        "SELECT * FROM hardware_work_orders WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
+    a50_numbers = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+
     return render_template("hardware_detail.html", item=item, logs=logs, docs=docs,
                            kit_items=kit_items, kit_memberships=kit_memberships,
-                           spec_fields=spec_fields, specs=specs)
+                           spec_fields=spec_fields, specs=specs,
+                           work_orders=work_orders, a50_numbers=a50_numbers)
 
 @bp.route("/new", methods=("GET", "POST"))
 def hardware_new():
@@ -314,11 +327,11 @@ def hardware_new():
         serial_number = request.form.get("serial_number", "").strip()
         
         # 2. Tracking / MSFC
+        ctn = request.form.get("ctn", "").strip()
         ecn = request.form.get("ecn", "").strip()
         calibration_id = request.form.get("calibration_id", "").strip()
         repair_id = request.form.get("repair_id", "").strip()
-        work_order_id = request.form.get("work_order_id", "").strip()
-        
+
         # 3. Technical Specs
         specs_json = request.form.get("specs_json", "").strip() or None
 
@@ -355,7 +368,7 @@ def hardware_new():
             INSERT INTO hardware (
                 hardware_id, description, category, classification, manufacturer,
                 part_number, serial_number,
-                ecn, calibration_id, repair_id, work_order_id,
+                ctn, ecn, calibration_id, repair_id,
                 port_configuration, cv, orifice_diameter,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
@@ -366,7 +379,7 @@ def hardware_new():
             (
                 hardware_id, description, category, classification, manufacturer,
                 part_number, serial_number,
-                ecn, calibration_id, repair_id, work_order_id,
+                ctn, ecn, calibration_id, repair_id,
                 None, None, None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
@@ -405,11 +418,11 @@ def hardware_edit(id):
         serial_number = request.form.get("serial_number", "").strip()
 
         # 2. Tracking / MSFC
+        ctn = request.form.get("ctn", "").strip()
         ecn = request.form.get("ecn", "").strip()
         calibration_id = request.form.get("calibration_id", "").strip()
         repair_id = request.form.get("repair_id", "").strip()
-        work_order_id = request.form.get("work_order_id", "").strip()
-        
+
         # 3. Technical Specs
         specs_json = request.form.get("specs_json", "").strip() or None
 
@@ -418,7 +431,7 @@ def hardware_edit(id):
         custodian = request.form.get("custodian", "").strip()
         location = request.form.get("location", "").strip()
         traveler_path = request.form.get("traveler_path", "").strip()
-        
+
         # 5. Safety & Compliance
         safety_class = request.form.get("safety_class", "").strip()
         propellant_or_media = request.form.get("propellant_or_media", "").strip()
@@ -467,10 +480,10 @@ def hardware_edit(id):
             ("Manufacturer",   item['manufacturer'],          manufacturer),
             ("Part Number",    item['part_number'],           part_number),
             ("Serial Number",  item['serial_number'],         serial_number),
+            ("CTN",            item['ctn'],                   ctn),
             ("ECN",            item['ecn'],                   ecn),
             ("Calibration ID", item['calibration_id'],        calibration_id),
             ("Repair Ref",     item['repair_id'],             repair_id),
-            ("Work Order",     item['work_order_id'],         work_order_id),
             ("Status",         item['status'],                status),
             ("Location",       item['location'],              location),
             ("Custodian",      item['custodian'],             custodian),
@@ -508,7 +521,7 @@ def hardware_edit(id):
             UPDATE hardware SET
                 description=?, category=?, classification=?, manufacturer=?,
                 part_number=?, serial_number=?,
-                ecn=?, calibration_id=?, repair_id=?, work_order_id=?,
+                ctn=?, ecn=?, calibration_id=?, repair_id=?,
                 port_configuration=?, cv=?, orifice_diameter=?,
                 status=?, custodian=?, location=?,
                 safety_class=?, propellant_or_media=?, cleaning_spec=?, compliance_specs=?,
@@ -519,7 +532,7 @@ def hardware_edit(id):
             (
                 description, category, classification, manufacturer,
                 part_number, serial_number,
-                ecn, calibration_id, repair_id, work_order_id,
+                ctn, ecn, calibration_id, repair_id,
                 None, None, None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
@@ -702,9 +715,53 @@ def kit_delete_item(kit_item_id):
     return redirect(url_for("hardware.hardware_list"))
 
 
+# --- WORK ORDER ROUTES ---
+
+@bp.route("/<int:id>/work-orders/add", methods=["POST"])
+def work_order_add(id):
+    db = get_db()
+    if not db.execute("SELECT id FROM hardware WHERE id = ?", (id,)).fetchone():
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+    work_order_number = request.form.get("work_order_number", "").strip()
+    date = request.form.get("date", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
+    if not work_order_number:
+        flash("Work order number is required.", "error")
+        return redirect(url_for("hardware.hardware_detail", id=id))
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute(
+        "INSERT INTO hardware_work_orders (hardware_id, work_order_number, date, notes, added_at) VALUES (?, ?, ?, ?, ?)",
+        (id, work_order_number, date, notes, now)
+    )
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Work Order", f"Added work order: {work_order_number}" + (f" ({date})" if date else ""))
+    )
+    db.commit()
+    flash(f"Added work order {work_order_number}.", "success")
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/work-orders/<int:wo_id>/delete", methods=["POST"])
+def work_order_delete(wo_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM hardware_work_orders WHERE id = ?", (wo_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM hardware_work_orders WHERE id = ?", (wo_id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (row['hardware_id'], now, "Work Order", f"Removed work order: {row['work_order_number']}")
+        )
+        db.commit()
+        flash(f"Removed work order {row['work_order_number']}.", "success")
+        return redirect(url_for("hardware.hardware_detail", id=row['hardware_id']))
+    return redirect(url_for("hardware.hardware_list"))
+
+
 # --- QUICK-ADD (modal fetch endpoint) ---
 
-_QUICK_ADD_TABLES = {'manufacturers', 'custodians', 'locations', 'media', 'port_configs', 'categories'}
+_QUICK_ADD_TABLES = {'manufacturers', 'custodians', 'locations', 'media', 'port_configs', 'categories', 'cleaning_specs', 'ctns', 'ecns', 'calibration_ids', 'repair_ids', 'part_numbers', 'other_specs', 'a50_numbers'}
 
 @bp.route("/quick-add/<table>", methods=["POST"])
 def quick_add(table):
@@ -880,6 +937,34 @@ def media_list():
 @bp.route("/port_configs", methods=["GET", "POST"])
 def port_config_list():
     return handle_simple_list("port_configs", "Manage Port Configs")
+
+@bp.route("/ctns", methods=["GET", "POST"])
+def ctn_list():
+    return handle_simple_list("ctns", "Manage CTN Numbers")
+
+@bp.route("/ecns", methods=["GET", "POST"])
+def ecn_list():
+    return handle_simple_list("ecns", "Manage ECN Numbers")
+
+@bp.route("/calibration-ids", methods=["GET", "POST"])
+def calibration_id_list():
+    return handle_simple_list("calibration_ids", "Manage Calibration IDs")
+
+@bp.route("/repair-ids", methods=["GET", "POST"])
+def repair_id_list():
+    return handle_simple_list("repair_ids", "Manage Repair / Ticket IDs")
+
+@bp.route("/part-numbers", methods=["GET", "POST"])
+def part_number_list():
+    return handle_simple_list("part_numbers", "Manage Part Numbers")
+
+@bp.route("/other-specs", methods=["GET", "POST"])
+def other_specs_list():
+    return handle_simple_list("other_specs", "Manage Other Specifications")
+
+@bp.route("/a50-numbers", methods=["GET", "POST"])
+def a50_number_list():
+    return handle_simple_list("a50_numbers", "Manage A50 Work Order Numbers")
 
 def handle_simple_list(table_name, page_title):
     """Generic handler for simple name-only tables."""

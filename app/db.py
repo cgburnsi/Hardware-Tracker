@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import click
+from datetime import datetime
 from flask import current_app, g
 
 def get_db():
@@ -586,6 +587,147 @@ def migrate_db():
             ('Valve', 'orifice_diameter', 'Orifice Diameter', 'number', None, 'in', '0.0', 3),
         ]
     )
+    if 'ctn' not in cols:
+        db.execute("ALTER TABLE hardware ADD COLUMN ctn TEXT")
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS ctns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS ecns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    for row in db.execute(
+        "SELECT DISTINCT ctn FROM hardware WHERE ctn IS NOT NULL AND ctn != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO ctns (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+    for row in db.execute(
+        "SELECT DISTINCT ecn FROM hardware WHERE ecn IS NOT NULL AND ecn != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO ecns (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS part_numbers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS other_specs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS a50_numbers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    for row in db.execute(
+        "SELECT DISTINCT part_number FROM hardware WHERE part_number IS NOT NULL AND part_number != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO part_numbers (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+    for row in db.execute(
+        "SELECT DISTINCT compliance_specs FROM hardware WHERE compliance_specs IS NOT NULL AND compliance_specs != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO other_specs (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS calibration_ids (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS repair_ids (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    for row in db.execute(
+        "SELECT DISTINCT calibration_id FROM hardware WHERE calibration_id IS NOT NULL AND calibration_id != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO calibration_ids (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+    for row in db.execute(
+        "SELECT DISTINCT repair_id FROM hardware WHERE repair_id IS NOT NULL AND repair_id != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO repair_ids (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS cleaning_specs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.executescript("""
+        INSERT OR IGNORE INTO cleaning_specs (name) VALUES
+            ('O2 Clean'), ('MSFC-SPEC-164'), ('Solvent Clean'),
+            ('Aqueous Clean'), ('N2 Purge'), ('As-Received');
+    """)
+    for row in db.execute(
+        "SELECT DISTINCT cleaning_spec FROM hardware WHERE cleaning_spec IS NOT NULL AND cleaning_spec != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO cleaning_specs (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hardware_work_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hardware_id INTEGER NOT NULL,
+            work_order_number TEXT NOT NULL,
+            date TEXT,
+            notes TEXT,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    for row in db.execute(
+        "SELECT DISTINCT work_order_number FROM hardware_work_orders WHERE work_order_number IS NOT NULL AND work_order_number != ''"
+    ).fetchall():
+        try:
+            db.execute("INSERT OR IGNORE INTO a50_numbers (name) VALUES (?)", (row[0],))
+        except Exception:
+            pass
+    _now = datetime.utcnow().isoformat(timespec="seconds")
+    for row in db.execute(
+        "SELECT id, work_order_id FROM hardware WHERE work_order_id IS NOT NULL AND work_order_id != ''"
+    ).fetchall():
+        existing = db.execute(
+            "SELECT id FROM hardware_work_orders WHERE hardware_id = ? AND work_order_number = ?",
+            (row['id'], row['work_order_id'])
+        ).fetchone()
+        if not existing:
+            db.execute(
+                "INSERT INTO hardware_work_orders (hardware_id, work_order_number, added_at) VALUES (?, ?, ?)",
+                (row['id'], row['work_order_id'], _now)
+            )
+
     db.executescript("""
         INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
             ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),

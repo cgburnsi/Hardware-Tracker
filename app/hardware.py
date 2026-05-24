@@ -306,12 +306,22 @@ def hardware_detail(id):
     work_orders = db.execute(
         "SELECT * FROM hardware_work_orders WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
     ).fetchall()
+    calibrations = db.execute(
+        "SELECT * FROM hardware_calibrations WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
+    repairs = db.execute(
+        "SELECT * FROM hardware_repairs WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
     a50_numbers = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+    calibration_ids = db.execute("SELECT name FROM calibration_ids ORDER BY name").fetchall()
+    repair_ids = db.execute("SELECT name FROM repair_ids ORDER BY name").fetchall()
 
     return render_template("hardware_detail.html", item=item, logs=logs, docs=docs,
                            kit_items=kit_items, kit_memberships=kit_memberships,
                            spec_fields=spec_fields, specs=specs,
-                           work_orders=work_orders, a50_numbers=a50_numbers)
+                           work_orders=work_orders, calibrations=calibrations,
+                           repairs=repairs, a50_numbers=a50_numbers,
+                           calibration_ids=calibration_ids, repair_ids=repair_ids)
 
 @bp.route("/new", methods=("GET", "POST"))
 def hardware_new():
@@ -357,7 +367,10 @@ def hardware_new():
 
         if not description:
             flash("Description is required.", "error")
-            return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
+            _a50 = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+            return render_template("hardware_form.html", item=None,
+                                   work_orders=[], calibrations=[], repairs=[], a50_numbers=_a50,
+                                   **get_dropdown_data(db))
 
         hardware_id = generate_new_hardware_id(db)
         now = datetime.utcnow().isoformat(timespec="seconds")
@@ -388,15 +401,55 @@ def hardware_new():
             )
         )
         row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (hardware_id,)).fetchone()
+        new_id = row["id"]
         db.execute(
             "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
-            (row["id"], now, "Created", f"Item added: {description}" + (f" | S/N: {serial_number}" if serial_number else ""))
+            (new_id, now, "Created", f"Item added: {description}" + (f" | S/N: {serial_number}" if serial_number else ""))
         )
+        wo_number = request.form.get("new_work_order_number", "").strip()
+        if wo_number:
+            wo_date = request.form.get("new_work_order_date", "").strip() or None
+            wo_notes = request.form.get("new_work_order_notes", "").strip() or None
+            db.execute(
+                "INSERT INTO hardware_work_orders (hardware_id, work_order_number, date, notes, added_at) VALUES (?, ?, ?, ?, ?)",
+                (new_id, wo_number, wo_date, wo_notes, now)
+            )
+            db.execute(
+                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+                (new_id, now, "Work Order", f"Added work order: {wo_number}" + (f" ({wo_date})" if wo_date else ""))
+            )
+        cal_performed = request.form.get("new_cal_date_performed", "").strip() or None
+        cal_due = request.form.get("new_cal_due_date", "").strip() or None
+        cal_notes = request.form.get("new_cal_notes", "").strip() or None
+        if cal_performed or cal_due or cal_notes:
+            db.execute(
+                "INSERT INTO hardware_calibrations (hardware_id, cal_number, date_performed, due_date, notes, added_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (new_id, calibration_id, cal_performed, cal_due, cal_notes, now)
+            )
+            db.execute(
+                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+                (new_id, now, "Calibration", f"Added calibration entry ({calibration_id or 'no M-number'})" + (f" — due {cal_due}" if cal_due else ""))
+            )
+        repair_number = request.form.get("new_repair_number", "").strip()
+        if repair_number:
+            repair_date = request.form.get("new_repair_date", "").strip() or None
+            repair_notes = request.form.get("new_repair_notes", "").strip() or None
+            db.execute(
+                "INSERT INTO hardware_repairs (hardware_id, repair_number, date, notes, added_at) VALUES (?, ?, ?, ?, ?)",
+                (new_id, repair_number, repair_date, repair_notes, now)
+            )
+            db.execute(
+                "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+                (new_id, now, "Repair", f"Added repair: {repair_number}" + (f" ({repair_date})" if repair_date else ""))
+            )
         db.commit()
         flash(f"Created hardware {hardware_id}.", "success")
-        return redirect(url_for("hardware.hardware_detail", id=row["id"]))
+        return redirect(url_for("hardware.hardware_detail", id=new_id))
 
-    return render_template("hardware_form.html", item=None, **get_dropdown_data(db))
+    _a50 = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+    return render_template("hardware_form.html", item=None,
+                           work_orders=[], calibrations=[], repairs=[], a50_numbers=_a50,
+                           **get_dropdown_data(db))
 
 @bp.route("/<int:id>/edit", methods=("GET", "POST"))
 def hardware_edit(id):
@@ -448,7 +501,13 @@ def hardware_edit(id):
 
         if not description:
             flash("Description is required.", "error")
-            return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
+            wo = db.execute("SELECT * FROM hardware_work_orders WHERE hardware_id = ? ORDER BY added_at DESC", (id,)).fetchall()
+            cals = db.execute("SELECT * FROM hardware_calibrations WHERE hardware_id = ? ORDER BY added_at DESC", (id,)).fetchall()
+            reps = db.execute("SELECT * FROM hardware_repairs WHERE hardware_id = ? ORDER BY added_at DESC", (id,)).fetchall()
+            _a50 = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+            return render_template("hardware_form.html", item=item,
+                                   work_orders=wo, calibrations=cals, repairs=reps, a50_numbers=_a50,
+                                   **get_dropdown_data(db))
 
         now = datetime.utcnow().isoformat(timespec="seconds")
 
@@ -545,7 +604,20 @@ def hardware_edit(id):
         return redirect(url_for("hardware.hardware_detail", id=id))
 
     # GET Request: Render form with item data AND dropdown lists
-    return render_template("hardware_form.html", item=item, **get_dropdown_data(db))
+    work_orders = db.execute(
+        "SELECT * FROM hardware_work_orders WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
+    calibrations = db.execute(
+        "SELECT * FROM hardware_calibrations WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
+    repairs = db.execute(
+        "SELECT * FROM hardware_repairs WHERE hardware_id = ? ORDER BY added_at DESC", (id,)
+    ).fetchall()
+    a50_numbers = db.execute("SELECT name FROM a50_numbers ORDER BY name").fetchall()
+    return render_template("hardware_form.html", item=item,
+                           work_orders=work_orders, calibrations=calibrations,
+                           repairs=repairs, a50_numbers=a50_numbers,
+                           **get_dropdown_data(db))
 
 
 
@@ -715,6 +787,112 @@ def kit_delete_item(kit_item_id):
     return redirect(url_for("hardware.hardware_list"))
 
 
+# --- CALIBRATION ROUTES ---
+
+@bp.route("/<int:id>/calibrations/add", methods=["POST"])
+def calibration_add(id):
+    db = get_db()
+    if not db.execute("SELECT id FROM hardware WHERE id = ?", (id,)).fetchone():
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+    hw = db.execute("SELECT calibration_id FROM hardware WHERE id = ?", (id,)).fetchone()
+    cal_number = hw['calibration_id'] if hw and hw['calibration_id'] else ''
+    date_performed = request.form.get("date_performed", "").strip() or None
+    due_date = request.form.get("due_date", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
+    if not date_performed and not due_date and not notes:
+        flash("Enter at least one field (date or notes).", "error")
+        referrer = request.referrer or ""
+        if "/edit" in referrer:
+            return redirect(url_for("hardware.hardware_edit", id=id))
+        return redirect(url_for("hardware.hardware_detail", id=id))
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute(
+        "INSERT INTO hardware_calibrations (hardware_id, cal_number, date_performed, due_date, notes, added_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (id, cal_number, date_performed, due_date, notes, now)
+    )
+    label = cal_number or "record"
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Calibration", f"Added calibration entry ({label})" + (f" — due {due_date}" if due_date else ""))
+    )
+    db.commit()
+    flash("Calibration record added.", "success")
+    referrer = request.referrer or ""
+    if "/edit" in referrer:
+        return redirect(url_for("hardware.hardware_edit", id=id))
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/calibrations/<int:cal_id>/delete", methods=["POST"])
+def calibration_delete(cal_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM hardware_calibrations WHERE id = ?", (cal_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM hardware_calibrations WHERE id = ?", (cal_id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (row['hardware_id'], now, "Calibration", f"Removed calibration: {row['cal_number']}")
+        )
+        db.commit()
+        flash(f"Removed calibration {row['cal_number']}.", "success")
+        referrer = request.referrer or ""
+        if "/edit" in referrer:
+            return redirect(url_for("hardware.hardware_edit", id=row['hardware_id']))
+        return redirect(url_for("hardware.hardware_detail", id=row['hardware_id']))
+    return redirect(url_for("hardware.hardware_list"))
+
+
+# --- REPAIR ROUTES ---
+
+@bp.route("/<int:id>/repairs/add", methods=["POST"])
+def repair_add(id):
+    db = get_db()
+    if not db.execute("SELECT id FROM hardware WHERE id = ?", (id,)).fetchone():
+        flash("Hardware not found.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+    repair_number = request.form.get("repair_number", "").strip()
+    date = request.form.get("date", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
+    if not repair_number:
+        flash("Repair number is required.", "error")
+        return redirect(url_for("hardware.hardware_edit", id=id))
+    now = datetime.utcnow().isoformat(timespec="seconds")
+    db.execute(
+        "INSERT INTO hardware_repairs (hardware_id, repair_number, date, notes, added_at) VALUES (?, ?, ?, ?, ?)",
+        (id, repair_number, date, notes, now)
+    )
+    db.execute(
+        "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+        (id, now, "Repair", f"Added repair: {repair_number}" + (f" ({date})" if date else ""))
+    )
+    db.commit()
+    flash(f"Added repair {repair_number}.", "success")
+    referrer = request.referrer or ""
+    if "/edit" in referrer:
+        return redirect(url_for("hardware.hardware_edit", id=id))
+    return redirect(url_for("hardware.hardware_detail", id=id))
+
+@bp.route("/repairs/<int:repair_id>/delete", methods=["POST"])
+def repair_delete(repair_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM hardware_repairs WHERE id = ?", (repair_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM hardware_repairs WHERE id = ?", (repair_id,))
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO hardware_log (hardware_id, timestamp, action_type, description) VALUES (?, ?, ?, ?)",
+            (row['hardware_id'], now, "Repair", f"Removed repair: {row['repair_number']}")
+        )
+        db.commit()
+        flash(f"Removed repair {row['repair_number']}.", "success")
+        referrer = request.referrer or ""
+        if "/edit" in referrer:
+            return redirect(url_for("hardware.hardware_edit", id=row['hardware_id']))
+        return redirect(url_for("hardware.hardware_detail", id=row['hardware_id']))
+    return redirect(url_for("hardware.hardware_list"))
+
+
 # --- WORK ORDER ROUTES ---
 
 @bp.route("/<int:id>/work-orders/add", methods=["POST"])
@@ -740,6 +918,9 @@ def work_order_add(id):
     )
     db.commit()
     flash(f"Added work order {work_order_number}.", "success")
+    referrer = request.referrer or ""
+    if "/edit" in referrer:
+        return redirect(url_for("hardware.hardware_edit", id=id))
     return redirect(url_for("hardware.hardware_detail", id=id))
 
 @bp.route("/work-orders/<int:wo_id>/delete", methods=["POST"])
@@ -755,6 +936,9 @@ def work_order_delete(wo_id):
         )
         db.commit()
         flash(f"Removed work order {row['work_order_number']}.", "success")
+        referrer = request.referrer or ""
+        if "/edit" in referrer:
+            return redirect(url_for("hardware.hardware_edit", id=row['hardware_id']))
         return redirect(url_for("hardware.hardware_detail", id=row['hardware_id']))
     return redirect(url_for("hardware.hardware_list"))
 

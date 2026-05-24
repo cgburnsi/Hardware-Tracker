@@ -166,7 +166,7 @@
 
         <div class="row-split">
           <div class="form-row">
-            <label>Current Calibration #</label>
+            <label>Calibration M-number <span style="font-weight:400; text-transform:none;">(assigned by cal lab, fixed per sensor)</span></label>
             <div class="select-group">
               <select name="calibration_id">
                 <option value="">(Select...)</option>
@@ -177,26 +177,11 @@
                   <option value="{{ item['calibration_id'] }}" selected>{{ item['calibration_id'] }}</option>
                 {% endif %}
               </select>
-              <button type="button" class="secondary-button add-btn" title="Add new calibration ID"
-                      onclick="openQuickAdd('calibration_ids', this.closest('.select-group').querySelector('select'), 'Calibration #')">+</button>
+              <button type="button" class="secondary-button add-btn" title="Add new M-number"
+                      onclick="openQuickAdd('calibration_ids', this.closest('.select-group').querySelector('select'), 'Calibration M-number')">+</button>
             </div>
           </div>
-          <div class="form-row">
-            <label>Last Repair / Ticket #</label>
-            <div class="select-group">
-              <select name="repair_id">
-                <option value="">(Select...)</option>
-                {% for r in repair_ids %}
-                  <option value="{{ r['name'] }}" {% if item and item['repair_id'] == r['name'] %}selected{% endif %}>{{ r['name'] }}</option>
-                {% endfor %}
-                {% if item and item['repair_id'] and item['repair_id'] not in repair_ids|map(attribute='name') %}
-                  <option value="{{ item['repair_id'] }}" selected>{{ item['repair_id'] }}</option>
-                {% endif %}
-              </select>
-              <button type="button" class="secondary-button add-btn" title="Add new repair/ticket ID"
-                      onclick="openQuickAdd('repair_ids', this.closest('.select-group').querySelector('select'), 'Repair / Ticket #')">+</button>
-            </div>
-          </div>
+          <div class="form-row"></div>
         </div>
 
         <hr class="section-divider">
@@ -374,11 +359,306 @@
       </div>
     </div>
 
+    {% if not item %}
+    <!-- ── Initial records (new items only — submitted with the main form) ── -->
+    {% set _opt = "— optional, add now or later" %}
+
+    <div class="section-card">
+      <div class="section-header">Calibration Record <span style="font-weight:400; text-transform:none; font-size:0.8rem; color:#888;">{{ _opt }}</span></div>
+      <div class="section-body">
+        <div style="font-size:0.82rem; color:#888; margin-bottom:0.75rem;">M-number is set in the Tracking &amp; Compliance section above.</div>
+        <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:0 0 140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date Performed</label>
+            <input type="date" name="new_cal_date_performed" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+          <div style="flex:0 0 140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Due Date</label>
+            <input type="date" name="new_cal_due_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+          <div style="flex:2; min-width:140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes</label>
+            <input type="text" name="new_cal_notes" placeholder="e.g. Full 5-point calibration" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-header">Repair Record <span style="font-weight:400; text-transform:none; font-size:0.8rem; color:#888;">{{ _opt }}</span></div>
+      <div class="section-body">
+        <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Repair Ticket #</label>
+            <div style="display:flex; gap:0.4rem;">
+              <select name="new_repair_number" style="flex:1; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem; font-family:inherit;">
+                <option value="">(None)</option>
+                {% for r in repair_ids %}<option value="{{ r['name'] }}">{{ r['name'] }}</option>{% endfor %}
+              </select>
+              <button type="button" class="secondary-button" style="padding:0.28rem 0.65rem; font-size:1.1rem; line-height:1; flex-shrink:0;" title="Add new repair ticket"
+                      onclick="openQuickAdd('repair_ids', this.previousElementSibling, 'Repair Ticket #')">+</button>
+            </div>
+          </div>
+          <div style="flex:0 0 140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date</label>
+            <input type="date" name="new_repair_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+          <div style="flex:2; min-width:140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes</label>
+            <input type="text" name="new_repair_notes" placeholder="e.g. Replaced diaphragm" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-header">Valve Lab Work Order (A50) <span style="font-weight:400; text-transform:none; font-size:0.8rem; color:#888;">{{ _opt }}</span></div>
+      <div class="section-body">
+        <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Work Order #</label>
+            <div style="display:flex; gap:0.4rem;">
+              <select name="new_work_order_number" style="flex:1; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem; font-family:inherit;">
+                <option value="">(None)</option>
+                {% for a in a50_numbers %}<option value="{{ a['name'] }}">{{ a['name'] }}</option>{% endfor %}
+              </select>
+              <button type="button" class="secondary-button" style="padding:0.28rem 0.65rem; font-size:1.1rem; line-height:1; flex-shrink:0;" title="Add new A50 number"
+                      onclick="openQuickAdd('a50_numbers', this.previousElementSibling, 'A50 Work Order #')">+</button>
+            </div>
+          </div>
+          <div style="flex:0 0 140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date Returned</label>
+            <input type="date" name="new_work_order_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+          <div style="flex:2; min-width:140px;">
+            <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes</label>
+            <input type="text" name="new_work_order_notes" placeholder="e.g. Rebuilt seat, new stem packing" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="form-actions">
       <button type="submit" class="primary-button">Save</button>
       <a href="{{ url_for('hardware.hardware_list') }}" class="secondary-button">Cancel</a>
     </div>
   </form>
+
+  {% if item %}
+  <!-- ── Edit: work orders outside the main form so their own POSTs work ── -->
+  <div class="section-card" style="max-width:820px;">
+    <div class="section-header">Valve Lab Work Orders (A50)</div>
+    <div class="section-body">
+
+      {% if work_orders %}
+      <table style="margin-bottom:1.25rem; width:100%;">
+        <thead>
+          <tr>
+            <th>Work Order #</th>
+            <th style="width:8rem;">Date Returned</th>
+            <th>Notes</th>
+            <th style="width:3rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for wo in work_orders %}
+          <tr>
+            <td style="font-family:monospace; font-weight:600; color:#0b5f9c;">{{ wo['work_order_number'] }}</td>
+            <td style="color:#666; font-size:0.9rem;">{{ wo['date'] or '—' }}</td>
+            <td style="color:#666; font-size:0.9rem;">{{ wo['notes'] or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('hardware.work_order_delete', wo_id=wo['id']) }}"
+                    onsubmit="return confirm('Remove work order {{ wo['work_order_number'] }}?');">
+                <button type="submit"
+                        style="background:none; border:none; color:#aaa; cursor:pointer; font-size:0.8rem; padding:0.2rem 0.4rem;"
+                        title="Remove">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post"
+            action="{{ url_for('hardware.work_order_add', id=item['id']) }}"
+            style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if work_orders %}0.5rem; border-top:1px solid #eee{% else %}0{% endif %};">
+        <div style="flex:1; min-width:140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Work Order # *</label>
+          <div style="display:flex; gap:0.4rem;">
+            <select name="work_order_number" required
+                    style="flex:1; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem; font-family:inherit;">
+              <option value="">(Select...)</option>
+              {% for a in a50_numbers %}
+                <option value="{{ a['name'] }}">{{ a['name'] }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="secondary-button"
+                    style="padding:0.28rem 0.65rem; font-size:1.1rem; line-height:1; flex-shrink:0;"
+                    title="Add new A50 number"
+                    onclick="openQuickAdd('a50_numbers', this.previousElementSibling, 'A50 Work Order #')">+</button>
+          </div>
+        </div>
+        <div style="flex:0 0 140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date Returned <span style="font-weight:400;">(optional)</span></label>
+          <input type="date" name="date"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <div style="flex:2; min-width:160px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="notes" placeholder="e.g. Rebuilt seat, new stem packing"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <button type="submit" class="secondary-button" style="white-space:nowrap;">Add</button>
+      </form>
+
+    </div>
+  </div>
+  <!-- ── Edit: calibrations outside the main form ── -->
+  <div class="section-card" style="max-width:820px;">
+    <div class="section-header">
+      Calibration History
+      {% if item['calibration_id'] %}
+        <span style="font-weight:400; font-size:0.85rem; color:#0b5f9c; margin-left:0.6rem; font-family:monospace;">{{ item['calibration_id'] }}</span>
+      {% else %}
+        <span style="font-weight:400; font-size:0.8rem; color:#aaa; margin-left:0.5rem;">no M-number set — edit Tracking &amp; Compliance above</span>
+      {% endif %}
+    </div>
+    <div class="section-body">
+
+      {% if calibrations %}
+      <table style="margin-bottom:1.25rem; width:100%;">
+        <thead>
+          <tr>
+            <th style="width:8rem;">Date Performed</th>
+            <th style="width:8rem;">Due Date</th>
+            <th>Notes</th>
+            <th style="width:3rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cal in calibrations %}
+          <tr>
+            <td style="color:#666; font-size:0.9rem;">{{ cal['date_performed'] or '—' }}</td>
+            <td style="font-size:0.9rem;">
+              {% if cal['due_date'] %}
+                {% set today = now().strftime('%Y-%m-%d') %}
+                <span style="font-weight:600; color:{% if cal['due_date'] < today %}#b00020{% else %}#1a7a34{% endif %};">
+                  {{ cal['due_date'] }}
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="color:#666; font-size:0.9rem;">{{ cal['notes'] or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('hardware.calibration_delete', cal_id=cal['id']) }}"
+                    onsubmit="return confirm('Remove this calibration record?');">
+                <button type="submit"
+                        style="background:none; border:none; color:#aaa; cursor:pointer; font-size:0.8rem; padding:0.2rem 0.4rem;"
+                        title="Remove">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post"
+            action="{{ url_for('hardware.calibration_add', id=item['id']) }}"
+            style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if calibrations %}0.5rem; border-top:1px solid #eee{% else %}0{% endif %};">
+        <div style="flex:0 0 140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date Performed <span style="font-weight:400;">(optional)</span></label>
+          <input type="date" name="date_performed"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <div style="flex:0 0 140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Due Date <span style="font-weight:400;">(optional)</span></label>
+          <input type="date" name="due_date"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <div style="flex:2; min-width:160px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="notes" placeholder="e.g. Full 5-point calibration"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <button type="submit" class="secondary-button" style="white-space:nowrap;">Add</button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ── Edit: repairs outside the main form ── -->
+  <div class="section-card" style="max-width:820px;">
+    <div class="section-header">Repair History</div>
+    <div class="section-body">
+
+      {% if repairs %}
+      <table style="margin-bottom:1.25rem; width:100%;">
+        <thead>
+          <tr>
+            <th>Repair Ticket #</th>
+            <th style="width:8rem;">Date</th>
+            <th>Notes</th>
+            <th style="width:3rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rep in repairs %}
+          <tr>
+            <td style="font-family:monospace; font-weight:600; color:#0b5f9c;">{{ rep['repair_number'] }}</td>
+            <td style="color:#666; font-size:0.9rem;">{{ rep['date'] or '—' }}</td>
+            <td style="color:#666; font-size:0.9rem;">{{ rep['notes'] or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('hardware.repair_delete', repair_id=rep['id']) }}"
+                    onsubmit="return confirm('Remove repair record {{ rep['repair_number'] }}?');">
+                <button type="submit"
+                        style="background:none; border:none; color:#aaa; cursor:pointer; font-size:0.8rem; padding:0.2rem 0.4rem;"
+                        title="Remove">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post"
+            action="{{ url_for('hardware.repair_add', id=item['id']) }}"
+            style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if repairs %}0.5rem; border-top:1px solid #eee{% else %}0{% endif %};">
+        <div style="flex:1; min-width:140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Repair Ticket # *</label>
+          <div style="display:flex; gap:0.4rem;">
+            <select name="repair_number" required
+                    style="flex:1; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem; font-family:inherit;">
+              <option value="">(Select...)</option>
+              {% for r in repair_ids %}
+                <option value="{{ r['name'] }}">{{ r['name'] }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="secondary-button"
+                    style="padding:0.28rem 0.65rem; font-size:1.1rem; line-height:1; flex-shrink:0;"
+                    title="Add new repair ticket"
+                    onclick="openQuickAdd('repair_ids', this.previousElementSibling, 'Repair Ticket #')">+</button>
+          </div>
+        </div>
+        <div style="flex:0 0 140px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Date <span style="font-weight:400;">(optional)</span></label>
+          <input type="date" name="date"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <div style="flex:2; min-width:160px;">
+          <label style="font-size:0.72rem; color:#888; text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:0.3rem;">Notes <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" name="notes" placeholder="e.g. Replaced diaphragm, reseated valve"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.5rem; font-size:0.9rem;">
+        </div>
+        <button type="submit" class="secondary-button" style="white-space:nowrap;">Add</button>
+      </form>
+
+    </div>
+  </div>
+
+  {% endif %}
 
 <script>
   (function () {

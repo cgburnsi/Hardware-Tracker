@@ -4,9 +4,13 @@
 
 {% block sidebar_filters %}
 <div class="subbar">
-  <span class="sidebar-section-title">Filter</span>
-  <form method="get">
-    <input type="hidden" name="q" value="{{ q }}">
+  <form method="get" style="display:contents;">
+    <span class="sidebar-section-title">Filter</span>
+    <input type="text" name="q"
+           placeholder="Search ID, description, part #…"
+           value="{{ q }}"
+           style="width:200px; border:1px solid #ccc; border-radius:3px; padding:0.28rem 0.45rem; font-size:0.82rem; background:#fff; font-family:inherit;">
+
     <div class="filter-field">
       <span class="filter-field-label">Category</span>
       <select name="category" class="sidebar-select">
@@ -16,6 +20,7 @@
         {% endfor %}
       </select>
     </div>
+
     <div class="filter-field">
       <span class="filter-field-label">Status</span>
       <select name="status" class="sidebar-select">
@@ -25,98 +30,169 @@
         {% endfor %}
       </select>
     </div>
+
+    <div class="filter-field">
+      <span class="filter-field-label">Location</span>
+      <select name="location" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for loc in locations %}
+          <option value="{{ loc }}" {% if loc == location %}selected{% endif %}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-field">
+      <span class="filter-field-label">Class</span>
+      <select name="classification" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for cl in classifications %}
+          <option value="{{ cl }}" {% if cl == classification %}selected{% endif %}>{{ cl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-field">
+      <span class="filter-field-label">Mfr</span>
+      <select name="manufacturer" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for m in manufacturers %}
+          <option value="{{ m }}" {% if m == manufacturer %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# preserve sort state across filter apply #}
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
+
     <button type="submit" class="sidebar-button">Apply</button>
   </form>
+</div>
+
+<div style="background:#e8eaed; border-bottom:1px solid #d1d1c8; padding:0.35rem 1.5rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+  <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#999; margin-right:0.25rem;">Quick Filters</span>
+
+  {% if kits_only %}
+    <a href="{{ url_for('hardware.hardware_list', q=q, category=category, status=status, location=location, classification=classification, manufacturer=manufacturer, sort=sort, order=order, low_stock=low_stock) }}"
+       style="background:#0b5f9c; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">
+      Kits Only ✕
+    </a>
+  {% else %}
+    <a href="{{ url_for('hardware.hardware_list', q=q, category=category, status=status, location=location, classification=classification, manufacturer=manufacturer, sort=sort, order=order, kits_only=1, low_stock=low_stock) }}"
+       style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">
+      Kits Only
+    </a>
+  {% endif %}
+
+  {% if low_stock %}
+    <a href="{{ url_for('hardware.hardware_list', q=q, category=category, status=status, location=location, classification=classification, manufacturer=manufacturer, sort=sort, order=order, kits_only=kits_only) }}"
+       style="background:#b45309; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">
+      Low Stock ✕
+    </a>
+  {% else %}
+    <a href="{{ url_for('hardware.hardware_list', q=q, category=category, status=status, location=location, classification=classification, manufacturer=manufacturer, sort=sort, order=order, kits_only=kits_only, low_stock=1) }}"
+       style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">
+      Low Stock
+    </a>
+  {% endif %}
+
 </div>
 {% endblock %}
 
 {% block content %}
 
-  <div class="page-title-row">
-    <h2 class="page-title">Hardware Index</h2>
-    <a href="{{ url_for('hardware.hardware_new') }}" class="primary-button">+ New Hardware</a>
-  </div>
+<div class="page-title-row">
+  <h2 class="page-title">Hardware Index</h2>
+  <a href="{{ url_for('hardware.hardware_new') }}" class="primary-button">+ New Hardware</a>
+</div>
 
-  <form method="get" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-    <input type="hidden" name="category" value="{{ category }}">
-    <input type="hidden" name="status" value="{{ status }}">
-    <input type="text" name="q"
-           placeholder="Search ID, description, part number…"
-           value="{{ q }}"
-           style="flex:1; border:1px solid #ccc; border-radius:4px; background:#fff;">
-    <button type="submit" class="secondary-button">Search</button>
-  </form>
+{# ── Sortable header macro ── #}
+{% macro sort_link(col, label) %}
+  {% set new_order = 'asc' if (sort == col and order == 'desc') else ('desc' if sort == col else 'asc') %}
+  <a href="{{ url_for('hardware.hardware_list', q=q, category=category, status=status, location=location, classification=classification, manufacturer=manufacturer, kits_only=kits_only, low_stock=low_stock, sort=col, order=new_order) }}"
+     style="color:inherit; text-decoration:none; white-space:nowrap;">
+    {{ label }}
+    {% if sort == col %}
+      {{ '↑' if order == 'asc' else '↓' }}
+    {% else %}
+      <span style="opacity:0.3;">↕</span>
+    {% endif %}
+  </a>
+{% endmacro %}
 
-  <table>
-    <thead>
+<table>
+  <thead>
+    <tr>
+      <th style="width:52px;"></th>
+      <th style="width:10%;">{{ sort_link('hardware_id', 'ID') }}</th>
+      <th>{{ sort_link('description', 'Description') }}</th>
+      <th style="width:9%;">{{ sort_link('classification', 'Class') }}</th>
+      <th style="width:11%;">{{ sort_link('category', 'Category') }}</th>
+      <th style="width:11%;">{{ sort_link('location', 'Location') }}</th>
+      <th style="width:11%;">{{ sort_link('status', 'Status') }}</th>
+      <th style="width:5%; text-align:center;">{{ sort_link('quantity', 'Qty') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
       <tr>
-        <th style="width:52px;"></th>
-        <th style="width: 10%">ID</th>
-        <th style="width: 28%">Description</th>
-        <th style="width: 10%">Class</th>
-        <th style="width: 14%">Category</th>
-        <th style="width: 14%">Status</th>
-        <th style="width: 14%">Safety/Media</th>
-        <th style="width: 6%; text-align:center;">Qty</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-        <tr>
-          <td style="padding:0.4rem 0.5rem;">
-            {% if item['image_filename'] %}
-              <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}">
-                <img src="{{ url_for('hardware.serve_image', filename=item['image_filename']) }}"
-                     alt=""
-                     style="width:48px; height:48px; object-fit:cover; border-radius:3px; display:block; border:1px solid #e0e0e0;">
-              </a>
-            {% else %}
-              <div style="width:48px; height:48px; border-radius:3px; background:#f0f0ee; border:1px solid #e0e0e0; display:flex; align-items:center; justify-content:center;">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
-              </div>
-            {% endif %}
-          </td>
-          <td>
-            <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}" style="font-weight:700;">
-              {{ item['hardware_id'] }}
+        <td style="padding:0.4rem 0.5rem;">
+          {% if item['image_filename'] %}
+            <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}">
+              <img src="{{ url_for('hardware.serve_image', filename=item['image_filename']) }}"
+                   alt=""
+                   style="width:48px; height:48px; object-fit:cover; border-radius:3px; display:block; border:1px solid #e0e0e0;">
             </a>
-          </td>
-          <td>
-            {{ item['description'] }}
-            {% if item['classification'] == 'Flight' %}
-              <span style="font-size:0.62rem; font-weight:800; background:#fffbe6; color:#7a5c00; border:1px solid #f0c040; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">FLIGHT</span>
-            {% endif %}
-            {% if item['id'] in kit_ids %}
-              <span style="font-size:0.62rem; font-weight:800; background:#e0f0ff; color:#0b5f9c; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">KIT</span>
-            {% endif %}
-            {% if item['manufacturer'] %}<div style="font-size:0.75rem; color:#666;">{{ item['manufacturer'] }}</div>{% endif %}
-          </td>
-          <td>
-            <span style="color:#666;">{{ item['classification'] or '-' }}</span>
-          </td>
-          <td>{{ item['category'] or '-' }}</td>
-          <td>
-            {% set s = item['status']|lower %}
-            {% if 'quarantined' in s %}<span class="badge badge-quarantined">{{ item['status'] }}</span>
-            {% elif 'in-service' in s %}<span class="badge badge-in-service">{{ item['status'] }}</span>
-            {% elif 'in-storage' in s %}<span class="badge badge-in-storage">{{ item['status'] }}</span>
-            {% elif 'new' in s %}<span class="badge badge-new">{{ item['status'] }}</span>
-            {% else %}<span class="badge badge-maintenance">{{ item['status'] }}</span>{% endif %}
-          </td>
-          <td>
-            {% if item['safety_class'] and item['safety_class'] != 'None' %}
-              <span style="color:#d9534f; font-weight:600;">{{ item['safety_class'] }}</span>
-              {% if item['propellant_or_media'] %}<span style="font-size:0.8rem; color:#444;">({{ item['propellant_or_media'] }})</span>{% endif %}
-            {% else %}<span style="color:#999;">-</span>{% endif %}
-          </td>
-          <td style="text-align:center; font-weight:600;
-                     color:{% if item['quantity'] == 0 %}#dc3545{% elif item['quantity'] != None and item['quantity'] <= 2 %}#b45309{% else %}#333{% endif %};">
-            {{ item['quantity'] if item['quantity'] is not none else 1 }}
-          </td>
-        </tr>
-      {% else %}
-        <tr><td colspan="8" style="text-align:center; padding: 2rem; color:#777;">No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+          {% else %}
+            <div style="width:48px; height:48px; border-radius:3px; background:#f0f0ee; border:1px solid #e0e0e0; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+            </div>
+          {% endif %}
+        </td>
+
+        <td>
+          <a href="{{ url_for('hardware.hardware_detail', id=item['id']) }}" style="font-weight:700;">
+            {{ item['hardware_id'] }}
+          </a>
+        </td>
+
+        <td>
+          {{ item['description'] }}
+          {% if item['classification'] == 'Flight' %}
+            <span style="font-size:0.62rem; font-weight:800; background:#fffbe6; color:#7a5c00; border:1px solid #f0c040; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">FLIGHT</span>
+          {% endif %}
+          {% if item['id'] in kit_ids %}
+            <span style="font-size:0.62rem; font-weight:800; background:#e0f0ff; color:#0b5f9c; padding:0.1rem 0.35rem; border-radius:3px; vertical-align:middle; margin-left:0.35rem;">KIT</span>
+          {% endif %}
+          {% if item['manufacturer'] %}<div style="font-size:0.75rem; color:#666;">{{ item['manufacturer'] }}</div>{% endif %}
+        </td>
+
+        <td><span style="color:#666;">{{ item['classification'] or '-' }}</span></td>
+
+        <td>{{ item['category'] or '-' }}</td>
+
+        <td style="font-size:0.88rem; color:#555;">{{ item['location'] or '-' }}</td>
+
+        <td>
+          {% set s = item['status']|lower %}
+          {% if 'quarantined' in s %}<span class="badge badge-quarantined">{{ item['status'] }}</span>
+          {% elif 'in-service' in s %}<span class="badge badge-in-service">{{ item['status'] }}</span>
+          {% elif 'in-storage' in s %}<span class="badge badge-in-storage">{{ item['status'] }}</span>
+          {% elif 'new' in s %}<span class="badge badge-new">{{ item['status'] }}</span>
+          {% else %}<span class="badge badge-maintenance">{{ item['status'] }}</span>{% endif %}
+        </td>
+
+        <td style="text-align:center; font-weight:600;
+                   color:{% if item['quantity'] == 0 %}#dc3545{% elif item['quantity'] != None and item['quantity'] <= 2 %}#b45309{% else %}#333{% endif %};">
+          {{ item['quantity'] if item['quantity'] is not none else 1 }}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" style="text-align:center; padding:2rem; color:#777;">
+        No hardware found. <a href="{{ url_for('hardware.hardware_new') }}">Add your first item</a>.
+      </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 {% endblock %}

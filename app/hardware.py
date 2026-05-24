@@ -91,50 +91,71 @@ def get_dropdown_data(db):
 # Routes
 # ---------------------------------------------------------------------------
 
+SORT_COLS = {'hardware_id', 'description', 'classification', 'category', 'status', 'quantity', 'location', 'manufacturer'}
+
 @bp.route("/")
 def hardware_list():
     db = get_db()
-    q = request.args.get("q", "").strip()
-    category = request.args.get("category", "").strip()
-    status = request.args.get("status", "").strip()
+    q            = request.args.get("q", "").strip()
+    category     = request.args.get("category", "").strip()
+    status       = request.args.get("status", "").strip()
+    location     = request.args.get("location", "").strip()
+    classification = request.args.get("classification", "").strip()
+    manufacturer = request.args.get("manufacturer", "").strip()
+    kits_only    = request.args.get("kits_only", "")
+    low_stock    = request.args.get("low_stock", "")
+    sort         = request.args.get("sort", "hardware_id").strip()
+    order        = request.args.get("order", "desc").strip()
+
+    if sort not in SORT_COLS:
+        sort = "hardware_id"
+    if order not in ("asc", "desc"):
+        order = "desc"
 
     query = "SELECT * FROM hardware WHERE 1=1"
     params = []
 
     if q:
-        query += " AND (hardware_id LIKE ? OR description LIKE ? OR part_number LIKE ? OR ecn LIKE ?)"
+        query += " AND (hardware_id LIKE ? OR description LIKE ? OR part_number LIKE ? OR ecn LIKE ? OR manufacturer LIKE ?)"
         like = f"%{q}%"
-        params.extend([like, like, like, like])
-
+        params.extend([like, like, like, like, like])
     if category:
-        query += " AND category = ?"
-        params.append(category)
-
+        query += " AND category = ?"; params.append(category)
     if status:
-        query += " AND status = ?"
-        params.append(status)
+        query += " AND status = ?"; params.append(status)
+    if location:
+        query += " AND location = ?"; params.append(location)
+    if classification:
+        query += " AND classification = ?"; params.append(classification)
+    if manufacturer:
+        query += " AND manufacturer = ?"; params.append(manufacturer)
+    if kits_only:
+        query += " AND id IN (SELECT DISTINCT kit_hardware_id FROM kit_items)"
+    if low_stock:
+        query += " AND COALESCE(quantity, 1) <= 2"
 
-    query += " ORDER BY hardware_id DESC"
+    query += f" ORDER BY {sort} {order.upper()}"
+    items = db.execute(query, params).fetchall()
 
-    cur = db.execute(query, params)
-    items = cur.fetchall()
+    def distinct(col):
+        return [r[0] for r in db.execute(
+            f"SELECT DISTINCT {col} FROM hardware WHERE {col} IS NOT NULL AND {col} != '' ORDER BY {col}"
+        ).fetchall()]
 
-    # Get distinct categories and statuses for filters
-    cats = db.execute("SELECT DISTINCT category FROM hardware WHERE category IS NOT NULL ORDER BY category").fetchall()
-    stats = db.execute("SELECT DISTINCT status FROM hardware WHERE status IS NOT NULL ORDER BY status").fetchall()
-
-    # IDs of hardware items that have kit contents
     kit_ids = {row[0] for row in db.execute("SELECT DISTINCT kit_hardware_id FROM kit_items").fetchall()}
 
     return render_template(
         "hardware_list.html",
-        items=items,
-        q=q,
-        category=category,
-        status=status,
-        categories=[c["category"] for c in cats if c["category"]],
-        statuses=[s["status"] for s in stats if s["status"]],
-        kit_ids=kit_ids,
+        items=items, kit_ids=kit_ids,
+        q=q, category=category, status=status,
+        location=location, classification=classification, manufacturer=manufacturer,
+        kits_only=kits_only, low_stock=low_stock,
+        sort=sort, order=order,
+        categories=distinct("category"),
+        statuses=distinct("status"),
+        locations=distinct("location"),
+        manufacturers=distinct("manufacturer"),
+        classifications=distinct("classification"),
     )
 
 @bp.route("/manufacturers", methods=["GET", "POST"])

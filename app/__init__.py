@@ -36,28 +36,51 @@ def create_app():
         from .db import get_db
         conn = get_db()
 
-        status_rows = conn.execute(
-            "SELECT status, COUNT(*) as count FROM hardware GROUP BY status"
-        ).fetchall()
-        status_counts = {(row['status'] or '').lower(): row['count'] for row in status_rows}
-        total_hw = sum(status_counts.values())
-
-        recent_runs = conn.execute("""
-            SELECT pr.id, pr.run_id, pr.timestamp, pr.status, pr.operator,
-                   p.proc_id, p.title, h.hardware_id
+        open_tests = conn.execute("""
+            SELECT pr.id, pr.run_id, pr.timestamp, pr.operator,
+                   p.proc_id, p.title as proc_title, h.hardware_id
             FROM procedure_runs pr
             JOIN procedures p ON pr.procedure_id = p.id
             JOIN hardware h ON pr.hardware_id = h.id
-            ORDER BY pr.timestamp DESC LIMIT 5
+            WHERE pr.status = 'In-Progress'
+            ORDER BY pr.timestamp DESC
         """).fetchall()
 
-        proc_count = conn.execute("SELECT COUNT(*) as c FROM procedures").fetchone()['c']
+        open_procedures = conn.execute("""
+            SELECT id, proc_id, title, status, updated_at
+            FROM procedures
+            WHERE status = 'draft'
+            ORDER BY updated_at DESC
+        """).fetchall()
+
+        open_tps = conn.execute("""
+            SELECT id, tps_number, title, status, prepared_by, updated_at
+            FROM tps
+            WHERE status IN ('draft', 'in_progress')
+            ORDER BY updated_at DESC
+        """).fetchall()
+
+        open_ha = conn.execute("""
+            SELECT id, ha_id, title, status, updated_at
+            FROM hazard_analyses
+            WHERE status != 'approved'
+            ORDER BY updated_at DESC
+        """).fetchall()
+
+        recent_activity = conn.execute("""
+            SELECT hl.hardware_id, hl.timestamp, hl.action_type, hl.description,
+                   h.id as hw_pk
+            FROM hardware_log hl
+            LEFT JOIN hardware h ON h.hardware_id = hl.hardware_id
+            ORDER BY hl.timestamp DESC LIMIT 10
+        """).fetchall()
 
         return render_template('home.html',
-            status_counts=status_counts,
-            total_hw=total_hw,
-            recent_runs=recent_runs,
-            proc_count=proc_count,
+            open_tests=open_tests,
+            open_procedures=open_procedures,
+            open_tps=open_tps,
+            open_ha=open_ha,
+            recent_activity=recent_activity,
         )
 
     @app.route('/backup-db')

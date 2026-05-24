@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Database Statistics{% endblock %}
+
+{% block content %}
+<style>
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .stat-tile {
+    background: #fff;
+    border: 1px solid var(--border-soft);
+    border-top: 3px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .st-hw   { border-top-color: #28a745; }
+  .st-runs { border-top-color: #0b5f9c; }
+  .st-proc { border-top-color: #6f42c1; }
+  .st-tps  { border-top-color: #e6a817; }
+  .st-ha   { border-top-color: #dc3545; }
+  .stat-tile-header {
+    background: #f5f5f3;
+    border-bottom: 1px solid var(--border-soft);
+    padding: 0.5rem 1rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stat-tile-total {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #1a1a1a;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid #f5f5f3;
+    font-size: 0.88rem;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: #444; }
+  .stat-bar-wrap {
+    display: flex; align-items: center; gap: 0.5rem; flex: 1; margin: 0 1rem;
+  }
+  .stat-bar-bg {
+    flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden;
+  }
+  .stat-bar-fill {
+    height: 100%; border-radius: 3px; background: var(--accent);
+  }
+  .stat-count { font-weight: 700; color: #333; min-width: 28px; text-align: right; font-size: 0.88rem; }
+
+  .totals-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .total-card {
+    background: #fff;
+    border: 1px solid var(--border-soft);
+    border-top: 3px solid #ccc;
+    border-radius: 4px;
+    padding: 0.9rem 1.1rem;
+    text-align: left;
+  }
+  .total-card-count { font-size: 2rem; font-weight: 800; color: #1a1a1a; line-height: 1; margin-bottom: 0.2rem; }
+  .total-card-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
+  .tc-hw      { border-top-color: #28a745; }
+  .tc-runs    { border-top-color: #0b5f9c; }
+  .tc-procs   { border-top-color: #6f42c1; }
+  .tc-tps     { border-top-color: #e6a817; }
+  .tc-ha      { border-top-color: #dc3545; }
+  .tc-log     { border-top-color: #6c757d; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">Database Statistics</h2>
+</div>
+
+<div class="totals-row">
+  <div class="total-card tc-hw">
+    <div class="total-card-count">{{ total_hw }}</div>
+    <div class="total-card-label">Hardware Items</div>
+  </div>
+  <div class="total-card tc-runs">
+    <div class="total-card-count">{{ total_runs }}</div>
+    <div class="total-card-label">Test Runs</div>
+  </div>
+  <div class="total-card tc-procs">
+    <div class="total-card-count">{{ total_procs }}</div>
+    <div class="total-card-label">Procedures</div>
+  </div>
+  <div class="total-card tc-tps">
+    <div class="total-card-count">{{ total_tps }}</div>
+    <div class="total-card-label">Test Prep Sheets</div>
+  </div>
+  <div class="total-card tc-ha">
+    <div class="total-card-count">{{ total_ha }}</div>
+    <div class="total-card-label">Hazard Analyses</div>
+  </div>
+  <div class="total-card tc-log">
+    <div class="total-card-count">{{ total_log }}</div>
+    <div class="total-card-label">Activity Log Entries</div>
+  </div>
+</div>
+
+<div class="stats-grid">
+
+  {% macro breakdown(title, total, rows, cls='') %}
+  <div class="stat-tile {{ cls }}">
+    <div class="stat-tile-header">
+      {{ title }}
+      <span class="stat-tile-total">{{ total }}</span>
+    </div>
+    {% if rows %}
+      {% for label, n in rows %}
+      <div class="stat-row">
+        <span class="stat-label">{{ label }}</span>
+        <div class="stat-bar-wrap">
+          <div class="stat-bar-bg">
+            <div class="stat-bar-fill" style="width:{{ (n / total * 100)|round|int if total else 0 }}%;"></div>
+          </div>
+        </div>
+        <span class="stat-count">{{ n }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding:1rem; color:#aaa; font-size:0.85rem; font-style:italic;">No data yet.</div>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {{ breakdown("Hardware by Status",         total_hw,    hw_by_status,    "st-hw") }}
+  {{ breakdown("Hardware by Classification", total_hw,    hw_by_class,     "st-hw") }}
+  {{ breakdown("Hardware by Category",       total_hw,    hw_by_category,  "st-hw") }}
+  {{ breakdown("Hardware by Location",       total_hw,    hw_by_location,  "st-hw") }}
+  {{ breakdown("Test Runs by Status",        total_runs,  runs_by_status,  "st-runs") }}
+  {{ breakdown("Procedures by Status",       total_procs, procs_by_status, "st-proc") }}
+  {{ breakdown("Test Prep Sheets by Status", total_tps,   tps_by_status,   "st-tps") }}
+  {{ breakdown("Hazard Analyses by Status",  total_ha,    ha_by_status,    "st-ha") }}
+
+</div>
+{% endblock %}

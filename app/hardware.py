@@ -158,6 +158,35 @@ def hardware_list():
         classifications=distinct("classification"),
     )
 
+@bp.route("/stats")
+def stats():
+    db = get_db()
+
+    def count_by(table, col):
+        rows = db.execute(
+            f"SELECT COALESCE({col},'(none)') as label, COUNT(*) as n"
+            f" FROM {table} GROUP BY {col} ORDER BY n DESC"
+        ).fetchall()
+        return [(r['label'], r['n']) for r in rows]
+
+    return render_template("stats.html",
+        total_hw=db.execute("SELECT COUNT(*) FROM hardware").fetchone()[0],
+        total_runs=db.execute("SELECT COUNT(*) FROM procedure_runs").fetchone()[0],
+        total_procs=db.execute("SELECT COUNT(*) FROM procedures").fetchone()[0],
+        total_tps=db.execute("SELECT COUNT(*) FROM tps").fetchone()[0],
+        total_ha=db.execute("SELECT COUNT(*) FROM hazard_analyses").fetchone()[0],
+        total_log=db.execute("SELECT COUNT(*) FROM hardware_log").fetchone()[0],
+        hw_by_status=count_by("hardware", "status"),
+        hw_by_class=count_by("hardware", "classification"),
+        hw_by_category=count_by("hardware", "category"),
+        hw_by_location=count_by("hardware", "location"),
+        runs_by_status=count_by("procedure_runs", "status"),
+        procs_by_status=count_by("procedures", "status"),
+        tps_by_status=count_by("tps", "status"),
+        ha_by_status=count_by("hazard_analyses", "status"),
+    )
+
+
 @bp.route("/manufacturers", methods=["GET", "POST"])
 def manufacturer_list():
     db = get_db()

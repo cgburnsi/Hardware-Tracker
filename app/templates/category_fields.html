@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Category Specs{% endblock %}
+
+{% block content %}
+<style>
+  .form-row { margin-bottom: 0.9rem; }
+  .form-row label { display: block; font-size: 0.75rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+  .form-row input[type="text"],
+  .form-row input[type="number"],
+  .form-row select,
+  .form-row textarea { width: 100%; }
+  .row-split { display: flex; gap: 1.5rem; }
+  .row-split > div { flex: 1; min-width: 0; }
+  .action-btn {
+    background: none; border: 1px solid #ccc; border-radius: 3px;
+    padding: 0.2rem 0.5rem; font-size: 0.8rem; cursor: pointer;
+    color: #555; font-family: inherit;
+  }
+  .action-btn:hover { background: #f2f2f0; }
+  .action-btn-danger { color: #dc3545; border-color: #f5c2c7; }
+  .action-btn-danger:hover { background: #fff5f5; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">Category Specs</h2>
+</div>
+
+<div style="max-width:820px;">
+
+<div class="section-card">
+  <div class="section-header">Select Category</div>
+  <div class="section-body">
+    <form method="get" style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <label style="font-size:0.75rem; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.05em; margin:0;">Category</label>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <select name="category" id="cat-select" onchange="this.form.submit()" style="min-width:160px;">
+          <option value="">(Select...)</option>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if cat == selected %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="secondary-button"
+                style="padding:0.28rem 0.65rem; font-size:1.1rem; line-height:1;"
+                title="Add new category"
+                onclick="openQuickAdd('categories', document.getElementById('cat-select'), 'Category', function(name){ document.getElementById('cat-select').form.submit(); })">+</button>
+      </div>
+      <button type="submit" class="secondary-button" style="font-size:0.85rem; padding:0.38rem 0.8rem;">View</button>
+    </form>
+  </div>
+</div>
+
+{% if selected %}
+
+{% if fields %}
+<div class="section-card">
+  <div class="section-header">Fields for {{ selected }}</div>
+  <div class="section-body" style="padding:0;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4rem;">Order</th>
+          <th>Label</th>
+          <th>Key</th>
+          <th style="width:6rem;">Type</th>
+          <th>Unit / Options</th>
+          <th style="width:10rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for field in fields %}
+        <tr>
+          <td style="text-align:center;">
+            <form method="post" action="{{ url_for('hardware.category_fields_move', field_id=field['id']) }}" style="display:inline;">
+              <input type="hidden" name="direction" value="up">
+              <button type="submit" class="action-btn" title="Move up">↑</button>
+            </form>
+            <form method="post" action="{{ url_for('hardware.category_fields_move', field_id=field['id']) }}" style="display:inline;">
+              <input type="hidden" name="direction" value="down">
+              <button type="submit" class="action-btn" title="Move down">↓</button>
+            </form>
+          </td>
+          <td style="font-weight:600;">{{ field['label'] }}</td>
+          <td style="font-family:monospace; font-size:0.85rem; color:#555;">{{ field['field_key'] }}</td>
+          <td style="font-size:0.85rem; color:#555; text-transform:capitalize;">{{ field['field_type'] }}</td>
+          <td style="font-size:0.85rem; color:#666;">
+            {% if field['unit'] %}<span style="font-weight:600; color:#0b5f9c;">{{ field['unit'] }}</span>{% endif %}
+            {% if field['options'] %}
+              <span style="color:#888; font-size:0.8rem;">{{ field['options'] }}</span>
+            {% endif %}
+            {% if field['placeholder'] and not field['unit'] and not field['options'] %}
+              <span style="color:#aaa; font-size:0.8rem;">placeholder: {{ field['placeholder'] }}</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap; text-align:right; padding-right:0.75rem;">
+            <button type="button" class="action-btn"
+                    onclick="openEditModal({{ field['id'] }}, {{ field['label']|tojson }}, {{ field['unit']|tojson if field['unit'] else 'null' }}, {{ field['placeholder']|tojson if field['placeholder'] else 'null' }}, {{ field['field_type']|tojson }}, {{ field['options']|tojson if field['options'] else 'null' }})">
+              Edit
+            </button>
+            <form method="post" action="{{ url_for('hardware.category_fields_delete', field_id=field['id']) }}" style="display:inline;"
+                  onsubmit="return confirm('Delete field \'{{ field['label'] }}\'?');">
+              <button type="submit" class="action-btn action-btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="section-card">
+  <div class="section-header">Fields for {{ selected }}</div>
+  <div class="section-body">
+    <p style="color:#888; font-size:0.9rem; margin:0;">No fields configured yet. Add one below.</p>
+  </div>
+</div>
+{% endif %}
+
+<div class="section-card">
+  <div class="section-header">Add Field — {{ selected }}</div>
+  <div class="section-body">
+    <form method="post" action="{{ url_for('hardware.category_fields_add') }}">
+      <input type="hidden" name="category" value="{{ selected }}">
+      <div class="row-split">
+        <div class="form-row">
+          <label>Label *</label>
+          <input type="text" name="label" placeholder="e.g. Orifice Diameter" required>
+        </div>
+        <div class="form-row">
+          <label>Field Key *</label>
+          <input type="text" name="field_key" placeholder="e.g. orifice_diameter" required>
+          <div style="font-size:0.75rem; color:#aaa; margin-top:0.25rem;">snake_case, unique per category</div>
+        </div>
+      </div>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Type</label>
+          <select name="field_type" id="add-field-type" onchange="toggleOptionsField('add-options-row', this.value)">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="select">Select (dropdown)</option>
+            <option value="multicheck">Multi-check</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Unit <span style="font-weight:400; text-transform:none;">(optional)</span></label>
+          <input type="text" name="unit" placeholder="e.g. in, PSI, °C">
+        </div>
+        <div class="form-row">
+          <label>Placeholder <span style="font-weight:400; text-transform:none;">(optional)</span></label>
+          <input type="text" name="placeholder" placeholder="e.g. 0.0">
+        </div>
+      </div>
+      <div class="form-row" id="add-options-row" style="display:none;">
+        <label>Options <span style="font-weight:400; text-transform:none;">(one per line)</span></label>
+        <textarea name="options" rows="4" placeholder="Option A&#10;Option B&#10;Option C"></textarea>
+      </div>
+      <button type="submit" class="primary-button">Add Field</button>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<div class="section-card">
+  <div class="section-body">
+    <p style="color:#888; margin:0;">Select a category above to configure its technical spec fields.</p>
+  </div>
+</div>
+{% endif %}
+
+<dialog id="edit-field-dialog"
+        style="border:none; border-radius:6px; padding:0; width:420px;
+               box-shadow:0 8px 32px rgba(0,0,0,0.25); top:50%; left:50%;
+               transform:translate(-50%,-50%);">
+  <div style="background:#f5f5f3; border-bottom:1px solid #d1d1c8; padding:0.65rem 1rem;
+              display:flex; justify-content:space-between; align-items:center;
+              border-radius:6px 6px 0 0;">
+    <span style="font-weight:700; font-size:0.88rem; color:#333; text-transform:uppercase; letter-spacing:0.05em;">Edit Field</span>
+    <button type="button" onclick="document.getElementById('edit-field-dialog').close()"
+            style="background:none; border:none; font-size:1.1rem; cursor:pointer; color:#888; padding:0 0.2rem; line-height:1;">✕</button>
+  </div>
+  <div style="padding:1rem;">
+    <form method="post" id="edit-field-form" action="">
+      <div class="form-row">
+        <label>Label</label>
+        <input type="text" name="label" id="ef-label" required>
+      </div>
+      <div class="row-split">
+        <div class="form-row">
+          <label>Unit <span style="font-weight:400; text-transform:none;">(optional)</span></label>
+          <input type="text" name="unit" id="ef-unit">
+        </div>
+        <div class="form-row">
+          <label>Placeholder <span style="font-weight:400; text-transform:none;">(optional)</span></label>
+          <input type="text" name="placeholder" id="ef-placeholder">
+        </div>
+      </div>
+      <div class="form-row" id="ef-options-row" style="display:none;">
+        <label>Options <span style="font-weight:400; text-transform:none;">(one per line)</span></label>
+        <textarea name="options" id="ef-options" rows="4"></textarea>
+      </div>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.5rem;">
+        <button type="button" class="secondary-button" style="padding:0.38rem 0.8rem; font-size:0.85rem;"
+                onclick="document.getElementById('edit-field-dialog').close()">Cancel</button>
+        <button type="submit" class="primary-button" style="padding:0.38rem 0.8rem; font-size:0.85rem;">Save</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+</div><!-- /max-width wrapper -->
+
+<script>
+  function toggleOptionsField(rowId, fieldType) {
+    const row = document.getElementById(rowId);
+    if (row) {
+      row.style.display = (fieldType === 'select' || fieldType === 'multicheck') ? '' : 'none';
+    }
+  }
+
+  function openEditModal(id, label, unit, placeholder, fieldType, optionsJson) {
+    const form = document.getElementById('edit-field-form');
+    form.action = '/hardware/category-fields/' + id + '/edit';
+    document.getElementById('ef-label').value = label || '';
+    document.getElementById('ef-unit').value = unit || '';
+    document.getElementById('ef-placeholder').value = placeholder || '';
+    const optRow = document.getElementById('ef-options-row');
+    const optArea = document.getElementById('ef-options');
+    if (fieldType === 'select' || fieldType === 'multicheck') {
+      optRow.style.display = '';
+      if (optionsJson) {
+        try {
+          const arr = JSON.parse(optionsJson);
+          optArea.value = Array.isArray(arr) ? arr.join('\n') : optionsJson;
+        } catch (e) {
+          optArea.value = optionsJson;
+        }
+      } else {
+        optArea.value = '';
+      }
+    } else {
+      optRow.style.display = 'none';
+      optArea.value = '';
+    }
+    document.getElementById('edit-field-dialog').showModal();
+  }
+</script>
+{% endblock %}

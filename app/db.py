@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import click
 from flask import current_app, g
@@ -86,6 +87,7 @@ def init_db():
     CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     CREATE TABLE port_configs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
+    CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL);
     
     -- 4. PROCEDURES
     CREATE TABLE procedures (
@@ -284,6 +286,7 @@ def init_db():
     INSERT OR IGNORE INTO manufacturers (name) VALUES ('Swagelok'), ('Parker'), ('McMaster-Carr'), ('Omega'), ('DigiKey');
     INSERT OR IGNORE INTO custodians (name) VALUES ('Lab Manager'), ('Test Engineer'), ('Quality Lead');
     INSERT OR IGNORE INTO locations (name) VALUES ('Flammables Cabinet'), ('Rack A'), ('Rack B'), ('Clean Room');
+    INSERT OR IGNORE INTO categories (name) VALUES ('Valve'), ('Regulator'), ('Sensor'), ('Tank'), ('Fitting'), ('Tool'), ('Electronics'), ('Other');
     INSERT OR IGNORE INTO media (name) VALUES ('N2'), ('He'), ('H2O'), ('H2O2'), ('AF-M315E'), ('Hydrazine');
     INSERT OR IGNORE INTO port_configs (name) VALUES ('1/4" Tube'), ('1/8" Tube'), ('1/4" NPT'), ('1/4" VCR'), ('3/8" Tube');
 
@@ -340,6 +343,17 @@ def migrate_db():
             uploaded_at TEXT NOT NULL,
             FOREIGN KEY (hardware_id) REFERENCES hardware(id)
         )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+    db.executescript("""
+        INSERT OR IGNORE INTO categories (name) VALUES
+            ('Valve'), ('Regulator'), ('Sensor'), ('Tank'),
+            ('Fitting'), ('Tool'), ('Electronics'), ('Other');
     """)
     db.execute("""
         CREATE TABLE IF NOT EXISTS kit_items (
@@ -526,6 +540,52 @@ def migrate_db():
             FOREIGN KEY (tps_id) REFERENCES tps(id)
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS category_fields (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            field_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            field_type TEXT NOT NULL DEFAULT 'text',
+            options TEXT,
+            unit TEXT,
+            placeholder TEXT,
+            sort_order INTEGER DEFAULT 0,
+            UNIQUE(category, field_key)
+        )
+    """)
+    if 'specs_json' not in cols:
+        db.execute("ALTER TABLE hardware ADD COLUMN specs_json TEXT")
+    rows_to_migrate = db.execute(
+        "SELECT id, port_configuration, cv, orifice_diameter FROM hardware"
+        " WHERE specs_json IS NULL"
+        "  AND (port_configuration IS NOT NULL OR cv IS NOT NULL OR orifice_diameter IS NOT NULL)"
+    ).fetchall()
+    for row in rows_to_migrate:
+        specs = {}
+        if row['port_configuration']:
+            specs['port_configuration'] = row['port_configuration']
+        if row['cv'] is not None:
+            specs['cv'] = row['cv']
+        if row['orifice_diameter'] is not None:
+            specs['orifice_diameter'] = row['orifice_diameter']
+        db.execute(
+            "UPDATE hardware SET specs_json = ? WHERE id = ?",
+            (json.dumps(specs), row['id'])
+        )
+    db.executemany(
+        "INSERT OR IGNORE INTO category_fields"
+        " (category, field_key, label, field_type, options, unit, placeholder, sort_order)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            ('Valve', 'port_configuration', 'Port / Fitting Config', 'select',
+             json.dumps(['1/4" Tube', '1/8" Tube', '1/4" NPT', '1/4" VCR',
+                         '3/8" Tube', '1/2" Tube', '1/2" NPT', '3/4" Tube']),
+             None, None, 1),
+            ('Valve', 'cv', 'Cv (Flow Coeff)', 'number', None, None, '0.0', 2),
+            ('Valve', 'orifice_diameter', 'Orifice Diameter', 'number', None, 'in', '0.0', 3),
+        ]
+    )
     db.executescript("""
         INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
             ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),

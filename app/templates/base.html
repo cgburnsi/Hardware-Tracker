@@ -235,7 +235,7 @@
           </div>
 
           <div class="nav-item">
-            <span class="nav-top-link {% if request.endpoint and request.endpoint.startswith('hardware.') and request.endpoint not in ['hardware.manufacturer_list','hardware.location_list','hardware.hardware_new','hardware.stats'] %}active{% endif %}">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint.startswith('hardware.') and request.endpoint not in ['hardware.manufacturer_list','hardware.location_list','hardware.hardware_new','hardware.stats','hardware.category_fields_config','hardware.category_fields_add','hardware.category_fields_edit','hardware.category_fields_delete','hardware.category_fields_move','hardware.category_fields_json','hardware.quick_add'] %}active{% endif %}">
               Hardware <span class="nav-drop-arrow">▼</span>
             </span>
             <div class="nav-drop">
@@ -284,7 +284,7 @@
           </div>
 
           <div class="nav-item">
-            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete','hardware.manufacturer_list','hardware.location_list','hardware.stats'] %}active{% endif %}">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete','hardware.manufacturer_list','hardware.location_list','hardware.stats','hardware.category_fields_config'] %}active{% endif %}">
               Configuration <span class="nav-drop-arrow">▼</span>
             </span>
             <div class="nav-drop">
@@ -300,6 +300,11 @@
               <a href="{{ url_for('procedures.hazard_settings') }}"
                  class="{% if request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete'] %}active{% endif %}">
                 Hazard Types
+              </a>
+              <div class="nav-drop-divider"></div>
+              <a href="{{ url_for('hardware.category_fields_config') }}"
+                 class="{% if request.endpoint == 'hardware.category_fields_config' %}active{% endif %}">
+                Category Specs
               </a>
               <div class="nav-drop-divider"></div>
               <a href="{{ url_for('hardware.stats') }}"
@@ -333,5 +338,95 @@
       </main>
 
     </div>
+
+  <!-- ── Quick-add modal (global) ── -->
+  <dialog id="quick-add-dialog"
+          style="border:none; border-radius:6px; padding:0; width:320px;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.25); top:50%; left:50%;
+                 transform:translate(-50%,-50%);">
+    <div style="background:#f5f5f3; border-bottom:1px solid #d1d1c8; padding:0.65rem 1rem;
+                display:flex; justify-content:space-between; align-items:center;
+                border-radius:6px 6px 0 0;">
+      <span id="qa-title" style="font-weight:700; font-size:0.88rem; color:#333; text-transform:uppercase; letter-spacing:0.05em;"></span>
+      <button type="button" onclick="document.getElementById('quick-add-dialog').close()"
+              style="background:none; border:none; font-size:1.1rem; cursor:pointer; color:#888; padding:0 0.2rem; line-height:1;">✕</button>
+    </div>
+    <div style="padding:1rem;">
+      <label style="display:block; font-size:0.75rem; font-weight:700; color:#555;
+                    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">Name</label>
+      <input type="text" id="qa-input" style="width:100%; margin-bottom:0.15rem;">
+      <div id="qa-error" style="color:#dc3545; font-size:0.8rem; min-height:1.2em; margin-bottom:0.6rem;"></div>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+        <button type="button" class="secondary-button"
+                style="padding:0.38rem 0.8rem; font-size:0.85rem;"
+                onclick="document.getElementById('quick-add-dialog').close()">Cancel</button>
+        <button type="button" class="primary-button" id="qa-save"
+                style="padding:0.38rem 0.8rem; font-size:0.85rem;">Add</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    let _qaSelect = null, _qaTable = null, _qaCallback = null;
+
+    function openQuickAdd(table, selectEl, label, callback) {
+      _qaSelect   = selectEl;
+      _qaTable    = table;
+      _qaCallback = callback || null;
+      document.getElementById('qa-title').textContent = 'Add ' + label;
+      document.getElementById('qa-input').value = '';
+      document.getElementById('qa-error').textContent = '';
+      document.getElementById('quick-add-dialog').showModal();
+      setTimeout(() => document.getElementById('qa-input').select(), 30);
+    }
+
+    function addOptionSorted(select, name) {
+      const opt = new Option(name, name, true, true);
+      let inserted = false;
+      for (let i = 1; i < select.options.length; i++) {
+        if (select.options[i].value.toLowerCase() > name.toLowerCase()) {
+          select.insertBefore(opt, select.options[i]);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) select.add(opt);
+      select.value = name;
+    }
+
+    document.getElementById('qa-save').addEventListener('click', async function () {
+      const name = document.getElementById('qa-input').value.trim();
+      const errEl = document.getElementById('qa-error');
+      if (!name) { errEl.textContent = 'Name is required.'; return; }
+
+      this.disabled = true;
+      this.textContent = 'Saving…';
+      errEl.textContent = '';
+
+      try {
+        const fd = new FormData();
+        fd.append('name', name);
+        const resp = await fetch('/hardware/quick-add/' + _qaTable, { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (data.success) {
+          if (_qaSelect) addOptionSorted(_qaSelect, data.name);
+          if (_qaCallback) _qaCallback(data.name);
+          document.getElementById('quick-add-dialog').close();
+        } else {
+          errEl.textContent = data.error || 'Failed to add.';
+        }
+      } catch (e) {
+        errEl.textContent = 'Network error — please try again.';
+      }
+
+      this.disabled = false;
+      this.textContent = 'Add';
+    });
+
+    document.getElementById('qa-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('qa-save').click();
+    });
+  </script>
+
   </body>
 </html>

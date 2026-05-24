@@ -1,7 +1,8 @@
+import json
 import os
 import uuid
 from datetime import datetime
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 from app.db import get_db
 
@@ -85,6 +86,7 @@ def get_dropdown_data(db):
         'locations': db.execute("SELECT name FROM locations ORDER BY name").fetchall(),
         'media': db.execute("SELECT name FROM media ORDER BY name").fetchall(),
         'port_configs': db.execute("SELECT name FROM port_configs ORDER BY name").fetchall(),
+        'categories': db.execute("SELECT name FROM categories ORDER BY name").fetchall(),
     }
 
 # ---------------------------------------------------------------------------
@@ -92,6 +94,7 @@ def get_dropdown_data(db):
 # ---------------------------------------------------------------------------
 
 SORT_COLS = {'hardware_id', 'description', 'classification', 'category', 'status', 'quantity', 'location', 'manufacturer'}
+_VALID_PER_PAGE = (10, 25, 50, 100)
 
 @bp.route("/")
 def hardware_list():
@@ -106,36 +109,76 @@ def hardware_list():
     low_stock    = request.args.get("low_stock", "")
     sort         = request.args.get("sort", "hardware_id").strip()
     order        = request.args.get("order", "desc").strip()
+    per_page_raw = request.args.get("per_page", "25").strip()
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except ValueError:
+        page = 1
 
     if sort not in SORT_COLS:
         sort = "hardware_id"
     if order not in ("asc", "desc"):
         order = "desc"
+    if per_page_raw == "all":
+        per_page = 0
+    else:
+        try:
+            per_page = int(per_page_raw)
+            if per_page not in _VALID_PER_PAGE:
+                per_page = 25
+        except ValueError:
+            per_page = 25
 
-    query = "SELECT * FROM hardware WHERE 1=1"
+    conditions = "WHERE 1=1"
     params = []
 
     if q:
-        query += " AND (hardware_id LIKE ? OR description LIKE ? OR part_number LIKE ? OR ecn LIKE ? OR manufacturer LIKE ?)"
+        conditions += " AND (hardware_id LIKE ? OR description LIKE ? OR part_number LIKE ? OR ecn LIKE ? OR manufacturer LIKE ?)"
         like = f"%{q}%"
         params.extend([like, like, like, like, like])
     if category:
-        query += " AND category = ?"; params.append(category)
+        conditions += " AND category = ?"; params.append(category)
     if status:
-        query += " AND status = ?"; params.append(status)
+        conditions += " AND status = ?"; params.append(status)
     if location:
-        query += " AND location = ?"; params.append(location)
+        conditions += " AND location = ?"; params.append(location)
     if classification:
-        query += " AND classification = ?"; params.append(classification)
+        conditions += " AND classification = ?"; params.append(classification)
     if manufacturer:
-        query += " AND manufacturer = ?"; params.append(manufacturer)
+        conditions += " AND manufacturer = ?"; params.append(manufacturer)
     if kits_only:
-        query += " AND id IN (SELECT DISTINCT kit_hardware_id FROM kit_items)"
+        conditions += " AND id IN (SELECT DISTINCT kit_hardware_id FROM kit_items)"
     if low_stock:
-        query += " AND COALESCE(quantity, 1) <= 2"
+        conditions += " AND COALESCE(quantity, 1) <= 2"
 
-    query += f" ORDER BY {sort} {order.upper()}"
-    items = db.execute(query, params).fetchall()
+    total = db.execute(f"SELECT COUNT(*) FROM hardware {conditions}", params).fetchone()[0]
+
+    if per_page > 0:
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        items = db.execute(
+            f"SELECT * FROM hardware {conditions} ORDER BY {sort} {order.upper()} LIMIT ? OFFSET ?",
+            params + [per_page, offset]
+        ).fetchall()
+    else:
+        total_pages = 1
+        page = 1
+        items = db.execute(
+            f"SELECT * FROM hardware {conditions} ORDER BY {sort} {order.upper()}",
+            params
+        ).fetchall()
+
+    # Build page list for pagination controls (None = ellipsis)
+    if total_pages <= 7:
+        page_list = list(range(1, total_pages + 1))
+    else:
+        visible = sorted({1, total_pages} | set(range(max(1, page - 2), min(total_pages, page + 2) + 1)))
+        page_list = []
+        for i, p in enumerate(visible):
+            if i > 0 and p > visible[i - 1] + 1:
+                page_list.append(None)
+            page_list.append(p)
 
     def distinct(col):
         return [r[0] for r in db.execute(
@@ -156,6 +199,8 @@ def hardware_list():
         locations=distinct("location"),
         manufacturers=distinct("manufacturer"),
         classifications=distinct("classification"),
+        total=total, page=page, per_page=per_page,
+        total_pages=total_pages, page_list=page_list,
     )
 
 @bp.route("/stats")
@@ -245,8 +290,15 @@ def hardware_detail(id):
         flash("Hardware not found.", "error")
         return redirect(url_for("hardware.hardware_list"))
 
+    spec_fields = db.execute(
+        "SELECT * FROM category_fields WHERE category = ? ORDER BY sort_order, id",
+        (item['category'],)
+    ).fetchall() if item['category'] else []
+    specs = json.loads(item['specs_json']) if item['specs_json'] else {}
+
     return render_template("hardware_detail.html", item=item, logs=logs, docs=docs,
-                           kit_items=kit_items, kit_memberships=kit_memberships)
+                           kit_items=kit_items, kit_memberships=kit_memberships,
+                           spec_fields=spec_fields, specs=specs)
 
 @bp.route("/new", methods=("GET", "POST"))
 def hardware_new():
@@ -268,16 +320,14 @@ def hardware_new():
         work_order_id = request.form.get("work_order_id", "").strip()
         
         # 3. Technical Specs
-        port_configuration = request.form.get("port_configuration", "").strip()
-        cv = request.form.get("cv", "").strip()
-        orifice_diameter = request.form.get("orifice_diameter", "").strip()
+        specs_json = request.form.get("specs_json", "").strip() or None
 
         # 4. Status
         status = request.form.get("status", "").strip()
         custodian = request.form.get("custodian", "").strip()
         location = request.form.get("location", "").strip()
         traveler_path = request.form.get("traveler_path", "").strip()
-        
+
         # 5. Safety & Compliance
         safety_class = request.form.get("safety_class", "").strip()
         propellant_or_media = request.form.get("propellant_or_media", "").strip()
@@ -310,18 +360,18 @@ def hardware_new():
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_rated_pressure, max_rated_temperature,
-                traveler_path, image_filename, quantity, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                traveler_path, image_filename, quantity, specs_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 hardware_id, description, category, classification, manufacturer,
                 part_number, serial_number,
                 ecn, calibration_id, repair_id, work_order_id,
-                port_configuration, cv or None, orifice_diameter or None,
+                None, None, None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_pressure or None, max_temp or None,
-                traveler_path, image_filename, quantity, now, now
+                traveler_path, image_filename, quantity, specs_json, now, now
             )
         )
         row = db.execute("SELECT id FROM hardware WHERE hardware_id = ?", (hardware_id,)).fetchone()
@@ -361,10 +411,8 @@ def hardware_edit(id):
         work_order_id = request.form.get("work_order_id", "").strip()
         
         # 3. Technical Specs
-        port_configuration = request.form.get("port_configuration", "").strip()
-        cv = request.form.get("cv", "").strip()
-        orifice_diameter = request.form.get("orifice_diameter", "").strip()
-        
+        specs_json = request.form.get("specs_json", "").strip() or None
+
         # 4. Status
         status = request.form.get("status", "").strip()
         custodian = request.form.get("custodian", "").strip()
@@ -423,9 +471,6 @@ def hardware_edit(id):
             ("Calibration ID", item['calibration_id'],        calibration_id),
             ("Repair Ref",     item['repair_id'],             repair_id),
             ("Work Order",     item['work_order_id'],         work_order_id),
-            ("Port Config",    item['port_configuration'],    port_configuration),
-            ("Cv",             item['cv'],                    cv),
-            ("Orifice Dia.",   item['orifice_diameter'],      orifice_diameter),
             ("Status",         item['status'],                status),
             ("Location",       item['location'],              location),
             ("Custodian",      item['custodian'],             custodian),
@@ -444,6 +489,9 @@ def hardware_edit(id):
             for label, old, new in watched
             if not _eq(old, new)
         ]
+
+        if item['specs_json'] != specs_json:
+            changes.append("Technical specs updated")
 
         if new_image:
             changes.append("Photo: " + ("replaced" if item['image_filename'] else "added"))
@@ -465,18 +513,18 @@ def hardware_edit(id):
                 status=?, custodian=?, location=?,
                 safety_class=?, propellant_or_media=?, cleaning_spec=?, compliance_specs=?,
                 max_rated_pressure=?, max_rated_temperature=?,
-                traveler_path=?, image_filename=?, quantity=?, updated_at=?
+                traveler_path=?, image_filename=?, quantity=?, specs_json=?, updated_at=?
             WHERE id=?
             """,
             (
                 description, category, classification, manufacturer,
                 part_number, serial_number,
                 ecn, calibration_id, repair_id, work_order_id,
-                port_configuration, cv or None, orifice_diameter or None,
+                None, None, None,
                 status, custodian, location,
                 safety_class, propellant_or_media, cleaning_spec, compliance_specs,
                 max_pressure or None, max_temp or None,
-                traveler_path, image_filename, quantity, now, id
+                traveler_path, image_filename, quantity, specs_json, now, id
             )
         )
         db.commit()
@@ -652,6 +700,167 @@ def kit_delete_item(kit_item_id):
         db.commit()
         return redirect(url_for("hardware.hardware_detail", id=row['kit_hardware_id']))
     return redirect(url_for("hardware.hardware_list"))
+
+
+# --- QUICK-ADD (modal fetch endpoint) ---
+
+_QUICK_ADD_TABLES = {'manufacturers', 'custodians', 'locations', 'media', 'port_configs', 'categories'}
+
+@bp.route("/quick-add/<table>", methods=["POST"])
+def quick_add(table):
+    if table not in _QUICK_ADD_TABLES:
+        return jsonify({"success": False, "error": "Unknown list"}), 400
+    name = request.form.get("name", "").strip()
+    if not name:
+        return jsonify({"success": False, "error": "Name is required"}), 400
+    db = get_db()
+    try:
+        db.execute(f"INSERT INTO {table} (name) VALUES (?)", (name,))
+        db.commit()
+        return jsonify({"success": True, "name": name})
+    except Exception:
+        return jsonify({"success": False, "error": f'"{name}" already exists'}), 409
+
+
+# --- CATEGORY FIELDS ---
+
+_KNOWN_CATEGORIES = ['Valve', 'Regulator', 'Sensor', 'Tank', 'Fitting', 'Tool', 'Electronics', 'Other']
+
+@bp.route("/category-fields/<category>/json")
+def category_fields_json(category):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM category_fields WHERE category = ? ORDER BY sort_order, id",
+        (category,)
+    ).fetchall()
+    result = []
+    for row in rows:
+        d = dict(row)
+        if d.get('options'):
+            try:
+                d['options'] = json.loads(d['options'])
+            except (ValueError, TypeError):
+                d['options'] = []
+        else:
+            d['options'] = []
+        result.append(d)
+    return jsonify(result)
+
+@bp.route("/category-fields")
+def category_fields_config():
+    db = get_db()
+    selected = request.args.get("category", "").strip()
+    managed = [r[0] for r in db.execute("SELECT name FROM categories ORDER BY name").fetchall()]
+    hw_cats = [r[0] for r in db.execute(
+        "SELECT DISTINCT category FROM hardware WHERE category IS NOT NULL AND category != ''"
+    ).fetchall()]
+    all_cats = sorted(set(managed) | set(hw_cats))
+    fields = []
+    if selected:
+        fields = db.execute(
+            "SELECT * FROM category_fields WHERE category = ? ORDER BY sort_order, id",
+            (selected,)
+        ).fetchall()
+    return render_template("category_fields.html",
+                           categories=all_cats, selected=selected, fields=fields)
+
+@bp.route("/category-fields/add", methods=["POST"])
+def category_fields_add():
+    db = get_db()
+    category = request.form.get("category", "").strip()
+    raw_key = request.form.get("field_key", "").strip()
+    field_key = raw_key.lower().replace(" ", "_")
+    label = request.form.get("label", "").strip()
+    field_type = request.form.get("field_type", "text").strip()
+    unit = request.form.get("unit", "").strip() or None
+    placeholder = request.form.get("placeholder", "").strip() or None
+    options_raw = request.form.get("options", "").strip()
+    options = None
+    if options_raw and field_type in ("select", "multicheck"):
+        opts = [o.strip() for o in options_raw.splitlines() if o.strip()]
+        options = json.dumps(opts) if opts else None
+    if not category or not field_key or not label:
+        flash("Category, field key, and label are required.", "error")
+        return redirect(url_for("hardware.category_fields_config", category=category))
+    max_row = db.execute(
+        "SELECT MAX(sort_order) FROM category_fields WHERE category = ?", (category,)
+    ).fetchone()
+    sort_order = (max_row[0] or 0) + 1
+    try:
+        db.execute(
+            "INSERT INTO category_fields (category, field_key, label, field_type, options, unit, placeholder, sort_order)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (category, field_key, label, field_type, options, unit, placeholder, sort_order)
+        )
+        db.commit()
+        flash(f"Added field '{label}'.", "success")
+    except Exception:
+        flash(f"Field key '{field_key}' already exists for this category.", "error")
+    return redirect(url_for("hardware.category_fields_config", category=category))
+
+@bp.route("/category-fields/<int:field_id>/edit", methods=["POST"])
+def category_fields_edit(field_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM category_fields WHERE id = ?", (field_id,)).fetchone()
+    if not row:
+        flash("Field not found.", "error")
+        return redirect(url_for("hardware.category_fields_config"))
+    label = request.form.get("label", "").strip()
+    unit = request.form.get("unit", "").strip() or None
+    placeholder = request.form.get("placeholder", "").strip() or None
+    options_raw = request.form.get("options", "").strip()
+    options = row['options']
+    if row['field_type'] in ("select", "multicheck"):
+        if options_raw:
+            opts = [o.strip() for o in options_raw.splitlines() if o.strip()]
+            options = json.dumps(opts) if opts else None
+        else:
+            options = None
+    db.execute(
+        "UPDATE category_fields SET label=?, unit=?, placeholder=?, options=? WHERE id=?",
+        (label, unit, placeholder, options, field_id)
+    )
+    db.commit()
+    flash("Field updated.", "success")
+    return redirect(url_for("hardware.category_fields_config", category=row['category']))
+
+@bp.route("/category-fields/<int:field_id>/delete", methods=["POST"])
+def category_fields_delete(field_id):
+    db = get_db()
+    row = db.execute("SELECT category FROM category_fields WHERE id = ?", (field_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM category_fields WHERE id = ?", (field_id,))
+        db.commit()
+        flash("Field deleted.", "success")
+        return redirect(url_for("hardware.category_fields_config", category=row['category']))
+    return redirect(url_for("hardware.category_fields_config"))
+
+@bp.route("/category-fields/<int:field_id>/move", methods=["POST"])
+def category_fields_move(field_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM category_fields WHERE id = ?", (field_id,)).fetchone()
+    if not row:
+        return redirect(url_for("hardware.category_fields_config"))
+    direction = request.form.get("direction", "down")
+    all_fields = db.execute(
+        "SELECT id, sort_order FROM category_fields WHERE category = ? ORDER BY sort_order, id",
+        (row['category'],)
+    ).fetchall()
+    ids = [f['id'] for f in all_fields]
+    try:
+        idx = ids.index(field_id)
+    except ValueError:
+        return redirect(url_for("hardware.category_fields_config", category=row['category']))
+    if direction == "up" and idx > 0:
+        neighbor = all_fields[idx - 1]
+    elif direction == "down" and idx < len(all_fields) - 1:
+        neighbor = all_fields[idx + 1]
+    else:
+        return redirect(url_for("hardware.category_fields_config", category=row['category']))
+    db.execute("UPDATE category_fields SET sort_order=? WHERE id=?", (neighbor['sort_order'], field_id))
+    db.execute("UPDATE category_fields SET sort_order=? WHERE id=?", (row['sort_order'], neighbor['id']))
+    db.commit()
+    return redirect(url_for("hardware.category_fields_config", category=row['category']))
 
 
 # --- GENERIC LIST HELPERS ---

@@ -128,6 +128,36 @@
     </div>
   </div>
 
+  {% set has_specs = namespace(value=false) %}
+  {% for field in spec_fields %}
+    {% if specs.get(field['field_key']) %}{% set has_specs.value = true %}{% endif %}
+  {% endfor %}
+
+  {% if spec_fields and has_specs.value %}
+  <div class="section-card">
+    <div class="section-header">Technical Specs</div>
+    <div class="section-body">
+      <div class="data-grid">
+        {% for field in spec_fields %}
+          {% set val = specs.get(field['field_key']) %}
+          {% if val %}
+          <div class="data-item">
+            <div class="data-label">{{ field['label'] }}{% if field['unit'] %} ({{ field['unit'] }}){% endif %}</div>
+            <div class="data-value">
+              {% if field['field_type'] == 'multicheck' and val is iterable and val is not string %}
+                {{ val | join(', ') }}
+              {% else %}
+                {{ val }}
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="section-card">
     <div class="section-header">Tracking & Compliance</div>
     <div class="section-body">

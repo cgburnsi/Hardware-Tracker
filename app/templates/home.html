@@ -131,7 +131,7 @@
       {% for r in recent_runs %}
       <tr>
         <td>
-          <a href="{{ url_for('procedures.run_execute', run_id=r['run_id']) }}"
+          <a href="{{ url_for('procedures.run_execute', id=r['id']) }}"
              style="font-weight:700; color:var(--accent); text-decoration:none;">
             {{ r['run_id'] }}
           </a>

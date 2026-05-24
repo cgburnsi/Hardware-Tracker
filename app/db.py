@@ -315,6 +315,21 @@ def migrate_db():
         db.execute("ALTER TABLE hardware ADD COLUMN image_filename TEXT")
     if 'quantity' not in cols:
         db.execute("ALTER TABLE hardware ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
+    proc_cols = {row[1] for row in db.execute("PRAGMA table_info(procedures)").fetchall()}
+    if 'parent_id' not in proc_cols:
+        db.execute("ALTER TABLE procedures ADD COLUMN parent_id INTEGER REFERENCES procedures(id)")
+    if 'status' not in proc_cols:
+        db.execute("ALTER TABLE procedures ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'")
+    sec_cols = {row[1] for row in db.execute("PRAGMA table_info(procedure_sections)").fetchall()}
+    if 'description' not in sec_cols:
+        db.execute("ALTER TABLE procedure_sections ADD COLUMN description TEXT")
+    rv_cols = {row[1] for row in db.execute("PRAGMA table_info(run_values)").fetchall()}
+    if 'step_id' not in rv_cols:
+        db.execute("ALTER TABLE run_values ADD COLUMN step_id INTEGER")
+    if 'checked' not in rv_cols:
+        db.execute("ALTER TABLE run_values ADD COLUMN checked INTEGER DEFAULT 0")
+    if 'notes' not in rv_cols:
+        db.execute("ALTER TABLE run_values ADD COLUMN notes TEXT")
     db.execute("""
         CREATE TABLE IF NOT EXISTS hardware_docs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -447,6 +462,80 @@ def migrate_db():
             signed_date  TEXT,
             FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_number TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            tps_type TEXT NOT NULL DEFAULT 'B',
+            quality_sensitive INTEGER NOT NULL DEFAULT 0,
+            safety_critical INTEGER NOT NULL DEFAULT 0,
+            limited_life INTEGER NOT NULL DEFAULT 0,
+            experiment_number TEXT,
+            date_prepared TEXT,
+            need_date TEXT,
+            reference_docs TEXT,
+            initiating_org TEXT DEFAULT 'ER64',
+            system_name TEXT,
+            reason_for_work TEXT,
+            special_notes TEXT,
+            prepared_by TEXT,
+            final_accepted_by TEXT,
+            acceptance_date TEXT,
+            linked_procedure_id INTEGER REFERENCES procedures(id),
+            status TEXT NOT NULL DEFAULT 'draft',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            order_index INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            input_type TEXT NOT NULL DEFAULT 'none',
+            unit TEXT,
+            min_value REAL,
+            max_value REAL,
+            result TEXT,
+            recorded_value TEXT,
+            tech_initial TEXT,
+            step_notes TEXT,
+            completed_at TEXT,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_approvals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            signer_name TEXT NOT NULL,
+            signed_date TEXT,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_references (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            ref_type TEXT NOT NULL,
+            linked_id INTEGER NOT NULL,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
+    db.executescript("""
+        INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
+            ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),
+            ('Propellant (ASCENT)', 'Chemical-resistant gloves (nitrile minimum). Chemical splash goggles. Lab coat or chemical-resistant apron. Ensure eyewash station is accessible and unobstructed. Review ASCENT SDS before handling.',   '#e67e22', 2),
+            ('Noise',               'Hearing protection required for operations exceeding 85 dB. Double protection (plugs + muffs) required above 100 dB.',                                                                                     '#f39c12', 3),
+            ('Cryogenic',           'Cryogenic-rated insulated gloves. Full face shield. Avoid synthetic clothing near cryogenic fluids. Ensure adequate ventilation to prevent oxygen displacement.',                                          '#2980b9', 4),
+            ('Flammable/Ignition',  'Eliminate all ignition sources within the test area. Fire extinguisher accessible and recently inspected. No open flames. Ground all conductive components.',                                              '#d35400', 5),
+            ('Electrical/ESD',      'ESD wrist strap required when handling electronics. Insulated tools only. Verify lockout/tagout procedure is complete before working on powered systems.',                                                 '#8e44ad', 6),
+            ('Toxic/Chemical',      'Chemical-resistant gloves. Splash goggles. Fume hood or forced ventilation required. Review SDS for all chemicals present. Know location of nearest emergency shower.',                                   '#27ae60', 7),
+            ('Heavy Lift',          'Back brace recommended for lifts over 35 lbs. Two-person lift required for loads over 50 lbs. Clear path before moving. Use lifting aids (dollies, hoists) where available.',                            '#7f8c8d', 8);
     """)
     db.commit()
 

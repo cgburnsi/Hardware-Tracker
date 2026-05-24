@@ -16,6 +16,8 @@ def create_app():
     except OSError:
         pass
 
+    app.jinja_env.globals['now'] = datetime.utcnow
+
     from . import db
     db.init_app(app)
 

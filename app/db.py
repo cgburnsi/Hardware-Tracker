@@ -697,6 +697,55 @@ def migrate_db():
             pass
 
     db.execute("""
+        CREATE TABLE IF NOT EXISTS hardware_calibrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hardware_id INTEGER NOT NULL,
+            cal_number TEXT NOT NULL,
+            date_performed TEXT,
+            due_date TEXT,
+            notes TEXT,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hardware_repairs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hardware_id INTEGER NOT NULL,
+            repair_number TEXT NOT NULL,
+            date TEXT,
+            notes TEXT,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY (hardware_id) REFERENCES hardware(id)
+        )
+    """)
+    _mig_now = datetime.utcnow().isoformat(timespec="seconds")
+    for row in db.execute(
+        "SELECT id, calibration_id FROM hardware WHERE calibration_id IS NOT NULL AND calibration_id != ''"
+    ).fetchall():
+        existing = db.execute(
+            "SELECT id FROM hardware_calibrations WHERE hardware_id = ? AND cal_number = ?",
+            (row['id'], row['calibration_id'])
+        ).fetchone()
+        if not existing:
+            db.execute(
+                "INSERT INTO hardware_calibrations (hardware_id, cal_number, added_at) VALUES (?, ?, ?)",
+                (row['id'], row['calibration_id'], _mig_now)
+            )
+    for row in db.execute(
+        "SELECT id, repair_id FROM hardware WHERE repair_id IS NOT NULL AND repair_id != ''"
+    ).fetchall():
+        existing = db.execute(
+            "SELECT id FROM hardware_repairs WHERE hardware_id = ? AND repair_number = ?",
+            (row['id'], row['repair_id'])
+        ).fetchone()
+        if not existing:
+            db.execute(
+                "INSERT INTO hardware_repairs (hardware_id, repair_number, added_at) VALUES (?, ?, ?)",
+                (row['id'], row['repair_id'], _mig_now)
+            )
+
+    db.execute("""
         CREATE TABLE IF NOT EXISTS hardware_work_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             hardware_id INTEGER NOT NULL,

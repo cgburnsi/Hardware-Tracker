@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ label }}: {{ name }}{% endblock %}
+
+{% block content %}
+<style>
+  .badge { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+</style>
+
+<div class="page-title-row">
+  <div>
+    <div style="font-size:0.8rem; color:#888; margin-bottom:0.2rem; text-transform:uppercase; letter-spacing:0.05em;">{{ label }}</div>
+    <h2 class="page-title" style="margin:0;">{{ name }}</h2>
+  </div>
+  <a href="{{ back_url }}" class="secondary-button">← Back to List</a>
+</div>
+
+<!-- Hardware Items -->
+<div class="section-card">
+  <div class="section-header">
+    Hardware Items
+    <span style="font-weight:400; font-size:0.82rem; color:#888; margin-left:0.5rem;">{{ hw_items|length }} item{% if hw_items|length != 1 %}s{% endif %}</span>
+  </div>
+  <div class="section-body">
+    {% if hw_items %}
+    <table style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:6rem;">H-number</th>
+          <th>Description</th>
+          <th style="width:8rem;">Status</th>
+          <th style="width:10rem;">Location</th>
+          <th style="width:4rem; text-align:center;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for hw in hw_items %}
+        <tr>
+          <td>
+            <a href="{{ url_for('hardware.hardware_detail', id=hw['id']) }}"
+               style="color:var(--accent); font-weight:700; font-size:0.9rem;">{{ hw['hardware_id'] }}</a>
+            {% if hw['classification'] == 'Flight' %}
+              <span style="font-size:0.6rem; font-weight:800; background:#fffbe6; color:#7a5c00;
+                           border:1px solid #f0c040; padding:0.1rem 0.35rem; border-radius:2px;
+                           vertical-align:middle; margin-left:0.3rem;">FLT</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.9rem;">{{ hw['description'] }}</td>
+          <td>
+            {% set s = hw['status']|lower %}
+            {% if 'quarantined' in s %}<span class="badge badge-quarantined">
+            {% elif 'in-service' in s %}<span class="badge badge-in-service">
+            {% elif 'in-storage' in s %}<span class="badge badge-in-storage">
+            {% elif 'new' in s %}<span class="badge badge-new">
+            {% else %}<span class="badge badge-maintenance">
+            {% endif %}{{ hw['status'] }}</span>
+          </td>
+          <td style="color:#555; font-size:0.9rem;">{{ hw['location'] or '—' }}</td>
+          <td style="text-align:center; font-weight:600;
+                     color:{% if hw['quantity'] == 0 %}#dc3545{% elif hw['quantity'] <= 2 %}#b45309{% else %}#155724{% endif %};">
+            {{ hw['quantity'] }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888; font-style:italic; margin:0;">No hardware items are currently assigned this value.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Event Timeline -->
+<div class="section-card">
+  <div class="section-header">
+    Event Timeline
+    <span style="font-weight:400; font-size:0.82rem; color:#888; margin-left:0.5rem;">{{ logs|length }} event{% if logs|length != 1 %}s{% endif %}</span>
+  </div>
+  <div class="section-body">
+    {% if logs %}
+    <table style="width:100%; font-size:0.9rem;">
+      <thead>
+        <tr>
+          <th style="width:6rem;">H-number</th>
+          <th style="width:11rem;">Timestamp (UTC)</th>
+          <th style="width:9rem;">Event</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr style="border-bottom:1px solid #f0f0ec;">
+          <td style="padding:0.45rem 0;">
+            {% if log['hw_pk'] %}
+            <a href="{{ url_for('hardware.hardware_detail', id=log['hw_pk']) }}"
+               style="color:var(--accent); font-weight:600; font-size:0.85rem;">{{ log['hardware_id'] }}</a>
+            {% else %}
+            <span style="color:#aaa; font-size:0.85rem;">{{ log['hardware_id'] }}</span>
+            {% endif %}
+          </td>
+          <td style="color:#888; font-size:0.82rem; padding:0.45rem 0;">{{ log['timestamp'] }}</td>
+          <td style="padding:0.45rem 0;"><strong style="font-size:0.85rem;">{{ log['action_type'] }}</strong></td>
+          <td style="color:#555; padding:0.45rem 0;">{{ log['description'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888; font-style:italic; margin:0;">No events logged for these items yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

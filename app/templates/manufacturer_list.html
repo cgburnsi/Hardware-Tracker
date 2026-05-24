@@ -1,62 +1,128 @@
 {% extends "base.html" %}
-{% block title %}Manage Manufacturers{% endblock %}
+{% block title %}Manufacturers{% endblock %}
 
 {% block content %}
+
 <div class="page-title-row">
-  <h2 class="page-title">Manufacturer List</h2>
-  <a href="{{ url_for('hardware.hardware_list') }}" class="secondary-button">Back to Hardware</a>
+  <h2 class="page-title">Manufacturers</h2>
+  <button id="add-btn" class="primary-button" onclick="toggleAddPanel()">+ Add Manufacturer</button>
 </div>
 
-<div style="display: flex; gap: 2rem; align-items: flex-start;">
-  
-  <div style="flex: 1;">
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Website</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in items %}
-        <tr>
-          <td><strong>{{ m['name'] }}</strong></td>
-          <td>
-            {% if m['website'] %}
-              <a href="{{ m['website'] }}" target="_blank" rel="noopener noreferrer">Link</a>
-            {% else %}
-              <span style="color:#999;">-</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-          <tr><td colspan="2" style="color:#777;">No manufacturers found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <div style="width: 300px; background: #fff; padding: 1.5rem; border: 1px solid var(--border-soft); border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <h4 style="margin-top:0; margin-bottom: 1rem;">Add New Vendor</h4>
-    
-    <form method="post">
-      <div style="margin-bottom: 1rem;">
-        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Name</label>
-        <input type="text" name="name" required style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px;">
-      </div>
-      
-      <div style="margin-bottom: 1rem;">
-        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Website (Optional)</label>
-        <input type="text" name="website" placeholder="https://..." style="width:100%; padding:0.4rem; border:1px solid #ccc; border-radius:3px;">
-      </div>
-      
-      <button type="submit" class="primary-button" style="width:100%;">Add Manufacturer</button>
-    </form>
-    
-    <div style="margin-top: 1rem; font-size: 0.8rem; color: #666; line-height: 1.4;">
-      <strong>Note:</strong> Adding a vendor here makes it available immediately in the dropdown menu on the "New Hardware" page.
+<div id="add-panel" style="display:none; max-width:580px; background:#fff;
+     border:1px solid var(--border-soft); border-radius:4px;
+     padding:1.1rem 1.25rem; margin-bottom:1.25rem; box-shadow:0 2px 6px rgba(0,0,0,0.07);">
+  <form method="post" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+    <div style="flex:2; min-width:160px;">
+      <label style="display:block; font-size:0.72rem; font-weight:700; color:#555;
+                    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">
+        Name
+      </label>
+      <input type="text" name="name" required id="add-input"
+             style="width:100%; border:1px solid #ccc; border-radius:4px;
+                    padding:0.45rem 0.55rem; font-size:0.9rem; font-family:inherit;">
     </div>
-  </div>
-
+    <div style="flex:3; min-width:180px;">
+      <label style="display:block; font-size:0.72rem; font-weight:700; color:#555;
+                    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">
+        Website <span style="font-weight:400; text-transform:none;">(optional)</span>
+      </label>
+      <input type="text" name="website" placeholder="https://..."
+             style="width:100%; border:1px solid #ccc; border-radius:4px;
+                    padding:0.45rem 0.55rem; font-size:0.9rem; font-family:inherit;">
+    </div>
+    <button type="submit" class="primary-button">Add</button>
+    <button type="button" class="secondary-button" onclick="toggleAddPanel()">Cancel</button>
+  </form>
 </div>
+
+{% if items %}
+<table style="width:100%;">
+  <thead>
+    <tr>
+      <th>Manufacturer</th>
+      <th style="width:14rem;">Website</th>
+      <th style="width:7rem; text-align:center;">Items</th>
+      <th style="width:3rem;"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in items %}
+    <tr>
+      <td>
+        <a href="{{ url_for('hardware.traceability_view', table='manufacturers', name=m['name']) }}"
+           style="color:var(--accent); font-weight:600;">{{ m['name'] }}</a>
+      </td>
+      <td style="font-size:0.88rem;">
+        {% if m['website'] %}
+          <a href="{{ m['website'] }}" target="_blank" rel="noopener noreferrer"
+             style="color:#0b5f9c;">{{ m['website'] | replace('https://','') | replace('http://','') | truncate(40, true, '…') }}</a>
+        {% else %}
+          <span style="color:#ccc;">—</span>
+        {% endif %}
+      </td>
+      <td style="text-align:center;">
+        {% if m['count'] > 0 %}
+          <a href="{{ url_for('hardware.traceability_view', table='manufacturers', name=m['name']) }}"
+             style="display:inline-block; background:#e8f0fa; color:#0b5f9c;
+                    border-radius:10px; padding:0.15rem 0.65rem;
+                    font-size:0.78rem; font-weight:700; text-decoration:none;">
+            {{ m['count'] }}
+          </a>
+        {% else %}
+          <span style="color:#ccc; font-size:0.82rem;">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if m['count'] == 0 %}
+        <form method="post"
+              action="{{ url_for('hardware.config_item_delete', table='manufacturers') }}"
+              onsubmit="return confirm('Delete \'{{ m['name'] | replace("'", "\\'") }}\'?');">
+          <input type="hidden" name="name" value="{{ m['name'] }}">
+          <button type="submit"
+                  style="background:none; border:none; color:#ccc; cursor:pointer;
+                         font-size:0.85rem; padding:0.2rem 0.5rem;"
+                  title="Delete" onmouseover="this.style.color='#dc3545'"
+                  onmouseout="this.style.color='#ccc'">✕</button>
+        </form>
+        {% else %}
+        <span style="color:#e0e0e0; font-size:0.85rem; padding:0.2rem 0.5rem;"
+              title="In use — reassign all hardware first">✕</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="section-card">
+  <div class="section-body" style="color:#888; font-style:italic; text-align:center; padding:2rem 1rem;">
+    No manufacturers yet.
+    <a href="javascript:void(0)" onclick="toggleAddPanel()"
+       style="color:var(--accent); margin-left:0.4rem;">Add one →</a>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function toggleAddPanel() {
+  var panel = document.getElementById('add-panel');
+  var btn   = document.getElementById('add-btn');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    document.getElementById('add-input').focus();
+    btn.textContent = '✕ Cancel';
+    btn.classList.replace('primary-button', 'secondary-button');
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '+ Add Manufacturer';
+    btn.classList.replace('secondary-button', 'primary-button');
+  }
+}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages and messages[-1][0] == 'error' %}
+    document.addEventListener('DOMContentLoaded', function() { toggleAddPanel(); });
+  {% endif %}
+{% endwith %}
+</script>
+
 {% endblock %}

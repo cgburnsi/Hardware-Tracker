@@ -2,38 +2,120 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+
 <div class="page-title-row">
   <h2 class="page-title">{{ title }}</h2>
-  <button onclick="window.close()" class="secondary-button">Close Window</button>
+  <button id="add-btn" class="primary-button" onclick="toggleAddPanel()">+ Add {{ item_label }}</button>
 </div>
 
-<div style="display: flex; gap: 2rem; align-items: flex-start;">
-  
-  <div style="flex: 1;">
-    <table>
-      <thead><tr><th>Name</th></tr></thead>
-      <tbody>
-        {% for item in items %}
-        <tr><td><strong>{{ item['name'] }}</strong></td></tr>
-        {% else %}
-          <tr><td style="color:#777;">No items found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <div style="width: 300px; background: #fff; padding: 1.5rem; border: 1px solid var(--border-soft); border-radius: 4px;">
-    <h4 style="margin-top:0; margin-bottom: 1rem;">Add New Item</h4>
-    <form method="post">
-      <div style="margin-bottom: 1rem;">
-        <label style="display:block; font-size:0.85rem; margin-bottom:0.2rem;">Name</label>
-        <input type="text" name="name" required style="width:100%; padding:0.4rem; border:1px solid #ccc;">
-      </div>
-      <button type="submit" class="primary-button" style="width:100%;">Add to List</button>
-    </form>
-    <div style="margin-top:1rem; font-size:0.8rem; color:#666;">
-      <strong>Tip:</strong> Refresh the previous page after adding to see it in the dropdown.
+<div id="add-panel" style="display:none; max-width:520px; background:#fff;
+     border:1px solid var(--border-soft); border-radius:4px;
+     padding:1.1rem 1.25rem; margin-bottom:1.25rem; box-shadow:0 2px 6px rgba(0,0,0,0.07);">
+  <form method="post" style="display:flex; gap:0.75rem; align-items:flex-end;">
+    <div style="flex:1;">
+      <label style="display:block; font-size:0.72rem; font-weight:700; color:#555;
+                    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.3rem;">
+        {{ item_label }}
+      </label>
+      <input type="text" name="name" required id="add-input"
+             style="width:100%; border:1px solid #ccc; border-radius:4px;
+                    padding:0.45rem 0.55rem; font-size:0.9rem; font-family:inherit;">
     </div>
+    <button type="submit" class="primary-button">Add</button>
+    <button type="button" class="secondary-button" onclick="toggleAddPanel()">Cancel</button>
+  </form>
+</div>
+
+{% if items %}
+<table style="width:100%;">
+  <thead>
+    <tr>
+      <th>{{ item_label }}</th>
+      {% if traceable %}
+      <th style="width:7rem; text-align:center;">Items</th>
+      {% endif %}
+      <th style="width:3rem;"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>
+        {% if traceable %}
+          <a href="{{ url_for('hardware.traceability_view', table=table_name, name=item['name']) }}"
+             style="color:var(--accent); font-weight:600;">{{ item['name'] }}</a>
+        {% else %}
+          <strong>{{ item['name'] }}</strong>
+        {% endif %}
+      </td>
+
+      {% if traceable %}
+      <td style="text-align:center;">
+        {% if item['count'] > 0 %}
+          <a href="{{ url_for('hardware.traceability_view', table=table_name, name=item['name']) }}"
+             style="display:inline-block; background:#e8f0fa; color:#0b5f9c;
+                    border-radius:10px; padding:0.15rem 0.65rem;
+                    font-size:0.78rem; font-weight:700; text-decoration:none;">
+            {{ item['count'] }}
+          </a>
+        {% else %}
+          <span style="color:#ccc; font-size:0.82rem;">—</span>
+        {% endif %}
+      </td>
+      {% endif %}
+
+      <td>
+        {% if item['count'] is none or item['count'] == 0 %}
+        <form method="post"
+              action="{{ url_for('hardware.config_item_delete', table=table_name) }}"
+              onsubmit="return confirm('Delete \'{{ item['name'] | replace("'", "\\'") }}\'?');">
+          <input type="hidden" name="name" value="{{ item['name'] }}">
+          <button type="submit"
+                  style="background:none; border:none; color:#ccc; cursor:pointer;
+                         font-size:0.85rem; padding:0.2rem 0.5rem;"
+                  title="Delete" onmouseover="this.style.color='#dc3545'"
+                  onmouseout="this.style.color='#ccc'">✕</button>
+        </form>
+        {% else %}
+        <span style="color:#e0e0e0; font-size:0.85rem; padding:0.2rem 0.5rem;"
+              title="In use — reassign all hardware first">✕</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="section-card">
+  <div class="section-body" style="color:#888; font-style:italic; text-align:center; padding:2rem 1rem;">
+    No {{ item_label|lower }} entries yet.
+    <a href="javascript:void(0)" onclick="toggleAddPanel()"
+       style="color:var(--accent); margin-left:0.4rem;">Add one →</a>
   </div>
 </div>
+{% endif %}
+
+<script>
+function toggleAddPanel() {
+  var panel = document.getElementById('add-panel');
+  var btn   = document.getElementById('add-btn');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    document.getElementById('add-input').focus();
+    btn.textContent = '✕ Cancel';
+    btn.classList.replace('primary-button', 'secondary-button');
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '+ Add {{ item_label }}';
+    btn.classList.replace('secondary-button', 'primary-button');
+  }
+}
+// Auto-open if there was a validation error (form was just submitted but failed)
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages and messages[-1][0] == 'error' %}
+    document.addEventListener('DOMContentLoaded', function() { toggleAddPanel(); });
+  {% endif %}
+{% endwith %}
+</script>
+
 {% endblock %}

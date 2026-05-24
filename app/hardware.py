@@ -254,7 +254,13 @@ def manufacturer_list():
             except:
                 flash("Manufacturer already exists.", "error")
                 
-    items = db.execute("SELECT * FROM manufacturers ORDER BY name").fetchall()
+    rows = db.execute("SELECT * FROM manufacturers ORDER BY name").fetchall()
+    items = []
+    for row in rows:
+        count = db.execute(
+            "SELECT COUNT(*) FROM hardware WHERE manufacturer = ?", (row['name'],)
+        ).fetchone()[0]
+        items.append({'name': row['name'], 'website': row['website'], 'count': count})
     return render_template("manufacturer_list.html", items=items)
 
 @bp.route("/<int:id>")
@@ -947,6 +953,59 @@ def work_order_delete(wo_id):
 
 _QUICK_ADD_TABLES = {'manufacturers', 'custodians', 'locations', 'media', 'port_configs', 'categories', 'cleaning_specs', 'ctns', 'ecns', 'calibration_ids', 'repair_ids', 'part_numbers', 'other_specs', 'a50_numbers'}
 
+# table_name → (source_table, column_on_that_table_that_holds_the_value)
+# 'hardware' = direct column; anything else = join via hardware_id FK
+_TRACEABLE = {
+    'manufacturers':   ('hardware',             'manufacturer'),
+    'custodians':      ('hardware',             'custodian'),
+    'locations':       ('hardware',             'location'),
+    'media':           ('hardware',             'propellant_or_media'),
+    'part_numbers':    ('hardware',             'part_number'),
+    'ctns':            ('hardware',             'ctn'),
+    'ecns':            ('hardware',             'ecn'),
+    'calibration_ids': ('hardware',             'calibration_id'),
+    'other_specs':     ('hardware',             'compliance_specs'),
+    'a50_numbers':     ('hardware_work_orders', 'work_order_number'),
+    'repair_ids':      ('hardware_repairs',     'repair_number'),
+}
+
+_TABLE_LABELS = {
+    'manufacturers':   'Manufacturer',
+    'custodians':      'Custodian',
+    'locations':       'Location',
+    'media':           'Service Media',
+    'part_numbers':    'Part Number',
+    'ctns':            'CTN #',
+    'ecns':            'ECN',
+    'calibration_ids': 'Cal M-number',
+    'other_specs':     'Other Spec',
+    'a50_numbers':     'A50 Work Order',
+    'repair_ids':      'Repair Ticket',
+}
+
+_TABLE_LIST_ENDPOINT = {
+    'manufacturers':   'hardware.manufacturer_list',
+    'custodians':      'hardware.custodian_list',
+    'locations':       'hardware.location_list',
+    'media':           'hardware.media_list',
+    'part_numbers':    'hardware.part_number_list',
+    'ctns':            'hardware.ctn_list',
+    'ecns':            'hardware.ecn_list',
+    'calibration_ids': 'hardware.calibration_id_list',
+    'other_specs':     'hardware.other_specs_list',
+    'a50_numbers':     'hardware.a50_number_list',
+    'repair_ids':      'hardware.repair_id_list',
+}
+
+def _item_label(table_name):
+    """Human-readable singular label for a config table."""
+    if table_name in _TABLE_LABELS:
+        return _TABLE_LABELS[table_name]
+    label = table_name.replace('_', ' ').title()
+    if label.endswith('s') and not label.endswith('ss'):
+        label = label[:-1]
+    return label
+
 @bp.route("/quick-add/<table>", methods=["POST"])
 def quick_add(table):
     if table not in _QUICK_ADD_TABLES:
@@ -961,6 +1020,55 @@ def quick_add(table):
         return jsonify({"success": True, "name": name})
     except Exception:
         return jsonify({"success": False, "error": f'"{name}" already exists'}), 409
+
+
+# --- TRACEABILITY ---
+
+@bp.route("/traceability/<table>/<path:name>")
+def traceability_view(table, name):
+    if table not in _TRACEABLE:
+        flash("Traceability not available for this list.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+
+    db = get_db()
+    source_table, source_col = _TRACEABLE[table]
+
+    if source_table == 'hardware':
+        hw_items = db.execute(
+            f"SELECT * FROM hardware WHERE {source_col} = ? ORDER BY hardware_id",
+            (name,)
+        ).fetchall()
+    else:
+        hw_items = db.execute(
+            f"""SELECT DISTINCT h.* FROM hardware h
+                JOIN {source_table} t ON t.hardware_id = h.id
+                WHERE t.{source_col} = ?
+                ORDER BY h.hardware_id""",
+            (name,)
+        ).fetchall()
+
+    logs = []
+    if hw_items:
+        hid_labels = [hw['hardware_id'] for hw in hw_items]
+        placeholders = ','.join('?' * len(hid_labels))
+        logs = db.execute(
+            f"""SELECT hl.hardware_id, hl.timestamp, hl.action_type, hl.description,
+                       h.id as hw_pk
+                FROM hardware_log hl
+                LEFT JOIN hardware h ON h.hardware_id = hl.hardware_id
+                WHERE hl.hardware_id IN ({placeholders})
+                ORDER BY hl.timestamp DESC""",
+            hid_labels
+        ).fetchall()
+
+    label = _TABLE_LABELS.get(table, table.replace('_', ' ').title())
+    back_endpoint = _TABLE_LIST_ENDPOINT.get(table)
+    back_url = url_for(back_endpoint) if back_endpoint else url_for('hardware.hardware_list')
+
+    return render_template("traceability.html",
+        hw_items=hw_items, logs=logs,
+        label=label, name=name,
+        back_url=back_url)
 
 
 # --- CATEGORY FIELDS ---
@@ -1106,6 +1214,34 @@ def category_fields_move(field_id):
 
 # --- GENERIC LIST HELPERS ---
 
+@bp.route("/config/<table>/delete", methods=["POST"])
+def config_item_delete(table):
+    if table not in _QUICK_ADD_TABLES:
+        flash("Unknown list.", "error")
+        return redirect(url_for("hardware.hardware_list"))
+    name = request.form.get("name", "").strip()
+    if not name:
+        return redirect(request.referrer or url_for("hardware.hardware_list"))
+    db = get_db()
+    if table in _TRACEABLE:
+        source_table, source_col = _TRACEABLE[table]
+        if source_table == 'hardware':
+            count = db.execute(
+                f"SELECT COUNT(*) FROM hardware WHERE {source_col} = ?", (name,)
+            ).fetchone()[0]
+        else:
+            count = db.execute(
+                f"SELECT COUNT(DISTINCT hardware_id) FROM {source_table} WHERE {source_col} = ?",
+                (name,)
+            ).fetchone()[0]
+        if count > 0:
+            flash(f'Cannot delete "{name}" — assigned to {count} hardware item(s).', "error")
+            return redirect(request.referrer or url_for("hardware.hardware_list"))
+    db.execute(f"DELETE FROM {table} WHERE name = ?", (name,))
+    db.commit()
+    flash(f'Deleted "{name}".', "success")
+    return redirect(request.referrer or url_for("hardware.hardware_list"))
+
 @bp.route("/custodians", methods=["GET", "POST"])
 def custodian_list():
     return handle_simple_list("custodians", "Manage Custodians")
@@ -1151,18 +1287,36 @@ def a50_number_list():
     return handle_simple_list("a50_numbers", "Manage A50 Work Order Numbers")
 
 def handle_simple_list(table_name, page_title):
-    """Generic handler for simple name-only tables."""
     db = get_db()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         if name:
             try:
-                # Safe injection: table_name is hardcoded in our routes above, not user input
                 db.execute(f"INSERT INTO {table_name} (name) VALUES (?)", (name,))
                 db.commit()
-                flash(f"Added {name}", "success")
+                flash(f'Added "{name}".', "success")
             except:
                 flash("Item already exists.", "error")
-    
-    items = db.execute(f"SELECT * FROM {table_name} ORDER BY name").fetchall()
-    return render_template("simple_list.html", items=items, title=page_title)
+
+    rows = db.execute(f"SELECT * FROM {table_name} ORDER BY name").fetchall()
+    traceable = table_name in _TRACEABLE
+
+    items = []
+    for row in rows:
+        count = None
+        if traceable:
+            source_table, source_col = _TRACEABLE[table_name]
+            if source_table == 'hardware':
+                count = db.execute(
+                    f"SELECT COUNT(*) FROM hardware WHERE {source_col} = ?", (row['name'],)
+                ).fetchone()[0]
+            else:
+                count = db.execute(
+                    f"SELECT COUNT(DISTINCT hardware_id) FROM {source_table} WHERE {source_col} = ?",
+                    (row['name'],)
+                ).fetchone()[0]
+        items.append({'name': row['name'], 'count': count})
+
+    return render_template("simple_list.html", items=items, title=page_title,
+                           table_name=table_name, traceable=traceable,
+                           item_label=_item_label(table_name))

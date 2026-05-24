@@ -13,6 +13,11 @@ venv/
 backup_data.json
 csv_export/
 
+# Local reference docs and scratch scripts
+reference_documents/
+docs/
+init_*.py
+
 # OS
 .DS_Store
 Thumbs.db

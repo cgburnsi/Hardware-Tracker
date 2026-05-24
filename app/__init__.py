@@ -28,6 +28,9 @@ def create_app():
     from . import hazard_analyses
     app.register_blueprint(hazard_analyses.bp)
 
+    from . import tps
+    app.register_blueprint(tps.bp)
+
     @app.route('/')
     def index():
         from .db import get_db
@@ -40,7 +43,7 @@ def create_app():
         total_hw = sum(status_counts.values())
 
         recent_runs = conn.execute("""
-            SELECT pr.run_id, pr.timestamp, pr.status, pr.operator,
+            SELECT pr.id, pr.run_id, pr.timestamp, pr.status, pr.operator,
                    p.proc_id, p.title, h.hardware_id
             FROM procedure_runs pr
             JOIN procedures p ON pr.procedure_id = p.id

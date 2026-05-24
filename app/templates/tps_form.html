@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New TPS' if not item else 'Edit ' + item['tps_number'] }} — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  .form-grid.three { grid-template-columns:1fr 1fr 1fr; }
+  .form-grid.full { grid-template-columns:1fr; }
+  .form-field label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.3rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .form-field input, .form-field select, .form-field textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.45rem 0.5rem; font-size:0.9rem; font-family:inherit; background:#fff;
+  }
+  .form-field textarea { min-height:80px; resize:vertical; }
+  .section-divider { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#888; border-bottom:1px solid #eee; padding-bottom:0.35rem; margin:1.25rem 0 0.75rem; }
+  .flag-row { display:flex; gap:1.5rem; flex-wrap:wrap; }
+  .flag-check { display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.88rem; color:#444; }
+  .flag-check input { width:auto; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">{{ 'New Test Preparation Sheet' if not item else 'Edit ' + item['tps_number'] }}</h2>
+  {% if item %}
+  <a href="{{ url_for('tps.tps_detail', id=item['id']) }}" class="secondary-button">Cancel</a>
+  {% else %}
+  <a href="{{ url_for('tps.tps_list') }}" class="secondary-button">Cancel</a>
+  {% endif %}
+</div>
+
+<div class="section-card">
+  <div class="section-header">TPS Header (MSFC Form 248)</div>
+  <div class="section-body">
+    <form method="post" action="{{ url_for('tps.tps_new') if not item else url_for('tps.tps_edit', id=item['id']) }}">
+
+      <div class="form-grid three">
+        <div class="form-field">
+          <label>TPS Number</label>
+          <input type="text" value="{{ item['tps_number'] if item else default_number }}" disabled
+                 style="background:#f3f3f1; color:#666; cursor:not-allowed;">
+        </div>
+        <div class="form-field">
+          <label>Type</label>
+          <select name="tps_type">
+            <option value="B" {% if not item or item['tps_type'] == 'B' %}selected{% endif %}>
+              Type B — Non-Configuration Change
+            </option>
+            <option value="A" {% if item and item['tps_type'] == 'A' %}selected{% endif %}>
+              Type A — Configuration Change
+            </option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Initiating Organization</label>
+          <input type="text" name="initiating_org"
+                 value="{{ item['initiating_org'] if item else 'ER64' }}"
+                 placeholder="ER64">
+        </div>
+      </div>
+
+      <div class="form-grid full">
+        <div class="form-field">
+          <label>TPS Title *</label>
+          <input type="text" name="title"
+                 value="{{ item['title'] if item else '' }}"
+                 placeholder="Short description of the work to be performed" required>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Experiment / Model Number</label>
+          <input type="text" name="experiment_number"
+                 value="{{ item['experiment_number'] or '' if item else '' }}"
+                 placeholder="e.g. RSS-2024-004">
+        </div>
+        <div class="form-field">
+          <label>System</label>
+          <input type="text" name="system_name"
+                 value="{{ item['system_name'] or '' if item else '' }}"
+                 placeholder="e.g. Green Propulsion Dual Mode">
+        </div>
+      </div>
+
+      <div class="form-grid three">
+        <div class="form-field">
+          <label>Date Prepared</label>
+          <input type="date" name="date_prepared"
+                 value="{{ item['date_prepared'] or '' if item else '' }}">
+        </div>
+        <div class="form-field">
+          <label>Need Date</label>
+          <input type="date" name="need_date"
+                 value="{{ item['need_date'] or '' if item else '' }}">
+        </div>
+        <div class="form-field">
+          <label>Prepared By</label>
+          <input type="text" name="prepared_by"
+                 value="{{ item['prepared_by'] or '' if item else '' }}"
+                 placeholder="Name / Org">
+        </div>
+      </div>
+
+      <div class="form-grid full">
+        <div class="form-field">
+          <label>Reference Drawings, Documents &amp; Part Numbers</label>
+          <input type="text" name="reference_docs"
+                 value="{{ item['reference_docs'] or '' if item else '' }}"
+                 placeholder="e.g. ASTM E 1417, EM20-NDE-OI-012E">
+        </div>
+      </div>
+
+      <div class="form-grid full">
+        <div class="form-field">
+          <label>Reason for Work</label>
+          <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.35rem;">
+            {% for phrase in [
+              'Perform functional test',
+              'Conduct acceptance testing',
+              'Perform proof pressure test',
+              'Conduct leak check',
+              'Perform calibration',
+              'Modify the facility',
+              'Troubleshoot anomaly',
+              'Verify hardware configuration'
+            ] %}
+            <button type="button"
+                    onclick="quickFill('reason-new', '{{ phrase }}')"
+                    style="font-size:0.72rem; padding:0.2rem 0.5rem; border:1px solid #c0ccdd; border-radius:3px; background:#eef2f7; color:#3a5cc7; cursor:pointer; font-family:inherit;">
+              {{ phrase }}
+            </button>
+            {% endfor %}
+          </div>
+          <textarea id="reason-new" name="reason_for_work" placeholder="Describe the purpose of this TPS…">{{ item['reason_for_work'] or '' if item else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="form-grid full">
+        <div class="form-field">
+          <label>Special Notes (Block 13)</label>
+          <textarea name="special_notes" placeholder="Special instructions not covered in the steps…">{{ item['special_notes'] or '' if item else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="section-divider">Category (Block 5)</div>
+      <div class="flag-row" style="margin-bottom:1rem;">
+        <label class="flag-check">
+          <input type="checkbox" name="quality_sensitive" value="1"
+                 {% if item and item['quality_sensitive'] %}checked{% endif %}>
+          Quality Sensitive
+        </label>
+        <label class="flag-check">
+          <input type="checkbox" name="safety_critical" value="1"
+                 {% if item and item['safety_critical'] %}checked{% endif %}>
+          Safety Critical
+        </label>
+        <label class="flag-check">
+          <input type="checkbox" name="limited_life" value="1"
+                 {% if item and item['limited_life'] %}checked{% endif %}>
+          Limited Life Item
+        </label>
+      </div>
+
+      <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="primary-button">
+          {{ 'Create TPS' if not item else 'Save Changes' }}
+        </button>
+        {% if item %}
+        <a href="{{ url_for('tps.tps_detail', id=item['id']) }}" class="secondary-button">Cancel</a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+<script>
+  function quickFill(textareaId, phrase) {
+    const ta = document.getElementById(textareaId);
+    if (!ta) return;
+    ta.value = ta.value ? ta.value + '\n' + phrase : phrase;
+    ta.focus();
+  }
+</script>
+{% endblock %}

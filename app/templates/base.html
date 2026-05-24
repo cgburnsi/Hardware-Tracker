@@ -250,6 +250,13 @@
               </span>
               Run Log
             </a>
+            <a href="{{ url_for('tps.tps_list') }}"
+               class="nav-link {% if request.endpoint and request.endpoint.startswith('tps.') %}active{% endif %}">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M4 6h16a1 1 0 011 1v13a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>
+              </span>
+              Test Prep Sheets
+            </a>
           </div>
 
           <div class="sidebar-group">

@@ -463,6 +463,69 @@ def migrate_db():
             FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_number TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            tps_type TEXT NOT NULL DEFAULT 'B',
+            quality_sensitive INTEGER NOT NULL DEFAULT 0,
+            safety_critical INTEGER NOT NULL DEFAULT 0,
+            limited_life INTEGER NOT NULL DEFAULT 0,
+            experiment_number TEXT,
+            date_prepared TEXT,
+            need_date TEXT,
+            reference_docs TEXT,
+            initiating_org TEXT DEFAULT 'ER64',
+            system_name TEXT,
+            reason_for_work TEXT,
+            special_notes TEXT,
+            prepared_by TEXT,
+            final_accepted_by TEXT,
+            acceptance_date TEXT,
+            linked_procedure_id INTEGER REFERENCES procedures(id),
+            status TEXT NOT NULL DEFAULT 'draft',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            order_index INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            input_type TEXT NOT NULL DEFAULT 'none',
+            unit TEXT,
+            min_value REAL,
+            max_value REAL,
+            result TEXT,
+            recorded_value TEXT,
+            tech_initial TEXT,
+            step_notes TEXT,
+            completed_at TEXT,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_approvals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            signer_name TEXT NOT NULL,
+            signed_date TEXT,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS tps_references (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tps_id INTEGER NOT NULL,
+            ref_type TEXT NOT NULL,
+            linked_id INTEGER NOT NULL,
+            FOREIGN KEY (tps_id) REFERENCES tps(id)
+        )
+    """)
     db.executescript("""
         INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
             ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),

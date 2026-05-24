@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Test Preparation Sheets — ER64 Ops Hub{% endblock %}
+
+{% block sidebar_filters %}
+<div class="sidebar-filter-group" style="margin-top:1rem;">
+  <form method="get" action="{{ url_for('tps.tps_list') }}">
+    <span class="sidebar-section-title">Filter</span>
+    <div class="filter-field">
+      <label class="filter-field-label">Search</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="TPS#, title, system…"
+             class="sidebar-select" style="padding:0.35rem 0.5rem;">
+    </div>
+    <div class="filter-field">
+      <label class="filter-field-label">Status</label>
+      <select name="status" class="sidebar-select">
+        <option value="">All</option>
+        {% for s in ['draft','approved','in_progress','complete','voided'] %}
+        <option value="{{ s }}" {% if status_f == s %}selected{% endif %}>{{ s.replace('_',' ').title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="sidebar-button">Apply</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .flag-chip {
+    display:inline-block; padding:0.1rem 0.35rem; border-radius:3px;
+    font-size:0.65rem; font-weight:700; margin-right:0.2rem;
+    border:1px solid currentColor;
+  }
+  .flag-qs  { color:#0f5132; background:#d1e7dd; }
+  .flag-sc  { color:#842029; background:#f8d7da; }
+  .flag-ll  { color:#664d03; background:#fff3cd; }
+</style>
+
+<div class="page-title-row">
+  <h2 class="page-title">Test Preparation Sheets</h2>
+  <a href="{{ url_for('tps.tps_new') }}" class="primary-button">+ New TPS</a>
+</div>
+
+{% if items %}
+<table>
+  <thead>
+    <tr>
+      <th>TPS Number</th>
+      <th>Title</th>
+      <th>Type</th>
+      <th>System</th>
+      <th>Flags</th>
+      <th>Status</th>
+      <th>Date</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in items %}
+    <tr>
+      <td>
+        <a href="{{ url_for('tps.tps_detail', id=t['id']) }}"
+           style="font-weight:700; color:var(--accent); text-decoration:none;">{{ t['tps_number'] }}</a>
+      </td>
+      <td>{{ t['title'] }}</td>
+      <td style="text-align:center;">
+        <span class="badge" style="background:#eef2f7; color:#3a5cc7; border:1px solid #c0ccdd;">
+          Type {{ t['tps_type'] }}
+        </span>
+      </td>
+      <td style="color:#666; font-size:0.88rem;">{{ t['system_name'] or '–' }}</td>
+      <td>
+        {% if t['quality_sensitive'] %}<span class="flag-chip flag-qs">QS</span>{% endif %}
+        {% if t['safety_critical']  %}<span class="flag-chip flag-sc">SC</span>{% endif %}
+        {% if t['limited_life']     %}<span class="flag-chip flag-ll">LL</span>{% endif %}
+        {% if not t['quality_sensitive'] and not t['safety_critical'] and not t['limited_life'] %}
+          <span style="color:#ccc; font-size:0.82rem;">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% set s = t['status'] %}
+        {% if s == 'draft' %}
+          <span class="badge badge-in-storage">Draft</span>
+        {% elif s == 'approved' %}
+          <span class="badge badge-new">Approved</span>
+        {% elif s == 'in_progress' %}
+          <span class="badge badge-in-progress">In Progress</span>
+        {% elif s == 'complete' %}
+          <span class="badge badge-completed">Complete</span>
+        {% elif s == 'voided' %}
+          <span class="badge badge-aborted">Voided</span>
+        {% endif %}
+      </td>
+      <td style="color:#888; font-size:0.82rem; white-space:nowrap;">
+        {{ (t['date_prepared'] or t['created_at'] or '')[:10] }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div style="background:#fff; border:1px solid var(--border-soft); border-radius:4px; padding:3rem; text-align:center; color:#aaa;">
+  <div style="font-size:1.1rem; margin-bottom:0.5rem;">No TPS documents yet.</div>
+  <a href="{{ url_for('tps.tps_new') }}" class="primary-button" style="margin-top:0.5rem;">Create First TPS</a>
+</div>
+{% endif %}
+{% endblock %}

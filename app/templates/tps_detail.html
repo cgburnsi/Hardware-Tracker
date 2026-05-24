@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+{% block title %}{{ item['tps_number'] }} — TPS — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  /* ── status banner ── */
+  .tps-banner { display:flex; align-items:center; gap:0.75rem; padding:0.6rem 1rem; border-radius:6px; margin-bottom:1.25rem; flex-wrap:wrap; font-size:0.88rem; }
+  .tps-banner.draft      { background:#f4f4f2; border:1px solid #ddd; color:#555; }
+  .tps-banner.approved   { background:#e8f4fd; border:1px solid #b8daff; color:#084298; }
+  .tps-banner.in_progress{ background:#fff8e1; border:1px solid #f4c842; color:#7a5c00; }
+  .tps-banner.complete   { background:#f0fff4; border:1px solid #6c9e6c; color:#1a5c1a; }
+  .tps-banner.voided     { background:#f2f2f2; border:1px solid #bbb; color:#777; }
+  .status-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+  /* ── flag chips ── */
+  .flag-chip { display:inline-block; padding:0.15rem 0.4rem; border-radius:3px; font-size:0.68rem; font-weight:700; border:1px solid currentColor; margin-left:0.3rem; }
+  .flag-qs   { color:#0f5132; background:#d1e7dd; }
+  .flag-sc   { color:#842029; background:#f8d7da; }
+  .flag-ll   { color:#664d03; background:#fff3cd; }
+
+  /* ── detail rows ── */
+  .detail-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:0.75rem 1.5rem; }
+  .detail-item .dl { font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.15rem; }
+  .detail-item .dv { font-size:0.92rem; color:#222; font-weight:500; }
+
+  /* ── step cards (edit mode) ── */
+  .step-card { border:1px solid #e2e2df; border-radius:4px; margin-bottom:0.5rem; background:#fff; overflow:hidden; }
+  .step-display { display:flex; align-items:flex-start; gap:0.75rem; padding:0.65rem 0.75rem; }
+  .step-num { font-size:0.78rem; font-weight:700; color:#bbb; min-width:1.6rem; padding-top:2px; flex-shrink:0; }
+  .step-main { flex:1; min-width:0; }
+  .step-desc { font-weight:500; color:#222; font-size:0.92rem; white-space:pre-wrap; line-height:1.45; }
+  .step-actions-edit { display:flex; gap:0.25rem; flex-shrink:0; }
+  .step-actions-edit form { margin:0; }
+  .step-btn { border:1px solid #ddd; background:#fff; border-radius:3px; padding:0.2rem 0.4rem; font-size:0.78rem; cursor:pointer; color:#666; font-family:inherit; line-height:1.4; }
+  .step-btn:hover { background:#f2f2f0; }
+  .step-btn.del  { color:#842029; border-color:#f5c6cb; }
+  .step-btn.del:hover { background:#f8d7da; }
+  .step-btn.edit-btn { color:var(--accent); border-color:#c0ccdd; }
+  .step-btn.edit-btn:hover { background:#eef2f7; }
+
+  /* ── inline step edit form ── */
+  .step-edit-form { padding:0.75rem; background:#fafaf8; border-top:1px solid #eee; display:grid; gap:0.5rem; }
+  .step-edit-form label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .step-edit-form input, .step-edit-form select, .step-edit-form textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit; background:#fff;
+  }
+  .step-edit-form textarea { min-height:65px; resize:vertical; }
+  .config-row { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; }
+  .data-field { opacity:0.5; }
+  .data-field.active { opacity:1; }
+
+  /* ── add step form ── */
+  .add-step-card { border:1px dashed #ccc; border-radius:4px; padding:0.85rem; background:#fff; margin-top:0.75rem; }
+  .add-step-card label { font-size:0.72rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600; }
+  .add-step-card input, .add-step-card select, .add-step-card textarea {
+    width:100%; border:1px solid #ccc; border-radius:3px;
+    padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit; background:#fff;
+  }
+  .add-step-card textarea { min-height:65px; resize:vertical; }
+
+  /* ── execution step cards ── */
+  .exec-step { border:1px solid #e2e2df; border-radius:4px; margin-bottom:0.5rem; background:#fff; overflow:hidden; }
+  .exec-step.pass  { border-left:4px solid #6c9e6c; }
+  .exec-step.fail  { border-left:4px solid #d9534f; }
+  .exec-step.na    { border-left:4px solid #aaa; }
+  .exec-step.pending { border-left:4px solid #f4c842; }
+  .exec-body { display:flex; align-items:flex-start; gap:0.75rem; padding:0.65rem 0.75rem; }
+  .exec-meta { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0.75rem 0.5rem; border-top:1px solid #f0f0f0; background:#fafaf8; flex-wrap:wrap; }
+  .exec-form { padding:0.5rem 0.75rem 0.6rem; border-top:1px solid #eee; background:#fafaf8; }
+  .exec-form .row { display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; }
+  .exec-form label { font-size:0.68rem; color:#666; display:block; margin-bottom:0.15rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .exec-form input { border:1px solid #ccc; border-radius:3px; padding:0.35rem 0.5rem; font-size:0.875rem; font-family:inherit; }
+  .exec-form textarea { width:100%; border:1px solid #ccc; border-radius:3px; padding:0.35rem 0.5rem; font-size:0.875rem; font-family:inherit; min-height:50px; resize:vertical; margin-top:0.35rem; }
+  .result-badge { display:inline-flex; align-items:center; justify-content:center; min-width:2rem; height:1.6rem; padding:0 0.5rem; border-radius:3px; font-size:0.78rem; font-weight:800; }
+  .rb-pass { background:#d1e7dd; color:#0f5132; }
+  .rb-fail { background:#f8d7da; color:#842029; }
+  .rb-na   { background:#e2e3e5; color:#41464b; }
+  .rb-pending { background:#fff3cd; color:#664d03; }
+  .btn-pass { background:#d1e7dd; color:#0f5132; border:1px solid #a3cfbb; border-radius:3px; padding:0.3rem 0.65rem; font-size:0.82rem; font-weight:700; cursor:pointer; font-family:inherit; }
+  .btn-pass:hover { background:#b8dfc8; }
+  .btn-fail { background:#f8d7da; color:#842029; border:1px solid #f1aeb5; border-radius:3px; padding:0.3rem 0.65rem; font-size:0.82rem; font-weight:700; cursor:pointer; font-family:inherit; }
+  .btn-fail:hover { background:#f1b9be; }
+  .btn-na   { background:#e2e3e5; color:#41464b; border:1px solid #c4c4c6; border-radius:3px; padding:0.3rem 0.65rem; font-size:0.82rem; font-weight:700; cursor:pointer; font-family:inherit; }
+  .btn-na:hover { background:#cccdd0; }
+  .btn-remark { border:none; background:none; cursor:pointer; font-size:0.75rem; color:#aaa; padding:0; font-weight:600; }
+  .btn-remark:hover { color:#555; }
+
+  /* ── progress bar ── */
+  .progress-bar-wrap { background:#eee; border-radius:4px; height:6px; margin-top:0.5rem; }
+  .progress-bar-fill { background:var(--accent); border-radius:4px; height:6px; transition:width 0.3s; }
+
+  /* ── approvals table ── */
+  .approval-row { display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0; border-bottom:1px solid #f0f0f0; font-size:0.9rem; }
+  .approval-row:last-of-type { border-bottom:none; }
+</style>
+
+{# ── STATUS BANNER ── #}
+{% set status = item['status'] %}
+<div class="tps-banner {{ status }}">
+  <span class="status-dot" style="
+    {% if status=='draft' %}background:#aaa;
+    {% elif status=='approved' %}background:#2980b9;
+    {% elif status=='in_progress' %}background:#f4c842;
+    {% elif status=='complete' %}background:#6c9e6c;
+    {% else %}background:#bbb;{% endif %}"></span>
+  <strong style="text-transform:uppercase; letter-spacing:0.04em; font-size:0.82rem;">
+    {{ status.replace('_',' ').title() }}
+  </strong>
+  {% if status == 'in_progress' and total %}
+    <span style="font-size:0.82rem;">— {{ completed }}/{{ total }} steps complete</span>
+  {% endif %}
+  <span style="flex:1;"></span>
+  {# transition buttons #}
+  {% if status == 'draft' %}
+    <form method="post" action="{{ url_for('tps.tps_set_status', id=item['id']) }}" style="margin:0;">
+      <input type="hidden" name="status" value="approved">
+      <button type="submit" class="primary-button" style="padding:0.3rem 0.8rem; font-size:0.82rem;">Mark Approved</button>
+    </form>
+  {% elif status == 'approved' %}
+    <form method="post" action="{{ url_for('tps.tps_set_status', id=item['id']) }}" style="margin:0;">
+      <input type="hidden" name="status" value="in_progress">
+      <button type="submit" class="primary-button" style="padding:0.3rem 0.8rem; font-size:0.82rem;">Begin Execution</button>
+    </form>
+    <form method="post" action="{{ url_for('tps.tps_set_status', id=item['id']) }}" style="margin:0;">
+      <input type="hidden" name="status" value="draft">
+      <button type="submit" class="secondary-button" style="padding:0.3rem 0.8rem; font-size:0.82rem;">Back to Draft</button>
+    </form>
+  {% elif status == 'in_progress' %}
+    <span style="font-size:0.8rem; color:#7a5c00;">Complete all steps, then submit for final acceptance below.</span>
+  {% endif %}
+</div>
+
+<div class="page-title-row" style="align-items:flex-start;">
+  <div>
+    <span style="font-size:0.82rem; color:#888;">
+      Test Preparation Sheet
+      {% if item['tps_type'] == 'A' %}<span style="color:#842029; font-weight:600;"> — Type A (Configuration Change)</span>{% endif %}
+    </span>
+    <h2 class="page-title" style="margin-top:0.1rem;">{{ item['tps_number'] }}</h2>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    {% if status in ('draft', 'approved') %}
+    <a href="{{ url_for('tps.tps_new') }}?clone={{ item['id'] }}" class="secondary-button" style="display:none;">Clone</a>
+    <button type="button" onclick="toggleEl('header-edit')" class="secondary-button">Edit Header</button>
+    {% endif %}
+    <form method="post" action="{{ url_for('tps.tps_set_status', id=item['id']) }}"
+          onsubmit="return confirm('Void this TPS? This cannot be undone.');" style="margin:0;">
+      <input type="hidden" name="status" value="voided">
+      {% if status != 'voided' and status != 'complete' %}
+      <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb; font-size:0.82rem; padding:0.4rem 0.7rem;">Void</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{# ── OVERVIEW CARD ── #}
+<div class="section-card">
+  <div class="section-header">
+    <span>
+      Overview
+      {% if item['quality_sensitive'] %}<span class="flag-chip flag-qs">Quality Sensitive</span>{% endif %}
+      {% if item['safety_critical']   %}<span class="flag-chip flag-sc">Safety Critical</span>{% endif %}
+      {% if item['limited_life']      %}<span class="flag-chip flag-ll">Limited Life</span>{% endif %}
+    </span>
+  </div>
+  <div class="section-body">
+    <h3 style="margin:0 0 1rem; font-size:1.05rem;">{{ item['title'] }}</h3>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="dl">System</div><div class="dv">{{ item['system_name'] or '–' }}</div></div>
+      <div class="detail-item"><div class="dl">Initiating Org</div><div class="dv">{{ item['initiating_org'] or '–' }}</div></div>
+      <div class="detail-item"><div class="dl">Experiment / Model</div><div class="dv">{{ item['experiment_number'] or '–' }}</div></div>
+      <div class="detail-item"><div class="dl">Date Prepared</div><div class="dv">{{ item['date_prepared'] or '–' }}</div></div>
+      <div class="detail-item"><div class="dl">Need Date</div><div class="dv">{{ item['need_date'] or '–' }}</div></div>
+      <div class="detail-item"><div class="dl">Prepared By</div><div class="dv">{{ item['prepared_by'] or '–' }}</div></div>
+    </div>
+    {% if item['reference_docs'] %}
+    <div style="margin-top:0.85rem;">
+      <div class="dl" style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.2rem;">References</div>
+      <div style="font-size:0.88rem; color:#444;">{{ item['reference_docs'] }}</div>
+    </div>
+    {% endif %}
+    {% if item['reason_for_work'] %}
+    <div style="margin-top:0.75rem;">
+      <div class="dl" style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.2rem;">Reason for Work</div>
+      <div style="font-size:0.88rem; color:#444; white-space:pre-wrap;">{{ item['reason_for_work'] }}</div>
+    </div>
+    {% endif %}
+    {% if item['special_notes'] %}
+    <div style="margin-top:0.75rem; padding:0.6rem 0.75rem; background:#fffdf0; border:1px solid #f4c842; border-radius:4px;">
+      <div class="dl" style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.2rem;">Special Notes</div>
+      <div style="font-size:0.88rem; color:#444; white-space:pre-wrap;">{{ item['special_notes'] }}</div>
+    </div>
+    {% endif %}
+    {% if item['reference_docs'] %}
+    <div style="margin-top:0.85rem;">
+      <div class="dl" style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.2rem;">Reference Drawings, Documents &amp; Part Numbers</div>
+      <div style="font-size:0.88rem; color:#444;">{{ item['reference_docs'] }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Inline header edit form #}
+  <div id="header-edit" style="display:none; padding:1rem; border-top:1px solid #eee; background:#f9f9f7;">
+    <form method="post" action="{{ url_for('tps.tps_edit', id=item['id']) }}">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">TPS Number</label>
+          <input type="text" value="{{ item['tps_number'] }}" disabled
+                 style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit; background:#f3f3f1; color:#666; cursor:not-allowed;">
+        </div>
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Type</label>
+          <select name="tps_type" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+            <option value="B" {% if item['tps_type']=='B' %}selected{% endif %}>Type B</option>
+            <option value="A" {% if item['tps_type']=='A' %}selected{% endif %}>Type A</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Org</label>
+          <input type="text" name="initiating_org" value="{{ item['initiating_org'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Title *</label>
+        <input type="text" name="title" value="{{ item['title'] }}" required style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">System</label>
+          <input type="text" name="system_name" value="{{ item['system_name'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Experiment / Model</label>
+          <input type="text" name="experiment_number" value="{{ item['experiment_number'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Date Prepared</label>
+          <input type="date" name="date_prepared" value="{{ item['date_prepared'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Need Date</label>
+          <input type="date" name="need_date" value="{{ item['need_date'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+        <div>
+          <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Prepared By</label>
+          <input type="text" name="prepared_by" value="{{ item['prepared_by'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+        </div>
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">References</label>
+        <input type="text" name="reference_docs" value="{{ item['reference_docs'] or '' }}" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Reason for Work</label>
+        <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.35rem;">
+          {% for phrase in [
+            'Perform functional test',
+            'Conduct acceptance testing',
+            'Perform proof pressure test',
+            'Conduct leak check',
+            'Perform calibration',
+            'Modify the facility',
+            'Troubleshoot anomaly',
+            'Verify hardware configuration'
+          ] %}
+          <button type="button"
+                  onclick="quickFill('reason-edit', '{{ phrase }}')"
+                  style="font-size:0.72rem; padding:0.2rem 0.5rem; border:1px solid #c0ccdd; border-radius:3px; background:#eef2f7; color:#3a5cc7; cursor:pointer; font-family:inherit;">
+            {{ phrase }}
+          </button>
+          {% endfor %}
+        </div>
+        <textarea id="reason-edit" name="reason_for_work" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit; min-height:60px; resize:vertical;">{{ item['reason_for_work'] or '' }}</textarea>
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label style="font-size:0.68rem; color:#555; display:block; margin-bottom:0.2rem; font-weight:600;">Special Notes</label>
+        <textarea name="special_notes" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit; min-height:55px; resize:vertical;">{{ item['special_notes'] or '' }}</textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:0.35rem; cursor:pointer; font-size:0.85rem;">
+          <input type="checkbox" name="quality_sensitive" value="1" {% if item['quality_sensitive'] %}checked{% endif %} style="width:auto;"> Quality Sensitive
+        </label>
+        <label style="display:flex; align-items:center; gap:0.35rem; cursor:pointer; font-size:0.85rem;">
+          <input type="checkbox" name="safety_critical" value="1" {% if item['safety_critical'] %}checked{% endif %} style="width:auto;"> Safety Critical
+        </label>
+        <label style="display:flex; align-items:center; gap:0.35rem; cursor:pointer; font-size:0.85rem;">
+          <input type="checkbox" name="limited_life" value="1" {% if item['limited_life'] %}checked{% endif %} style="width:auto;"> Limited Life
+        </label>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+        <button type="submit" class="primary-button" style="padding:0.38rem 0.8rem; font-size:0.82rem;">Save</button>
+        <button type="button" class="secondary-button" style="padding:0.38rem 0.8rem; font-size:0.82rem;" onclick="toggleEl('header-edit')">Cancel</button>
+      </div>
+      {# Pass through hidden fields that aren't shown #}
+      <input type="hidden" name="linked_procedure_id" value="{{ item['linked_procedure_id'] or '' }}">
+    </form>
+  </div>
+</div>
+
+{# ── STEPS CARD ── #}
+<div class="section-card" id="steps">
+  <div class="section-header">
+    <span>
+      Steps
+      {% if total %}
+        <span style="font-weight:400; color:#888; margin-left:0.4rem;">{{ completed }}/{{ total }} complete</span>
+        {% if total %}
+        <div class="progress-bar-wrap" style="width:120px; display:inline-block; margin-left:0.5rem; vertical-align:middle;">
+          <div class="progress-bar-fill" style="width:{{ (completed/total*100)|int }}%;"></div>
+        </div>
+        {% endif %}
+      {% endif %}
+    </span>
+  </div>
+  <div class="section-body">
+
+  {% if status == 'draft' %}
+  {# ────── EDIT MODE (Draft only) ────── #}
+  {% if steps %}
+  {% for step in steps %}
+  <div class="step-card">
+    <div class="step-display" id="step-view-{{ step['id'] }}">
+      <div class="step-num">{{ loop.index }}</div>
+      <div class="step-main">
+        <div class="step-desc">{{ step['description'] }}</div>
+        {% if step['input_type'] == 'number' %}
+          <div style="margin-top:0.2rem; font-size:0.75rem; color:#888;">
+            Records: {{ step['unit'] or 'value' }}
+            {% if step['min_value'] is not none or step['max_value'] is not none %}
+              [{{ step['min_value'] if step['min_value'] is not none else '—' }} – {{ step['max_value'] if step['max_value'] is not none else '—' }}]
+            {% endif %}
+          </div>
+        {% elif step['input_type'] == 'text' %}
+          <div style="margin-top:0.2rem; font-size:0.75rem; color:#888;">Records: text entry</div>
+        {% endif %}
+      </div>
+      <div class="step-actions-edit">
+        {% if not loop.first %}
+        <form method="post" action="{{ url_for('tps.step_move', id=item['id'], sid=step['id']) }}">
+          <input type="hidden" name="direction" value="up">
+          <button type="submit" class="step-btn" title="Move up">↑</button>
+        </form>
+        {% endif %}
+        {% if not loop.last %}
+        <form method="post" action="{{ url_for('tps.step_move', id=item['id'], sid=step['id']) }}">
+          <input type="hidden" name="direction" value="down">
+          <button type="submit" class="step-btn" title="Move down">↓</button>
+        </form>
+        {% endif %}
+        <button type="button" class="step-btn edit-btn"
+                onclick="toggleEl('step-view-{{ step['id'] }}'); toggleEl('step-edit-{{ step['id'] }}')">Edit</button>
+        <form method="post" action="{{ url_for('tps.step_delete', id=item['id'], sid=step['id']) }}"
+              onsubmit="return confirm('Delete this step?');">
+          <button type="submit" class="step-btn del">✕</button>
+        </form>
+      </div>
+    </div>
+    <div id="step-edit-{{ step['id'] }}" style="display:none;">
+      <form method="post" action="{{ url_for('tps.step_edit', id=item['id'], sid=step['id']) }}" class="step-edit-form">
+        <div>
+          <label>Description *</label>
+          <textarea name="description" required>{{ step['description'] }}</textarea>
+        </div>
+        <div class="config-row">
+          <div style="flex:2; min-width:150px;">
+            <label>Input Type</label>
+            <select name="input_type" onchange="toggleDataFields(this)">
+              <option value="none"   {% if step['input_type']=='none'   %}selected{% endif %}>None (check-off only)</option>
+              <option value="number" {% if step['input_type']=='number' %}selected{% endif %}>Number / Measurement</option>
+              <option value="text"   {% if step['input_type']=='text'   %}selected{% endif %}>Text Entry</option>
+            </select>
+          </div>
+          <div style="flex:1; min-width:70px;" class="data-field {{ 'active' if step['input_type']=='number' else '' }}">
+            <label>Unit</label>
+            <input type="text" name="unit" value="{{ step['unit'] or '' }}" placeholder="PSI"
+                   {% if step['input_type']!='number' %}disabled{% endif %}>
+          </div>
+          <div style="flex:1; min-width:70px;" class="data-field {{ 'active' if step['input_type']=='number' else '' }}">
+            <label>Min</label>
+            <input type="number" step="any" name="min_value"
+                   value="{{ step['min_value'] if step['min_value'] is not none else '' }}"
+                   {% if step['input_type']!='number' %}disabled{% endif %}>
+          </div>
+          <div style="flex:1; min-width:70px;" class="data-field {{ 'active' if step['input_type']=='number' else '' }}">
+            <label>Max</label>
+            <input type="number" step="any" name="max_value"
+                   value="{{ step['max_value'] if step['max_value'] is not none else '' }}"
+                   {% if step['input_type']!='number' %}disabled{% endif %}>
+          </div>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="submit" class="primary-button" style="padding:0.35rem 0.75rem; font-size:0.82rem;">Save</button>
+          <button type="button" class="secondary-button" style="padding:0.35rem 0.75rem; font-size:0.82rem;"
+                  onclick="toggleEl('step-edit-{{ step['id'] }}'); toggleEl('step-view-{{ step['id'] }}')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p style="color:#aaa; font-style:italic; margin:0 0 0.75rem;">No steps yet. Add the first one below.</p>
+  {% endif %}
+
+  {# Add step form #}
+  <div class="add-step-card">
+    <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Step</div>
+    <form method="post" action="{{ url_for('tps.step_add', id=item['id']) }}">
+      <div style="margin-bottom:0.5rem;">
+        <label>Step Description *</label>
+        <textarea name="description" required placeholder="Describe the work to be performed. Include any acceptance criteria inline."></textarea>
+      </div>
+      <div class="config-row" style="margin-bottom:0.5rem;">
+        <div style="flex:2; min-width:150px;">
+          <label>Input Type</label>
+          <select name="input_type" onchange="toggleDataFields(this)">
+            <option value="none">None (check-off only)</option>
+            <option value="number">Number / Measurement</option>
+            <option value="text">Text Entry</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:70px;" class="data-field">
+          <label>Unit</label>
+          <input type="text" name="unit" placeholder="PSI" disabled>
+        </div>
+        <div style="flex:1; min-width:70px;" class="data-field">
+          <label>Min</label>
+          <input type="number" step="any" name="min_value" disabled>
+        </div>
+        <div style="flex:1; min-width:70px;" class="data-field">
+          <label>Max</label>
+          <input type="number" step="any" name="max_value" disabled>
+        </div>
+      </div>
+      <button type="submit" class="primary-button" style="padding:0.38rem 0.85rem; font-size:0.85rem;">Add Step</button>
+    </form>
+  </div>
+
+  {% else %}
+  {# ────── EXECUTION MODE (approved / in_progress / complete) ────── #}
+  {% if steps %}
+  {% for step in steps %}
+  {% set done = step['result'] is not none %}
+  {% set res = step['result'] %}
+  <div class="exec-step {{ 'pass' if res=='+' else 'fail' if res=='-' else 'na' if res=='N/A' else 'pending' }}">
+    <div class="exec-body">
+      <div class="step-num" style="padding-top:4px;">{{ loop.index }}</div>
+      <div class="step-main">
+        <div class="step-desc">{{ step['description'] }}</div>
+        {% if step['input_type'] == 'number' and step['unit'] %}
+          <div style="font-size:0.75rem; color:#888; margin-top:0.15rem;">
+            Record: {{ step['unit'] }}
+            {% if step['min_value'] is not none or step['max_value'] is not none %}
+              ({{ step['min_value'] if step['min_value'] is not none else '—' }} – {{ step['max_value'] if step['max_value'] is not none else '—' }})
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div style="flex-shrink:0; padding-top:2px;">
+        {% if res == '+' %}
+          <span class="result-badge rb-pass">+ PASS</span>
+        {% elif res == '-' %}
+          <span class="result-badge rb-fail">- FAIL</span>
+        {% elif res == 'N/A' %}
+          <span class="result-badge rb-na">N/A</span>
+        {% else %}
+          <span class="result-badge rb-pending">Pending</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if done %}
+    {# Completed: show summary + re-mark option #}
+    <div class="exec-meta">
+      {% if step['recorded_value'] %}
+        <span style="font-size:0.82rem; font-weight:600; color:#333;">{{ step['recorded_value'] }}{{ ' ' + step['unit'] if step['unit'] }}</span>
+        <span style="color:#ddd;">|</span>
+      {% endif %}
+      {% if step['tech_initial'] %}
+        <span style="font-size:0.8rem; color:#555;">Tech: <strong>{{ step['tech_initial'] }}</strong></span>
+        <span style="color:#ddd;">|</span>
+      {% endif %}
+      <span style="font-size:0.75rem; color:#aaa;">{{ step['completed_at'][:16].replace('T',' ') if step['completed_at'] }}</span>
+      {% if step['step_notes'] %}
+        <span style="color:#ddd;">|</span>
+        <span style="font-size:0.8rem; color:#666; font-style:italic;">{{ step['step_notes'] }}</span>
+      {% endif %}
+      {% if status != 'complete' %}
+      <span style="margin-left:auto;">
+        <button type="button" class="btn-remark" onclick="toggleEl('exec-form-{{ step['id'] }}')">Re-mark</button>
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if status != 'complete' %}
+    <div id="exec-form-{{ step['id'] }}" {% if done %}style="display:none;"{% endif %}>
+      <form method="post" action="{{ url_for('tps.step_execute', id=item['id'], sid=step['id']) }}" class="exec-form">
+        <div class="row">
+          <div>
+            <label>Tech Initial</label>
+            <input type="text" name="tech_initial" value="{{ step['tech_initial'] or '' }}"
+                   placeholder="CB" style="width:80px;">
+          </div>
+          {% if step['input_type'] != 'none' %}
+          <div>
+            <label>Recorded Value</label>
+            <input type="{{ 'number' if step['input_type']=='number' else 'text' }}"
+                   name="recorded_value" value="{{ step['recorded_value'] or '' }}"
+                   placeholder="{{ step['unit'] or 'value' }}" style="width:120px;"
+                   {% if step['input_type']=='number' %}step="any"{% endif %}>
+          </div>
+          {% endif %}
+          <div style="display:flex; gap:0.35rem; align-items:flex-end; padding-bottom:0.1rem; flex-wrap:wrap;">
+            <button type="submit" name="result" value="+" class="btn-pass">+ Pass</button>
+            <button type="submit" name="result" value="-" class="btn-fail">- Fail</button>
+            <button type="submit" name="result" value="N/A" class="btn-na">N/A</button>
+          </div>
+          {% if done %}
+          <div style="display:flex; align-items:flex-end; padding-bottom:0.1rem;">
+            <button type="button" class="secondary-button" style="padding:0.28rem 0.6rem; font-size:0.8rem;"
+                    onclick="toggleEl('exec-form-{{ step['id'] }}')">Cancel</button>
+          </div>
+          {% endif %}
+        </div>
+        <div>
+          <textarea name="step_notes" placeholder="Notes (optional)…" style="margin-top:0.35rem; font-size:0.82rem;">{{ step['step_notes'] or '' }}</textarea>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p style="color:#aaa; font-style:italic; margin:0;">No steps defined.</p>
+  {% endif %}
+  {% endif %}
+
+  </div>
+</div>
+
+{# ── APPROVALS CARD ── #}
+<div class="section-card" id="approvals">
+  <div class="section-header">Approvals (Block 17)</div>
+  <div class="section-body">
+    {% if approvals %}
+    <div style="margin-bottom:1rem;">
+      {% for a in approvals %}
+      <div class="approval-row">
+        <div style="min-width:160px; font-size:0.8rem; font-weight:600; color:#555;">{{ a['role'] }}</div>
+        <div style="flex:1; font-size:0.9rem;">{{ a['signer_name'] }}</div>
+        <div style="min-width:90px; font-size:0.8rem; color:#888;">{{ a['signed_date'] or '' }}</div>
+        {% if status != 'complete' %}
+        <form method="post" action="{{ url_for('tps.approval_delete', id=item['id'], aid=a['id']) }}" style="margin:0;">
+          <button type="submit" style="border:none; background:none; cursor:pointer; color:#ccc; font-size:0.8rem; padding:0;" title="Remove">✕</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#aaa; font-style:italic; font-size:0.88rem; margin:0 0 0.75rem;">No approvals recorded yet.</p>
+    {% endif %}
+
+    {% if status != 'complete' %}
+    <form method="post" action="{{ url_for('tps.tps_approve', id=item['id']) }}"
+          style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; padding-top:{% if approvals %}0.75rem; border-top:1px solid #f0f0f0;{% else %}0;{% endif %}">
+      <div style="flex:1; min-width:140px;">
+        <label style="font-size:0.68rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Role</label>
+        <select name="role" style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+          {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+        </select>
+      </div>
+      <div style="flex:2; min-width:160px;">
+        <label style="font-size:0.68rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Name *</label>
+        <input type="text" name="signer_name" required placeholder="Full name"
+               style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <div style="min-width:130px;">
+        <label style="font-size:0.68rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Date</label>
+        <input type="date" name="signed_date"
+               style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <button type="submit" class="primary-button" style="padding:0.38rem 0.85rem; font-size:0.82rem; white-space:nowrap;">Add Approval</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# ── FINAL ACCEPTANCE ── #}
+{% if status in ('in_progress', 'complete') %}
+<div class="section-card">
+  <div class="section-header">Final Acceptance</div>
+  <div class="section-body">
+    {% if status == 'complete' and item['final_accepted_by'] %}
+    <div style="display:flex; gap:1.5rem; align-items:center; flex-wrap:wrap;">
+      <div>
+        <div style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.15rem;">Accepted By</div>
+        <div style="font-size:1rem; font-weight:600;">{{ item['final_accepted_by'] }}</div>
+      </div>
+      <div>
+        <div style="font-size:0.68rem; color:#999; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.15rem;">Date</div>
+        <div style="font-size:1rem; font-weight:600;">{{ item['acceptance_date'] }}</div>
+      </div>
+      <span class="badge badge-completed" style="font-size:0.8rem; padding:0.3rem 0.7rem;">TPS Complete</span>
+    </div>
+    {% else %}
+    <p style="font-size:0.88rem; color:#666; margin:0 0 0.75rem;">
+      Once all steps are complete, record final acceptance here. This will close the TPS.
+    </p>
+    <form method="post" action="{{ url_for('tps.tps_accept', id=item['id']) }}"
+          style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:2; min-width:160px;">
+        <label style="font-size:0.68rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Accepted By *</label>
+        <input type="text" name="final_accepted_by" required placeholder="Test Conductor name"
+               style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <div style="min-width:130px;">
+        <label style="font-size:0.68rem; color:#666; display:block; margin-bottom:0.2rem; font-weight:600;">Date</label>
+        <input type="date" name="acceptance_date"
+               style="width:100%; border:1px solid #ccc; border-radius:3px; padding:0.38rem 0.5rem; font-size:0.875rem; font-family:inherit;">
+      </div>
+      <button type="submit" class="primary-button" style="padding:0.38rem 0.85rem; font-size:0.82rem;"
+              onclick="return confirm('Mark this TPS complete?')">Accept &amp; Close</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+  function toggleEl(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+  }
+  function toggleDataFields(sel) {
+    const isNum = sel.value === 'number';
+    sel.closest('.config-row').querySelectorAll('.data-field').forEach(div => {
+      const inp = div.querySelector('input');
+      if (isNum) { div.classList.add('active'); div.style.opacity = '1'; if (inp) inp.disabled = false; }
+      else { div.classList.remove('active'); div.style.opacity = '0.5'; if (inp) { inp.disabled = true; inp.value = ''; } }
+    });
+  }
+  function quickFill(textareaId, phrase) {
+    const ta = document.getElementById(textareaId);
+    if (!ta) return;
+    ta.value = ta.value ? ta.value + '\n' + phrase : phrase;
+    ta.focus();
+  }
+</script>
+{% endblock %}

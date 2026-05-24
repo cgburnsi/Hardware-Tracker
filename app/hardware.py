@@ -254,14 +254,66 @@ def manufacturer_list():
             except:
                 flash("Manufacturer already exists.", "error")
                 
-    rows = db.execute("SELECT * FROM manufacturers ORDER BY name").fetchall()
+    valid_per_page = (10, 25, 50, 100, 0)
+    try:
+        per_page = int(request.args.get('per_page', 25))
+        if per_page not in valid_per_page:
+            per_page = 25
+    except (ValueError, TypeError):
+        per_page = 25
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        log_limit = int(request.args.get('log_limit', 25))
+        if log_limit not in (10, 25, 50, 100):
+            log_limit = 25
+    except (ValueError, TypeError):
+        log_limit = 25
+
+    total = db.execute("SELECT COUNT(*) FROM manufacturers").fetchone()[0]
+    if per_page > 0:
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        rows = db.execute("SELECT * FROM manufacturers ORDER BY name LIMIT ? OFFSET ?",
+                          (per_page, offset)).fetchall()
+    else:
+        total_pages = 1; page = 1
+        rows = db.execute("SELECT * FROM manufacturers ORDER BY name").fetchall()
+
+    if total_pages <= 7:
+        page_list = list(range(1, total_pages + 1))
+    else:
+        visible = sorted({1, total_pages} | set(range(max(1, page - 2), min(total_pages, page + 2) + 1)))
+        page_list = []
+        for i, p in enumerate(visible):
+            if i > 0 and p > visible[i - 1] + 1:
+                page_list.append(None)
+            page_list.append(p)
+
     items = []
     for row in rows:
         count = db.execute(
             "SELECT COUNT(*) FROM hardware WHERE manufacturer = ?", (row['name'],)
         ).fetchone()[0]
         items.append({'name': row['name'], 'website': row['website'], 'count': count})
-    return render_template("manufacturer_list.html", items=items)
+
+    history = db.execute(
+        """SELECT hl.hardware_id, hl.timestamp, hl.action_type, hl.description,
+                  h.id as hw_pk
+           FROM hardware_log hl
+           LEFT JOIN hardware h ON h.hardware_id = hl.hardware_id
+           WHERE h.manufacturer IN (SELECT name FROM manufacturers)
+           ORDER BY hl.timestamp DESC LIMIT ?""",
+        (log_limit,)
+    ).fetchall()
+
+    return render_template("manufacturer_list.html", items=items,
+                           total=total, page=page, per_page=per_page,
+                           total_pages=total_pages, page_list=page_list,
+                           history=history, log_limit=log_limit)
 
 @bp.route("/<int:id>")
 def hardware_detail(id):
@@ -1298,9 +1350,48 @@ def handle_simple_list(table_name, page_title):
             except:
                 flash("Item already exists.", "error")
 
-    rows = db.execute(f"SELECT * FROM {table_name} ORDER BY name").fetchall()
     traceable = table_name in _TRACEABLE
 
+    # --- pagination ---
+    valid_per_page = (10, 25, 50, 100, 0)
+    try:
+        per_page = int(request.args.get('per_page', 25))
+        if per_page not in valid_per_page:
+            per_page = 25
+    except (ValueError, TypeError):
+        per_page = 25
+
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+
+    total = db.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+
+    if per_page > 0:
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        rows = db.execute(
+            f"SELECT * FROM {table_name} ORDER BY name LIMIT ? OFFSET ?",
+            (per_page, offset)
+        ).fetchall()
+    else:
+        total_pages = 1
+        page = 1
+        rows = db.execute(f"SELECT * FROM {table_name} ORDER BY name").fetchall()
+
+    if total_pages <= 7:
+        page_list = list(range(1, total_pages + 1))
+    else:
+        visible = sorted({1, total_pages} | set(range(max(1, page - 2), min(total_pages, page + 2) + 1)))
+        page_list = []
+        for i, p in enumerate(visible):
+            if i > 0 and p > visible[i - 1] + 1:
+                page_list.append(None)
+            page_list.append(p)
+
+    # --- usage counts for current page ---
     items = []
     for row in rows:
         count = None
@@ -1317,6 +1408,44 @@ def handle_simple_list(table_name, page_title):
                 ).fetchone()[0]
         items.append({'name': row['name'], 'count': count})
 
+    # --- operational history ---
+    valid_log_limits = (10, 25, 50, 100)
+    try:
+        log_limit = int(request.args.get('log_limit', 25))
+        if log_limit not in valid_log_limits:
+            log_limit = 25
+    except (ValueError, TypeError):
+        log_limit = 25
+
+    history = []
+    if traceable:
+        source_table, source_col = _TRACEABLE[table_name]
+        if source_table == 'hardware':
+            history = db.execute(
+                f"""SELECT hl.hardware_id, hl.timestamp, hl.action_type, hl.description,
+                           h.id as hw_pk
+                    FROM hardware_log hl
+                    LEFT JOIN hardware h ON h.hardware_id = hl.hardware_id
+                    WHERE h.{source_col} IN (SELECT name FROM {table_name})
+                    ORDER BY hl.timestamp DESC LIMIT ?""",
+                (log_limit,)
+            ).fetchall()
+        else:
+            history = db.execute(
+                f"""SELECT hl.hardware_id, hl.timestamp, hl.action_type, hl.description,
+                           h.id as hw_pk
+                    FROM hardware_log hl
+                    LEFT JOIN hardware h ON h.hardware_id = hl.hardware_id
+                    WHERE h.id IN (
+                        SELECT DISTINCT hardware_id FROM {source_table}
+                    )
+                    ORDER BY hl.timestamp DESC LIMIT ?""",
+                (log_limit,)
+            ).fetchall()
+
     return render_template("simple_list.html", items=items, title=page_title,
                            table_name=table_name, traceable=traceable,
-                           item_label=_item_label(table_name))
+                           item_label=_item_label(table_name),
+                           total=total, page=page, per_page=per_page,
+                           total_pages=total_pages, page_list=page_list,
+                           history=history, log_limit=log_limit)

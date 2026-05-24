@@ -1157,13 +1157,20 @@ def category_fields_config():
     ).fetchall()]
     all_cats = sorted(set(managed) | set(hw_cats))
     fields = []
+    field_usage = {}
     if selected:
         fields = db.execute(
             "SELECT * FROM category_fields WHERE category = ? ORDER BY sort_order, id",
             (selected,)
         ).fetchall()
+        for f in fields:
+            field_usage[f['field_key']] = db.execute(
+                "SELECT COUNT(*) FROM hardware WHERE category = ? AND json_extract(specs_json, ?) IS NOT NULL",
+                (selected, f'$.{f["field_key"]}')
+            ).fetchone()[0]
     return render_template("category_fields.html",
-                           categories=all_cats, selected=selected, fields=fields)
+                           categories=all_cats, selected=selected,
+                           fields=fields, field_usage=field_usage)
 
 @bp.route("/category-fields/add", methods=["POST"])
 def category_fields_add():
@@ -1228,13 +1235,21 @@ def category_fields_edit(field_id):
 @bp.route("/category-fields/<int:field_id>/delete", methods=["POST"])
 def category_fields_delete(field_id):
     db = get_db()
-    row = db.execute("SELECT category FROM category_fields WHERE id = ?", (field_id,)).fetchone()
-    if row:
-        db.execute("DELETE FROM category_fields WHERE id = ?", (field_id,))
-        db.commit()
-        flash("Field deleted.", "success")
+    row = db.execute("SELECT * FROM category_fields WHERE id = ?", (field_id,)).fetchone()
+    if not row:
+        return redirect(url_for("hardware.category_fields_config"))
+    in_use = db.execute(
+        "SELECT COUNT(*) FROM hardware WHERE category = ? AND json_extract(specs_json, ?) IS NOT NULL",
+        (row['category'], f'$.{row["field_key"]}')
+    ).fetchone()[0]
+    if in_use > 0:
+        flash(f'Cannot delete "{row["label"]}" — {in_use} hardware item(s) have data for this field. '
+              f'Clear the field on those items first.', "error")
         return redirect(url_for("hardware.category_fields_config", category=row['category']))
-    return redirect(url_for("hardware.category_fields_config"))
+    db.execute("DELETE FROM category_fields WHERE id = ?", (field_id,))
+    db.commit()
+    flash(f'Field "{row["label"]}" deleted.', "success")
+    return redirect(url_for("hardware.category_fields_config", category=row['category']))
 
 @bp.route("/category-fields/<int:field_id>/move", methods=["POST"])
 def category_fields_move(field_id):

@@ -52,6 +52,13 @@
 
 {% if selected %}
 
+{# Safe per-field data blocks — avoids embedding complex data in onclick attributes #}
+{% for field in fields %}
+<script id="fd-{{ field['id'] }}" type="application/json">
+{{ {'id': field['id'], 'label': field['label'], 'unit': field['unit'] or '', 'placeholder': field['placeholder'] or '', 'field_type': field['field_type'], 'options_raw': field['options'] or ''}|tojson }}
+</script>
+{% endfor %}
+
 {% if fields %}
 <div class="section-card">
   <div class="section-header">Fields for {{ selected }}</div>
@@ -64,11 +71,13 @@
           <th>Key</th>
           <th style="width:6rem;">Type</th>
           <th>Unit / Options</th>
+          <th style="width:7rem; text-align:center;">In Use</th>
           <th style="width:10rem;"></th>
         </tr>
       </thead>
       <tbody>
         {% for field in fields %}
+        {% set usage = field_usage.get(field['field_key'], 0) %}
         <tr>
           <td style="text-align:center;">
             <form method="post" action="{{ url_for('hardware.category_fields_move', field_id=field['id']) }}" style="display:inline;">
@@ -92,15 +101,31 @@
               <span style="color:#aaa; font-size:0.8rem;">placeholder: {{ field['placeholder'] }}</span>
             {% endif %}
           </td>
+          <td style="text-align:center;">
+            {% if usage > 0 %}
+              <span style="display:inline-block; background:#e8f0fa; color:#0b5f9c;
+                           border-radius:10px; padding:0.15rem 0.65rem;
+                           font-size:0.78rem; font-weight:700;">{{ usage }}</span>
+            {% else %}
+              <span style="color:#ccc; font-size:0.82rem;">—</span>
+            {% endif %}
+          </td>
           <td style="white-space:nowrap; text-align:right; padding-right:0.75rem;">
-            <button type="button" class="action-btn"
-                    onclick="openEditModal({{ field['id'] }}, {{ field['label']|tojson }}, {{ field['unit']|tojson if field['unit'] else 'null' }}, {{ field['placeholder']|tojson if field['placeholder'] else 'null' }}, {{ field['field_type']|tojson }}, {{ field['options']|tojson if field['options'] else 'null' }})">
+            <button type="button" class="action-btn" onclick="openEditModal({{ field['id'] }})">
               Edit
             </button>
+            {% if usage == 0 %}
             <form method="post" action="{{ url_for('hardware.category_fields_delete', field_id=field['id']) }}" style="display:inline;"
-                  onsubmit="return confirm('Delete field \'{{ field['label'] }}\'?');">
+                  onsubmit="return confirm('Delete field \'{{ field['label'] }}\'? This cannot be undone.');">
               <button type="submit" class="action-btn action-btn-danger">Delete</button>
             </form>
+            {% else %}
+            <button type="button" class="action-btn action-btn-danger"
+                    style="opacity:0.35; cursor:not-allowed;"
+                    title="{{ usage }} item(s) have data for this field — clear the field on those items first">
+              Delete
+            </button>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

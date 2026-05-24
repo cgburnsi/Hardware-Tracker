@@ -2,11 +2,12 @@
 {% block title %}Revise / Branch: {{ source['proc_id'] }}{% endblock %}
 
 {% block sidebar_filters %}
-  <div class="sidebar-section-title">Actions</div>
+<div class="subbar">
   <ul class="nav-links">
     <li><a href="{{ url_for('procedures.procedure_detail', id=source['id']) }}">Back to Procedure</a></li>
     <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
   </ul>
+</div>
 {% endblock %}
 
 {% block content %}

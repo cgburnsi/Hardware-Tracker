@@ -2,13 +2,13 @@
 {% block title %}Test Preparation Sheets — ER64 Ops Hub{% endblock %}
 
 {% block sidebar_filters %}
-<div class="sidebar-filter-group" style="margin-top:1rem;">
+<div class="subbar">
+  <span class="sidebar-section-title">Filter</span>
   <form method="get" action="{{ url_for('tps.tps_list') }}">
-    <span class="sidebar-section-title">Filter</span>
     <div class="filter-field">
       <label class="filter-field-label">Search</label>
       <input type="text" name="q" value="{{ q }}" placeholder="TPS#, title, system…"
-             class="sidebar-select" style="padding:0.35rem 0.5rem;">
+             class="sidebar-select" style="padding:0.28rem 0.45rem; min-width:180px;">
     </div>
     <div class="filter-field">
       <label class="filter-field-label">Status</label>

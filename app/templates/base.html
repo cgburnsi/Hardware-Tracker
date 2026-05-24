@@ -8,7 +8,7 @@
       :root {
         --bg-main: #f7f7f5;
         --bg-header: #f4c842;
-        --bg-sidebar: #2c3e50;
+        --bg-nav: #2c3e50;
         --border-soft: #d1d1c8;
         --text-main: #222;
         --accent: #0b5f9c;
@@ -29,99 +29,115 @@
 
       /* ── TOPBAR ── */
       .topbar {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0 1.5rem; background: var(--bg-header);
-        border-bottom: 2px solid #c6a22f; height: 50px; flex-shrink: 0;
+        display: flex; align-items: stretch; justify-content: space-between;
+        background: var(--bg-header);
+        border-bottom: 2px solid #c6a22f;
+        height: 50px; flex-shrink: 0;
+        padding: 0 1.25rem 0 1.5rem;
       }
-      .app-title { font-weight: 800; font-size: 1.1rem; letter-spacing: 0.04em; color: #1a1a1a; }
-      .app-subtitle { font-size: 0.78rem; color: #6b5420; margin-left: 0.5rem; font-weight: 500; }
-
-      /* ── LAYOUT ── */
-      .layout { display: flex; flex: 1; min-height: 0; }
-
-      /* ── SIDEBAR ── */
-      .sidebar {
-        width: 210px;
-        background: var(--bg-sidebar);
-        display: flex; flex-direction: column;
-        padding: 0.75rem 0 1rem;
-        overflow-y: auto;
-        flex-shrink: 0;
+      .topbar-brand {
+        display: flex; align-items: baseline; gap: 0.4rem;
+        align-self: center;
       }
+      .app-title { font-weight: 800; font-size: 1.05rem; letter-spacing: 0.04em; color: #1a1a1a; }
+      .app-subtitle { font-size: 0.75rem; color: #6b5420; font-weight: 500; }
+      .topbar-right { display: flex; align-items: center; font-size: 0.8rem; color: #6b5420; font-weight: 500; }
 
-      .sidebar-group { margin-bottom: 1.1rem; }
+      /* ── TOP NAV ── */
+      .top-nav { display: flex; align-items: stretch; margin: 0 1.5rem; }
 
-      .sidebar-label {
-        padding: 0 1rem;
-        font-size: 0.66rem;
-        text-transform: uppercase;
-        letter-spacing: 0.11em;
-        color: #7f8c8d;
-        font-weight: 700;
-        margin-bottom: 0.2rem;
-        display: block;
-      }
+      .nav-item { position: relative; display: flex; align-items: stretch; }
 
-      .nav-link {
+      .nav-top-link {
         display: flex; align-items: center;
-        padding: 0.52rem 1rem;
+        padding: 0 0.95rem;
+        color: #1a1a1a;
+        text-decoration: none;
+        font-size: 0.84rem;
+        font-weight: 600;
+        white-space: nowrap;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        transition: background 0.1s;
+        user-select: none;
+      }
+      .nav-top-link:hover { background: rgba(0,0,0,0.07); }
+      .nav-top-link.active { border-bottom-color: #1a1a1a; }
+      .nav-top-link.run-link { color: #7a5000; }
+
+      .nav-drop-arrow { font-size: 0.6rem; margin-left: 0.3rem; opacity: 0.6; }
+
+      /* ── DROPDOWNS ── */
+      .nav-drop {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: var(--bg-nav);
+        border-radius: 0 0 4px 4px;
+        min-width: 185px;
+        z-index: 200;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+        padding: 0.3rem 0;
+      }
+      .nav-item:hover .nav-drop,
+      .nav-item:focus-within .nav-drop { display: block; }
+
+      .nav-drop a {
+        display: block;
+        padding: 0.55rem 1.1rem;
         color: #bdc3c7;
         text-decoration: none;
-        font-size: 0.875rem;
-        transition: background 0.12s, color 0.12s;
-        border-left: 3px solid transparent;
+        font-size: 0.855rem;
+        white-space: nowrap;
       }
-      .nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
-      .nav-link.active {
-        background: rgba(255,255,255,0.1);
-        color: #fff;
-        border-left-color: var(--bg-header);
-      }
-      .nav-link.run-link { color: #f4c842; font-weight: 600; }
-      .nav-link.run-link:hover { color: #fff; }
+      .nav-drop a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+      .nav-drop a.active { color: var(--bg-header); font-weight: 600; }
+      .nav-drop-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 0.25rem 0; }
 
-      .nav-icon {
-        width: 15px; height: 15px;
-        display: inline-flex; align-items: center; justify-content: center;
-        margin-right: 9px; opacity: 0.6; flex-shrink: 0;
+      /* ── SUBBAR (filters / contextual links) ── */
+      .subbar {
+        background: #f0f0ee;
+        border-bottom: 1px solid var(--border-soft);
+        padding: 0.45rem 1.5rem;
+        display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+        font-size: 0.82rem;
       }
-      .nav-icon svg { width: 15px; height: 15px; }
-      .nav-link:hover .nav-icon,
-      .nav-link.active .nav-icon,
-      .nav-link.run-link .nav-icon { opacity: 1; }
-
-      /* ── SIDEBAR FILTERS (used by hardware list and others) ── */
-      .sidebar-filter-group {
-        margin-top: 0.5rem;
-        padding: 0 1rem;
+      .subbar form { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0; }
+      .subbar .sidebar-section-title {
+        font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+        color: #999; font-weight: 700; white-space: nowrap;
       }
-      .sidebar-section-title {
-        font-size: 0.66rem;
-        text-transform: uppercase;
-        letter-spacing: 0.11em;
-        color: #7f8c8d;
-        font-weight: 700;
-        margin-bottom: 0.6rem;
-        display: block;
+      .subbar .filter-field {
+        display: flex; align-items: center; gap: 0.4rem; margin: 0;
       }
-      .filter-field { margin-bottom: 0.75rem; }
-      .filter-field-label {
-        font-size: 0.72rem; color: #95a5a6;
-        display: block; margin-bottom: 0.25rem;
+      .subbar .filter-field-label {
+        font-size: 0.72rem; color: #777; white-space: nowrap; margin: 0;
       }
-      .sidebar-select {
-        width: 100%; background: #1e2d3d; color: #ecf0f1;
-        border: 1px solid #3d5166; border-radius: 3px;
-        padding: 0.35rem 0.5rem; font-size: 0.82rem;
-        font-family: inherit;
+      .subbar .sidebar-select {
+        background: #fff; color: #333;
+        border: 1px solid #ccc; border-radius: 3px;
+        padding: 0.28rem 0.45rem; font-size: 0.82rem;
+        font-family: inherit; width: auto;
       }
-      .sidebar-button {
-        width: 100%; background: var(--accent); color: #fff;
+      .subbar .sidebar-button {
+        background: var(--accent); color: #fff;
         border: none; border-radius: 3px;
-        padding: 0.45rem; font-size: 0.82rem; font-weight: 600;
-        cursor: pointer; margin-top: 0.25rem; font-family: inherit;
+        padding: 0.3rem 0.7rem; font-size: 0.8rem; font-weight: 600;
+        cursor: pointer; font-family: inherit; width: auto;
       }
-      .sidebar-button:hover { background: var(--accent-hover); }
+      .subbar .sidebar-button:hover { background: var(--accent-hover); }
+      .subbar .nav-links {
+        list-style: none; margin: 0; padding: 0;
+        display: flex; gap: 0.25rem; align-items: center;
+      }
+      .subbar .nav-links li a {
+        display: block; padding: 0.25rem 0.65rem;
+        color: var(--accent); text-decoration: none; font-size: 0.82rem;
+        border: 1px solid #c0ccdd; border-radius: 3px; background: #fff;
+        white-space: nowrap;
+      }
+      .subbar .nav-links li a:hover { background: #eef2f7; }
 
       /* ── MAIN CONTENT ── */
       .main { flex: 1; padding: 1.5rem 2rem; overflow-y: auto; }
@@ -196,7 +212,7 @@
         border-radius: 4px; border-left: 4px solid #dc3545;
       }
 
-      /* ── SECTION CARDS (shared across detail pages) ── */
+      /* ── SECTION CARDS ── */
       .section-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; margin-bottom: 1.25rem; overflow: hidden; }
       .section-header {
         background: #f5f5f3; border-bottom: 1px solid var(--border-soft);
@@ -213,131 +229,113 @@
   </head>
   <body>
     <div class="page">
+
       <header class="topbar">
-        <div style="display:flex; align-items:baseline; gap:0.4rem;">
+        <div class="topbar-brand">
           <span class="app-title">ER64 OPS HUB</span>
           <span class="app-subtitle">Hardware &amp; Traceability</span>
         </div>
-        <span style="font-size:0.8rem; color:#6b5420; font-weight:500;">Admin</span>
-      </header>
 
-      <div class="layout">
-        <aside class="sidebar">
+        <nav class="top-nav">
 
-          <div class="sidebar-group">
+          <div class="nav-item">
             <a href="{{ url_for('index') }}"
-               class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              </span>
+               class="nav-top-link {% if request.endpoint == 'index' %}active{% endif %}">
               Home
             </a>
           </div>
 
-          <div class="sidebar-group">
-            <span class="sidebar-label">Operations</span>
-            <a href="{{ url_for('procedures.run_setup') }}"
-               class="nav-link run-link {% if request.endpoint in ['procedures.run_setup', 'procedures.run_execute'] %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
-              </span>
-              Start Run
-            </a>
-            <a href="{{ url_for('procedures.run_list') }}"
-               class="nav-link {% if request.endpoint == 'procedures.run_list' %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-              </span>
-              Run Log
-            </a>
-            <a href="{{ url_for('tps.tps_list') }}"
-               class="nav-link {% if request.endpoint and request.endpoint.startswith('tps.') %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M4 6h16a1 1 0 011 1v13a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>
-              </span>
-              Test Prep Sheets
-            </a>
+          <div class="nav-item">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint.startswith('hardware.') and request.endpoint not in ['hardware.manufacturer_list','hardware.location_list','hardware.hardware_new'] %}active{% endif %}">
+              Hardware <span class="nav-drop-arrow">▼</span>
+            </span>
+            <div class="nav-drop">
+              <a href="{{ url_for('hardware.hardware_list') }}"
+                 class="{% if request.endpoint in ['hardware.hardware_list','hardware.hardware_detail','hardware.hardware_edit','hardware.hardware_new'] %}active{% endif %}">
+                Hardware
+              </a>
+            </div>
           </div>
 
-          <div class="sidebar-group">
-            <span class="sidebar-label">Inventory</span>
-            <a href="{{ url_for('hardware.hardware_list') }}"
-               class="nav-link {% if request.endpoint in ['hardware.hardware_list', 'hardware.hardware_detail', 'hardware.hardware_edit'] %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-              </span>
-              Hardware
-            </a>
-            <a href="{{ url_for('hardware.hardware_new') }}"
-               class="nav-link {% if request.endpoint == 'hardware.hardware_new' %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-              </span>
-              Add Hardware
-            </a>
+          <div class="nav-item">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.procedure_list','procedures.procedure_detail','procedures.procedure_new','procedures.procedure_edit','procedures.procedure_sections','procedures.section_detail'] or (request.endpoint and request.endpoint.startswith('ha.')) or (request.endpoint and request.endpoint.startswith('tps.')) %}active{% endif %}">
+              Documents <span class="nav-drop-arrow">▼</span>
+            </span>
+            <div class="nav-drop">
+              <a href="{{ url_for('procedures.procedure_list') }}"
+                 class="{% if request.endpoint and request.endpoint in ['procedures.procedure_list','procedures.procedure_detail','procedures.procedure_new','procedures.procedure_edit','procedures.procedure_sections','procedures.section_detail'] %}active{% endif %}">
+                Procedures
+              </a>
+              <a href="{{ url_for('ha.ha_list') }}"
+                 class="{% if request.endpoint and request.endpoint.startswith('ha.') %}active{% endif %}">
+                Hazard Analyses
+              </a>
+              <a href="{{ url_for('tps.tps_list') }}"
+                 class="{% if request.endpoint and request.endpoint.startswith('tps.') %}active{% endif %}">
+                Test Prep Sheets
+              </a>
+            </div>
           </div>
 
-          <div class="sidebar-group">
-            <span class="sidebar-label">Safety</span>
-            <a href="{{ url_for('ha.ha_list') }}"
-               class="nav-link {% if request.endpoint and request.endpoint.startswith('ha.') %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </span>
-              Hazard Analyses
-            </a>
+          <div class="nav-item">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.run_setup','procedures.run_execute','procedures.run_list'] %}active{% endif %}">
+              Testing <span class="nav-drop-arrow">▼</span>
+            </span>
+            <div class="nav-drop">
+              <a href="{{ url_for('procedures.run_setup') }}"
+                 class="{% if request.endpoint in ['procedures.run_setup','procedures.run_execute'] %}active{% endif %}"
+                 style="color:#f4c842; font-weight:700;">
+                ▶ New Test
+              </a>
+              <a href="{{ url_for('procedures.run_list') }}"
+                 class="{% if request.endpoint == 'procedures.run_list' %}active{% endif %}">
+                Test Log
+              </a>
+            </div>
           </div>
 
-          <div class="sidebar-group">
-            <span class="sidebar-label">Definitions</span>
-            <a href="{{ url_for('procedures.procedure_list') }}"
-               class="nav-link {% if request.endpoint in ['procedures.procedure_list', 'procedures.procedure_detail', 'procedures.procedure_new', 'procedures.procedure_edit', 'procedures.procedure_sections'] %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              </span>
-              Procedures
-            </a>
-            <a href="{{ url_for('hardware.manufacturer_list') }}"
-               class="nav-link {% if request.endpoint == 'hardware.manufacturer_list' %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-              </span>
-              Manufacturers
-            </a>
-            <a href="{{ url_for('hardware.location_list') }}"
-               class="nav-link {% if request.endpoint == 'hardware.location_list' %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              </span>
-              Locations
-            </a>
-            <a href="{{ url_for('procedures.hazard_settings') }}"
-               class="nav-link {% if request.endpoint in ['procedures.hazard_settings', 'procedures.hazard_edit', 'procedures.hazard_delete'] %}active{% endif %}">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              </span>
-              Hazard Types
-            </a>
+          <div class="nav-item">
+            <span class="nav-top-link {% if request.endpoint and request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete','hardware.manufacturer_list','hardware.location_list'] %}active{% endif %}">
+              Configuration <span class="nav-drop-arrow">▼</span>
+            </span>
+            <div class="nav-drop">
+              <a href="{{ url_for('hardware.manufacturer_list') }}"
+                 class="{% if request.endpoint == 'hardware.manufacturer_list' %}active{% endif %}">
+                Manufacturers
+              </a>
+              <a href="{{ url_for('hardware.location_list') }}"
+                 class="{% if request.endpoint == 'hardware.location_list' %}active{% endif %}">
+                Locations
+              </a>
+              <div class="nav-drop-divider"></div>
+              <a href="{{ url_for('procedures.hazard_settings') }}"
+                 class="{% if request.endpoint in ['procedures.hazard_settings','procedures.hazard_edit','procedures.hazard_delete'] %}active{% endif %}">
+                Hazard Types
+              </a>
+            </div>
           </div>
 
-          {% block sidebar_filters %}{% endblock %}
+        </nav>
 
-        </aside>
+        <div class="topbar-right">Admin</div>
+      </header>
 
-        <main class="main">
-          {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-              <ul class="flash-list">
-                {% for category, message in messages %}
-                  <li class="flash-{{ category }}">{{ message }}</li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-          {% endwith %}
+      {% block sidebar_filters %}{% endblock %}
 
-          {% block content %}{% endblock %}
-        </main>
-      </div>
+      <main class="main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-list">
+              {% for category, message in messages %}
+                <li class="flash-{{ category }}">{{ message }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+
     </div>
   </body>
 </html>

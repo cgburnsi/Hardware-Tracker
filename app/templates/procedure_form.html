@@ -5,11 +5,12 @@
 {% endblock %}
 
 {% block sidebar_filters %}
-  <div class="sidebar-section-title">Actions</div>
+<div class="subbar">
   <ul class="nav-links">
     <li><a href="{{ url_for('procedures.procedure_list') }}">Procedure Index</a></li>
     <li><a href="{{ url_for('procedures.hazard_settings') }}">Manage Hazard Types</a></li>
   </ul>
+</div>
 {% endblock %}
 
 {% block content %}

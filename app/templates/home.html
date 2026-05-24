@@ -3,160 +3,176 @@
 
 {% block content %}
 <style>
-  .status-grid {
+  /* ── Two-column body ── */
+  .home-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  .status-tile {
-    background: #fff;
-    border: 1px solid var(--border-soft);
-    border-top: 3px solid #ccc;
-    border-radius: 4px;
-    padding: 1rem 1.25rem;
-  }
-  .status-tile.tile-in-service   { border-top-color: #28a745; }
-  .status-tile.tile-new          { border-top-color: #0b5f9c; }
-  .status-tile.tile-in-storage   { border-top-color: #8fa3b8; }
-  .status-tile.tile-maintenance  { border-top-color: #e6a817; }
-  .status-tile.tile-quarantined  { border-top-color: #dc3545; }
-  .status-tile.tile-quarantined.has-items {
-    background: #fff5f5;
-    border-color: #f5c6cb;
-    border-top-color: #dc3545;
+    grid-template-columns: 3fr 2fr;
+    gap: 1.25rem;
+    align-items: start;
   }
 
-  .tile-count {
-    font-size: 2.2rem;
-    font-weight: 800;
-    line-height: 1;
-    color: #1a1a1a;
-    margin-bottom: 0.25rem;
+  /* ── Open item rows ── */
+  .open-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f0f0ee;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.1s;
   }
-  .tile-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #888;
+  .open-item:last-child { border-bottom: none; }
+  .open-item:hover { background: #fafaf8; }
+  .open-item-badge {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    font-size: 0.62rem; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 0.18rem 0.45rem; border-radius: 3px;
+    min-width: 38px; text-align: center;
   }
-  .tile-quarantined.has-items .tile-count { color: #dc3545; }
-  .tile-quarantined.has-items .tile-label { color: #842029; }
+  .badge-type-test { background: #cfe2ff; color: #084298; }
+  .badge-type-proc { background: #e2e3e5; color: #41464b; }
+  .badge-type-tps  { background: #fff3cd; color: #664d03; }
+  .badge-type-ha   { background: #f8d7da; color: #842029; }
 
-  .section-title {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #888;
-    margin: 0 0 0.75rem;
-  }
+  .open-item-body { flex: 1; min-width: 0; }
+  .open-item-id   { font-weight: 700; font-size: 0.9rem; color: var(--accent); }
+  .open-item-title { font-size: 0.85rem; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .open-item-meta  { font-size: 0.75rem; color: #999; margin-top: 0.15rem; }
 
-  .meta-row {
+  /* ── Activity log rows ── */
+  .activity-row {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #f0f0ee;
     font-size: 0.82rem;
-    color: #888;
-    margin-bottom: 1.75rem;
+    align-items: center;
   }
-  .meta-row a { color: var(--accent); text-decoration: none; }
-  .meta-row a:hover { text-decoration: underline; }
-  .meta-sep { margin: 0 0.5rem; }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-header {
+    background: #f5f5f3;
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: #888; padding: 0.4rem 1rem;
+  }
+  .activity-type-col { flex-shrink: 0; width: 36px; }
+  .activity-date   { color: #bbb; flex-shrink: 0; font-size: 0.75rem; width: 40px; }
+  .activity-hw     { font-weight: 700; color: var(--accent); flex-shrink: 0; min-width: 55px; text-decoration: none; }
+  .activity-hw:hover { text-decoration: underline; }
+  .activity-action { color: #555; flex-shrink: 0; }
+  .activity-desc   { color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .badge-type-hw   { background: #d1e7dd; color: #0f5132; }
+
+  .home-empty {
+    padding: 1.5rem 1rem; text-align: center;
+    color: #aaa; font-size: 0.88rem; font-style: italic;
+  }
+
 </style>
 
-<div class="page-title-row">
-  <h2 class="page-title">ER64 Ops Hub</h2>
-  <div style="display:flex; gap:0.5rem;">
-    <a href="{{ url_for('procedures.run_setup') }}" class="primary-button">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      New Test
-    </a>
-    <a href="{{ url_for('hardware.hardware_new') }}" class="secondary-button">+ Add Hardware</a>
-    <a href="{{ url_for('backup_db') }}" class="secondary-button" title="Download a snapshot of the database">↓ Backup DB</a>
-  </div>
-</div>
+<div class="home-grid">
 
-<p class="meta-row">
-  <a href="{{ url_for('hardware.hardware_list') }}">{{ total_hw }} hardware item{{ 's' if total_hw != 1 }}</a>
-  <span class="meta-sep">·</span>
-  <a href="{{ url_for('procedures.procedure_list') }}">{{ proc_count }} procedure{{ 's' if proc_count != 1 }}</a>
-</p>
+  {# ── LEFT: Open Items ── #}
+  <div class="section-card" style="margin-bottom:0; border-top-color:#e6a817;">
+    <div class="section-header">
+      Open Items
+      {% set total_open = open_tests|length + open_procedures|length + open_tps|length + open_ha|length %}
+      {% if total_open > 0 %}
+        <span style="font-weight:400; color:#888;">{{ total_open }} item{{ 's' if total_open != 1 }}</span>
+      {% endif %}
+    </div>
 
-<p class="section-title">Hardware Status</p>
+    {% if open_tests or open_procedures or open_tps or open_ha %}
 
-<div class="status-grid">
-  {% set in_svc   = status_counts.get('in-service', 0) %}
-  {% set new_hw   = status_counts.get('new', 0) %}
-  {% set stored   = status_counts.get('in-storage', 0) %}
-  {% set maint    = status_counts.get('maintenance', 0) %}
-  {% set quarant  = status_counts.get('quarantined', 0) %}
-
-  <div class="status-tile tile-in-service">
-    <div class="tile-count">{{ in_svc }}</div>
-    <div class="tile-label">In Service</div>
-  </div>
-  <div class="status-tile tile-new">
-    <div class="tile-count">{{ new_hw }}</div>
-    <div class="tile-label">New</div>
-  </div>
-  <div class="status-tile tile-in-storage">
-    <div class="tile-count">{{ stored }}</div>
-    <div class="tile-label">In Storage</div>
-  </div>
-  <div class="status-tile tile-maintenance">
-    <div class="tile-count">{{ maint }}</div>
-    <div class="tile-label">Maintenance</div>
-  </div>
-  <div class="status-tile tile-quarantined {% if quarant > 0 %}has-items{% endif %}">
-    <div class="tile-count">{{ quarant }}</div>
-    <div class="tile-label">Quarantined</div>
-  </div>
-</div>
-
-<p class="section-title">Recent Runs</p>
-
-{% if recent_runs %}
-<div class="section-card" style="margin-bottom:0;">
-  <table>
-    <thead>
-      <tr>
-        <th>Run</th>
-        <th>Date</th>
-        <th>Procedure</th>
-        <th>Hardware</th>
-        <th>Operator</th>
-        <th>Result</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in recent_runs %}
-      <tr>
-        <td>
-          <a href="{{ url_for('procedures.run_execute', id=r['id']) }}"
-             style="font-weight:700; color:var(--accent); text-decoration:none;">
-            {{ r['run_id'] }}
-          </a>
-        </td>
-        <td style="color:#666; font-size:0.88rem;">{{ r['timestamp'][:10] }}</td>
-        <td style="font-size:0.9rem;">{{ r['title'] }}</td>
-        <td style="font-size:0.9rem;">{{ r['hardware_id'] }}</td>
-        <td style="font-size:0.9rem; color:#555;">{{ r['operator'] }}</td>
-        <td>
-          {% set s = r['status']|lower %}
-          {% if s == 'completed' %}<span class="badge badge-completed">Pass</span>
-          {% elif s == 'failed'    %}<span class="badge badge-failed">Fail</span>
-          {% elif s == 'aborted'   %}<span class="badge badge-aborted">Aborted</span>
-          {% else                  %}<span class="badge badge-in-progress">In Progress</span>
-          {% endif %}
-        </td>
-      </tr>
+      {% for t in open_tests %}
+      <a href="{{ url_for('procedures.run_execute', id=t['id']) }}" class="open-item">
+        <span class="open-item-badge badge-type-test">Test</span>
+        <div class="open-item-body">
+          <div class="open-item-id">{{ t['run_id'] }}</div>
+          <div class="open-item-title">{{ t['proc_title'] }} &middot; {{ t['hardware_id'] }}</div>
+          <div class="open-item-meta">In Progress &middot; {{ t['operator'] }} &middot; {{ t['timestamp'][:10] }}</div>
+        </div>
+      </a>
       {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div style="background:#fff; border:1px solid var(--border-soft); border-radius:4px; padding:2rem; text-align:center; color:#999; font-size:0.9rem;">
-  No runs recorded yet. <a href="{{ url_for('procedures.run_setup') }}" style="color:var(--accent);">Start the first one.</a>
-</div>
-{% endif %}
 
+      {% for p in open_procedures %}
+      <a href="{{ url_for('procedures.procedure_detail', id=p['id']) }}" class="open-item">
+        <span class="open-item-badge badge-type-proc">Proc</span>
+        <div class="open-item-body">
+          <div class="open-item-id">{{ p['proc_id'] }}</div>
+          <div class="open-item-title">{{ p['title'] }}</div>
+          <div class="open-item-meta">Draft &middot; {{ (p['updated_at'] or '')[:10] }}</div>
+        </div>
+      </a>
+      {% endfor %}
+
+      {% for t in open_tps %}
+      <a href="{{ url_for('tps.tps_detail', id=t['id']) }}" class="open-item">
+        <span class="open-item-badge badge-type-tps">TPS</span>
+        <div class="open-item-body">
+          <div class="open-item-id">{{ t['tps_number'] }}</div>
+          <div class="open-item-title">{{ t['title'] }}</div>
+          <div class="open-item-meta">
+            {{ t['status']|title|replace('_', ' ') }}
+            {% if t['prepared_by'] %}&middot; {{ t['prepared_by'] }}{% endif %}
+            &middot; {{ (t['updated_at'] or '')[:10] }}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+
+      {% for h in open_ha %}
+      <a href="{{ url_for('ha.ha_detail', ha_pk=h['id']) }}" class="open-item">
+        <span class="open-item-badge badge-type-ha">HA</span>
+        <div class="open-item-body">
+          <div class="open-item-id">{{ h['ha_id'] }}</div>
+          <div class="open-item-title">{{ h['title'] }}</div>
+          <div class="open-item-meta">{{ h['status']|title }} &middot; {{ (h['updated_at'] or '')[:10] }}</div>
+        </div>
+      </a>
+      {% endfor %}
+
+    {% else %}
+      <div class="home-empty">No open items — everything is buttoned up.</div>
+    {% endif %}
+  </div>
+
+  {# ── RIGHT: Recent Activity ── #}
+  <div class="section-card" style="margin-bottom:0; border-top-color:#6c757d;">
+    <div class="section-header">Recent Activity</div>
+
+    {% if recent_activity %}
+      <div class="activity-row activity-header">
+        <span class="activity-type-col">Type</span>
+        <span class="activity-date">Date</span>
+        <span class="activity-hw">Item</span>
+        <span class="activity-action">Action</span>
+        <span class="activity-desc">Detail</span>
+      </div>
+      {% for entry in recent_activity %}
+      <div class="activity-row">
+        <span class="activity-type-col">
+          <span class="open-item-badge badge-type-hw">HW</span>
+        </span>
+        <span class="activity-date">{{ entry['timestamp'][5:10] }}</span>
+        {% if entry['hw_pk'] %}
+          <a href="{{ url_for('hardware.hardware_detail', id=entry['hw_pk']) }}" class="activity-hw">{{ entry['hardware_id'] }}</a>
+        {% else %}
+          <span class="activity-hw" style="color:#999;">{{ entry['hardware_id'] }}</span>
+        {% endif %}
+        <span class="activity-action">{{ entry['action_type'] }}</span>
+        {% if entry['description'] %}
+          <span class="activity-desc" title="{{ entry['description'] }}">{{ entry['description'] }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="home-empty">No activity recorded yet.</div>
+    {% endif %}
+  </div>
+
+</div>
 {% endblock %}

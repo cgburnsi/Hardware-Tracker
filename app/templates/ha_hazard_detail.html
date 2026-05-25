@@ -33,6 +33,20 @@
   .add-form-card textarea { min-height:65px; resize:vertical; }
   .ctrl-grid { display:grid; grid-template-columns:160px 1fr 1fr; gap:0.5rem; align-items:start; }
 
+  .rec-block { border:1px solid #ddd; border-left:3px solid var(--accent); border-radius:4px; margin-bottom:1rem; background:#fff; }
+  .rec-header-row { display:flex; align-items:flex-start; gap:0.6rem; padding:0.6rem 0.85rem; background:#f7f8fa; border-bottom:1px solid #eee; border-radius:3px 3px 0 0; }
+  .rec-num { font-size:0.67rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--accent); white-space:nowrap; padding-top:0.15rem; }
+  .rec-text { flex:1; font-weight:600; font-size:0.92rem; color:#1a1a1a; line-height:1.4; }
+  .rec-body { padding:0.6rem 0.85rem 0.75rem; }
+  .ctrl-item { display:flex; align-items:flex-start; gap:0.6rem; padding:0.45rem 0; border-bottom:1px solid #f2f2f0; }
+  .ctrl-item:last-of-type { border-bottom:none; }
+  .ctrl-desc { flex:1; font-size:0.9rem; line-height:1.4; }
+  .ctrl-verification { font-size:0.78rem; color:#666; margin-top:0.2rem; }
+  details.add-ctrl { margin-top:0.6rem; border-top:1px dashed #e8e8e5; padding-top:0.5rem; }
+  details.add-ctrl > summary { font-size:0.8rem; color:var(--accent); cursor:pointer; font-weight:600; user-select:none; list-style:none; }
+  details.add-ctrl > summary::-webkit-details-marker { display:none; }
+  details.add-ctrl > summary:hover { text-decoration:underline; }
+
   .nav-hazards { display:flex; gap:0.5rem; align-items:center; }
   .nav-hazards a { color:var(--accent); text-decoration:none; font-size:0.85rem; font-weight:600; padding:0.3rem 0.6rem; border:1px solid #ccc; border-radius:3px; }
   .nav-hazards a:hover { background:#f2f2f0; }
@@ -115,57 +129,98 @@
 <div class="section-card" id="controls">
   <div class="section-header">Controls</div>
   <div class="section-body">
-    {% if controls %}
-    {% for ctrl in controls %}
-    <div class="control-card">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; margin-bottom:0.4rem;">
-        <div>
-          {% if ctrl.control_type %}
-          <span class="control-type-badge control-type-{{ ctrl.control_type }}">{{ ctrl.control_type }}</span>
-          {% endif %}
+
+    {% if recommendations %}
+      {% for entry in recommendations %}
+      {% set rec = entry.rec %}
+      {% set ctrls = entry.controls %}
+      <div class="rec-block">
+        <div class="rec-header-row">
+          <span class="rec-num">R{{ loop.index }}</span>
+          <span class="rec-text">{{ rec['text'] }}</span>
+          <form method="post"
+                action="{{ url_for('ha.rec_delete', ha_pk=ha.id, item_id=item.id, rec_id=rec['id']) }}"
+                onsubmit="return confirm('Remove this recommendation and all its controls?');"
+                style="margin:0; flex-shrink:0;">
+            <button type="submit" style="background:none; border:none; color:#ccc; cursor:pointer; font-size:0.82rem; padding:0.1rem 0.3rem;" title="Remove recommendation">Remove</button>
+          </form>
         </div>
-        <form method="post" action="{{ url_for('ha.control_delete', ha_pk=ha.id, item_id=item.id, ctrl_id=ctrl.id) }}" onsubmit="return confirm('Remove this control?');" style="margin:0;">
-          <button type="submit" style="background:none; border:none; color:#aaa; cursor:pointer; font-size:1rem; padding:0; line-height:1;" title="Remove">✕</button>
-        </form>
+        <div class="rec-body">
+          {% if ctrls %}
+            {% for ctrl in ctrls %}
+            <div class="ctrl-item">
+              <div style="flex-shrink:0; padding-top:0.1rem; min-width:9rem;">
+                {% if ctrl['control_type'] %}
+                <span class="control-type-badge control-type-{{ ctrl['control_type'] }}">{{ ctrl['control_type'] }}</span>
+                {% else %}
+                <span class="control-type-badge" style="background:#eee; color:#999;">Untyped</span>
+                {% endif %}
+              </div>
+              <div class="ctrl-desc">
+                {{ ctrl['description'] }}
+                {% if ctrl['verification'] %}
+                <div class="ctrl-verification"><strong>Verification:</strong> {{ ctrl['verification'] }}</div>
+                {% endif %}
+              </div>
+              <form method="post"
+                    action="{{ url_for('ha.control_delete', ha_pk=ha.id, item_id=item.id, rec_id=rec['id'], ctrl_id=ctrl['id']) }}"
+                    onsubmit="return confirm('Remove this control?');"
+                    style="margin:0; flex-shrink:0;">
+                <button type="submit" style="background:none; border:none; color:#ccc; cursor:pointer; font-size:1rem; line-height:1; padding:0.2rem;" title="Remove">✕</button>
+              </form>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p style="color:#bbb; font-size:0.85rem; margin:0 0 0.5rem;">No controls added yet.</p>
+          {% endif %}
+
+          <details class="add-ctrl">
+            <summary>+ Add Control</summary>
+            <form method="post" action="{{ url_for('ha.control_add', ha_pk=ha.id, item_id=item.id, rec_id=rec['id']) }}" style="margin-top:0.5rem;">
+              <div class="ctrl-grid">
+                <div>
+                  <label>Type</label>
+                  <select name="control_type">
+                    <option value="">— Select —</option>
+                    {% for ct in CONTROL_TYPES %}
+                    <option value="{{ ct }}">{{ ct }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div>
+                  <label>Description *</label>
+                  <textarea name="description" required placeholder="Specific control action or requirement"></textarea>
+                </div>
+                <div>
+                  <label>Verification</label>
+                  <textarea name="verification" placeholder="How this control was confirmed in place"></textarea>
+                </div>
+              </div>
+              <button type="submit" class="primary-button" style="padding:0.35rem 0.8rem; font-size:0.82rem;">Add Control</button>
+            </form>
+          </details>
+        </div>
       </div>
-      <div style="font-size:0.9rem; margin-bottom:0.3rem;">{{ ctrl.description }}</div>
-      {% if ctrl.verification %}
-      <div style="font-size:0.8rem; color:#666;">
-        <span style="font-weight:600;">Verification:</span> {{ ctrl.verification }}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+      {% endfor %}
     {% else %}
-    <p style="color:#aaa; margin:0 0 0.75rem;">No controls documented yet.</p>
+    <p style="color:#aaa; margin:0 0 0.75rem;">No recommendations yet. Add the first one below.</p>
     {% endif %}
 
-    <!-- Add control form -->
-    <div class="add-form-card" style="margin-top:0.75rem;">
-      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.6rem;">Add Control</div>
-      <form method="post" action="{{ url_for('ha.control_add', ha_pk=ha.id, item_id=item.id) }}">
-        <div class="ctrl-grid">
-          <div>
-            <label>Type</label>
-            <select name="control_type">
-              <option value="">— Select —</option>
-              {% for ct in CONTROL_TYPES %}
-              <option value="{{ ct }}">{{ ct }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div>
-            <label>Description *</label>
-            <textarea name="description" required placeholder="Specific control action or requirement"></textarea>
-          </div>
-          <div>
-            <label>Verification</label>
-            <textarea name="verification" placeholder="How this control was confirmed in place"></textarea>
-          </div>
+    <!-- Add recommendation -->
+    <div class="add-form-card">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#666; margin-bottom:0.5rem;">Add Recommendation</div>
+      <form method="post" action="{{ url_for('ha.rec_add', ha_pk=ha.id, item_id=item.id) }}" style="display:flex; gap:0.5rem; align-items:flex-end;">
+        <div style="flex:1;">
+          <textarea name="text" required
+                    placeholder="Describe the recommended control approach for this hazard..."
+                    style="width:100%; min-height:60px; resize:vertical; border:1px solid #ccc; border-radius:3px; padding:0.4rem 0.5rem; font-size:0.875rem; font-family:inherit; margin:0;"></textarea>
         </div>
-        <button type="submit" class="primary-button" style="padding:0.35rem 0.8rem; font-size:0.82rem;">Add Control</button>
+        <div>
+          <button type="submit" class="primary-button" style="padding:0.35rem 0.85rem; font-size:0.82rem; white-space:nowrap;">Add Recommendation</button>
+        </div>
       </form>
     </div>
+
   </div>
 </div>
 

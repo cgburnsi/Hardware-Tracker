@@ -309,10 +309,17 @@ def hazard_detail(ha_pk, item_id):
     ha = get_ha_or_404(db, ha_pk)
     item = get_hazard_or_404(db, item_id, ha_pk)
     position = get_hazard_position(db, item_id, ha_pk)
-    controls = db.execute(
-        "SELECT * FROM hazard_controls WHERE hazard_item_id = ? ORDER BY order_index, id",
+    raw_recs = db.execute(
+        "SELECT * FROM hazard_recommendations WHERE hazard_item_id = ? ORDER BY order_index, id",
         (item_id,)
     ).fetchall()
+    recommendations = []
+    for rec in raw_recs:
+        ctrls = db.execute(
+            "SELECT * FROM hazard_controls WHERE recommendation_id = ? ORDER BY order_index, id",
+            (rec['id'],)
+        ).fetchall()
+        recommendations.append({'rec': rec, 'controls': ctrls})
     notes = db.execute(
         "SELECT * FROM hazard_notes WHERE hazard_item_id = ? ORDER BY created_at",
         (item_id,)
@@ -329,7 +336,7 @@ def hazard_detail(ha_pk, item_id):
     final_rac, final_rank = compute_rac(item['final_severity'], item['final_probability'])
     return render_template('ha_hazard_detail.html',
         ha=ha, item=item, position=position,
-        controls=controls, notes=notes,
+        recommendations=recommendations, notes=notes,
         prev_id=prev_id, next_id=next_id,
         init_rac=init_rac, init_rank=init_rank,
         final_rac=final_rac, final_rank=final_rank,
@@ -376,6 +383,10 @@ def hazard_delete(ha_pk, item_id):
     db = get_db()
     get_ha_or_404(db, ha_pk)
     get_hazard_or_404(db, item_id, ha_pk)
+    rec_rows = db.execute("SELECT id FROM hazard_recommendations WHERE hazard_item_id = ?", (item_id,)).fetchall()
+    for rec in rec_rows:
+        db.execute("DELETE FROM hazard_controls WHERE recommendation_id = ?", (rec['id'],))
+    db.execute("DELETE FROM hazard_recommendations WHERE hazard_item_id = ?", (item_id,))
     db.execute("DELETE FROM hazard_controls WHERE hazard_item_id = ?", (item_id,))
     db.execute("DELETE FROM hazard_notes WHERE hazard_item_id = ?", (item_id,))
     db.execute("DELETE FROM hazard_items WHERE id = ?", (item_id,))
@@ -414,24 +425,62 @@ def note_add(ha_pk, item_id):
     return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#notes')
 
 
-# ── CONTROLS ──────────────────────────────────────────────────────────────────
+# ── RECOMMENDATIONS ───────────────────────────────────────────────────────────
 
-@bp.route('/<int:ha_pk>/hazards/<int:item_id>/controls/add', methods=['POST'])
-def control_add(ha_pk, item_id):
+@bp.route('/<int:ha_pk>/hazards/<int:item_id>/recs/add', methods=['POST'])
+def rec_add(ha_pk, item_id):
     db = get_db()
     get_ha_or_404(db, ha_pk)
     get_hazard_or_404(db, item_id, ha_pk)
+    text = request.form.get('text', '').strip()
+    if text:
+        row = db.execute(
+            "SELECT MAX(order_index) as mx FROM hazard_recommendations WHERE hazard_item_id=?", (item_id,)
+        ).fetchone()
+        next_idx = (row['mx'] or 0) + 1
+        db.execute(
+            "INSERT INTO hazard_recommendations (hazard_item_id, order_index, text) VALUES (?,?,?)",
+            (item_id, next_idx, text)
+        )
+        db.commit()
+    return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#controls')
+
+
+@bp.route('/<int:ha_pk>/hazards/<int:item_id>/recs/<int:rec_id>/delete', methods=['POST'])
+def rec_delete(ha_pk, item_id, rec_id):
+    db = get_db()
+    get_ha_or_404(db, ha_pk)
+    get_hazard_or_404(db, item_id, ha_pk)
+    db.execute("DELETE FROM hazard_controls WHERE recommendation_id = ?", (rec_id,))
+    db.execute("DELETE FROM hazard_recommendations WHERE id=? AND hazard_item_id=?", (rec_id, item_id))
+    db.commit()
+    return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#controls')
+
+
+# ── CONTROLS ──────────────────────────────────────────────────────────────────
+
+@bp.route('/<int:ha_pk>/hazards/<int:item_id>/recs/<int:rec_id>/controls/add', methods=['POST'])
+def control_add(ha_pk, item_id, rec_id):
+    db = get_db()
+    get_ha_or_404(db, ha_pk)
+    get_hazard_or_404(db, item_id, ha_pk)
+    rec = db.execute(
+        "SELECT id FROM hazard_recommendations WHERE id=? AND hazard_item_id=?", (rec_id, item_id)
+    ).fetchone()
+    if not rec:
+        abort(404)
     row = db.execute(
-        "SELECT MAX(order_index) as mx FROM hazard_controls WHERE hazard_item_id=?", (item_id,)
+        "SELECT MAX(order_index) as mx FROM hazard_controls WHERE recommendation_id=?", (rec_id,)
     ).fetchone()
     next_idx = (row['mx'] or 0) + 1
     desc = request.form.get('description', '').strip()
     if desc:
         db.execute("""
-            INSERT INTO hazard_controls (hazard_item_id, order_index, control_type, description, verification)
-            VALUES (?,?,?,?,?)
+            INSERT INTO hazard_controls
+              (hazard_item_id, recommendation_id, order_index, control_type, description, verification)
+            VALUES (?,?,?,?,?,?)
         """, (
-            item_id, next_idx,
+            item_id, rec_id, next_idx,
             request.form.get('control_type', '').strip(),
             desc,
             request.form.get('verification', '').strip(),
@@ -440,12 +489,12 @@ def control_add(ha_pk, item_id):
     return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#controls')
 
 
-@bp.route('/<int:ha_pk>/hazards/<int:item_id>/controls/<int:ctrl_id>/delete', methods=['POST'])
-def control_delete(ha_pk, item_id, ctrl_id):
+@bp.route('/<int:ha_pk>/hazards/<int:item_id>/recs/<int:rec_id>/controls/<int:ctrl_id>/delete', methods=['POST'])
+def control_delete(ha_pk, item_id, rec_id, ctrl_id):
     db = get_db()
     get_ha_or_404(db, ha_pk)
     get_hazard_or_404(db, item_id, ha_pk)
-    db.execute("DELETE FROM hazard_controls WHERE id=? AND hazard_item_id=?", (ctrl_id, item_id))
+    db.execute("DELETE FROM hazard_controls WHERE id=? AND recommendation_id=?", (ctrl_id, rec_id))
     db.commit()
     return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#controls')
 

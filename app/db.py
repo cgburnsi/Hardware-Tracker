@@ -254,14 +254,24 @@ def init_db():
         FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
     );
 
-    CREATE TABLE hazard_controls (
+    CREATE TABLE hazard_recommendations (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         hazard_item_id  INTEGER NOT NULL,
         order_index     INTEGER NOT NULL DEFAULT 0,
-        control_type    TEXT,
-        description     TEXT NOT NULL,
-        verification    TEXT,
+        text            TEXT NOT NULL,
         FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
+    );
+
+    CREATE TABLE hazard_controls (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        hazard_item_id    INTEGER NOT NULL,
+        recommendation_id INTEGER NOT NULL,
+        order_index       INTEGER NOT NULL DEFAULT 0,
+        control_type      TEXT,
+        description       TEXT NOT NULL,
+        verification      TEXT,
+        FOREIGN KEY (hazard_item_id)    REFERENCES hazard_items(id),
+        FOREIGN KEY (recommendation_id) REFERENCES hazard_recommendations(id)
     );
 
     CREATE TABLE hazard_notes (
@@ -448,15 +458,43 @@ def migrate_db():
     """)
     db.execute("""
         CREATE TABLE IF NOT EXISTS hazard_controls (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            hazard_item_id    INTEGER NOT NULL,
+            recommendation_id INTEGER,
+            order_index       INTEGER NOT NULL DEFAULT 0,
+            control_type      TEXT,
+            description       TEXT NOT NULL,
+            verification      TEXT,
+            FOREIGN KEY (hazard_item_id)    REFERENCES hazard_items(id),
+            FOREIGN KEY (recommendation_id) REFERENCES hazard_recommendations(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_recommendations (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             hazard_item_id  INTEGER NOT NULL,
             order_index     INTEGER NOT NULL DEFAULT 0,
-            control_type    TEXT,
-            description     TEXT NOT NULL,
-            verification    TEXT,
+            text            TEXT NOT NULL,
             FOREIGN KEY (hazard_item_id) REFERENCES hazard_items(id)
         )
     """)
+    hc_cols = {row[1] for row in db.execute("PRAGMA table_info(hazard_controls)").fetchall()}
+    if 'recommendation_id' not in hc_cols:
+        db.execute("ALTER TABLE hazard_controls ADD COLUMN recommendation_id INTEGER REFERENCES hazard_recommendations(id)")
+    # Migrate any orphaned controls (existing controls with no recommendation)
+    orphaned = db.execute(
+        "SELECT DISTINCT hazard_item_id FROM hazard_controls WHERE recommendation_id IS NULL"
+    ).fetchall()
+    for row in orphaned:
+        db.execute(
+            "INSERT INTO hazard_recommendations (hazard_item_id, order_index, text) VALUES (?,?,?)",
+            (row['hazard_item_id'], 0, 'General Controls')
+        )
+        rec_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+        db.execute(
+            "UPDATE hazard_controls SET recommendation_id=? WHERE hazard_item_id=? AND recommendation_id IS NULL",
+            (rec_id, row['hazard_item_id'])
+        )
     db.execute("""
         CREATE TABLE IF NOT EXISTS hazard_notes (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,

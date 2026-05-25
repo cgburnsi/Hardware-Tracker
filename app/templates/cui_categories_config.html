@@ -75,7 +75,14 @@
   </div>
   <div style="display:flex; align-items:center; gap:0.75rem; margin-left:auto;">
     <form method="get" style="display:inline-flex; align-items:center; gap:0.35rem;">
-      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="q"           value="{{ q }}">
+      <input type="hidden" name="cat_sort"    value="{{ cat_sort }}">
+      <input type="hidden" name="cat_order"   value="{{ cat_order }}">
+      <input type="hidden" name="dissem_sort"  value="{{ dissem_sort }}">
+      <input type="hidden" name="dissem_order" value="{{ dissem_order }}">
+      <input type="hidden" name="log_q"        value="{{ log_q }}">
+      <input type="hidden" name="log_per_page" value="{{ log_per_page or 'all' }}">
+      <input type="hidden" name="log_page"     value="{{ log_page }}">
       <label style="font-size:0.82rem; color:#666;">Per page:</label>
       <select name="per_page" onchange="this.form.submit()"
               style="font-size:0.82rem; border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.35rem; background:#fff; font-family:inherit; cursor:pointer;">
@@ -86,12 +93,35 @@
         <option value="all" {% if per_page == 0   %}selected{% endif %}>All</option>
       </select>
     </form>
-    <button type="button" class="secondary-button" onclick="openAddModal('cat')">+ Add Category</button>
+    <button type="button" class="primary-button" onclick="openAddModal('cat')">+ Add Category</button>
     <button type="button" class="primary-button" onclick="openAddModal('dissem')">+ Add Control</button>
   </div>
 </div>
 
-{% macro pager_url(cat_p, dissem_p) %}{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_p, dissem_page=dissem_p) }}{% endmacro %}
+{# ── Macros ── #}
+{% macro sort_link(tbl, col, label) %}
+  {% if tbl == 'cat' %}
+    {% set cur_sort  = cat_sort %}
+    {% set cur_order = cat_order %}
+    {% set new_order = 'asc' if (cat_sort == col and cat_order == 'desc') else ('desc' if cat_sort == col else 'asc') %}
+    <a href="{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_page, dissem_page=dissem_page, cat_sort=col, cat_order=new_order, dissem_sort=dissem_sort, dissem_order=dissem_order, log_q=log_q, log_per_page=log_per_page or 'all', log_page=log_page) }}"
+       style="color:inherit; text-decoration:none; white-space:nowrap;">
+  {% else %}
+    {% set cur_sort  = dissem_sort %}
+    {% set cur_order = dissem_order %}
+    {% set new_order = 'asc' if (dissem_sort == col and dissem_order == 'desc') else ('desc' if dissem_sort == col else 'asc') %}
+    <a href="{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_page, dissem_page=dissem_page, cat_sort=cat_sort, cat_order=cat_order, dissem_sort=col, dissem_order=new_order, log_q=log_q, log_per_page=log_per_page or 'all', log_page=log_page) }}"
+       style="color:inherit; text-decoration:none; white-space:nowrap;">
+  {% endif %}
+    {{ label }}
+    {% if cur_sort == col %}{{ '↑' if cur_order == 'asc' else '↓' }}
+    {% else %}<span style="opacity:0.3;">↕</span>{% endif %}
+  </a>
+{% endmacro %}
+
+{% macro pager_url(cat_p, dissem_p) %}{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_p, dissem_page=dissem_p, cat_sort=cat_sort, cat_order=cat_order, dissem_sort=dissem_sort, dissem_order=dissem_order, log_q=log_q, log_per_page=log_per_page or 'all', log_page=log_page) }}{% endmacro %}
+
+{% macro log_page_url(p) %}{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_page, dissem_page=dissem_page, cat_sort=cat_sort, cat_order=cat_order, dissem_sort=dissem_sort, dissem_order=dissem_order, log_q=log_q, log_per_page=log_per_page or 'all', log_page=p) }}{% endmacro %}
 
 {# ── Category Markings ── #}
 <div class="section-card" style="margin-bottom:1.5rem;">
@@ -108,9 +138,9 @@
   <table>
     <thead>
       <tr>
-        <th style="width:9rem;">Code</th>
-        <th>Label / Description</th>
-        <th style="width:5rem;">Order</th>
+        <th style="width:9rem;">{{ sort_link('cat', 'code', 'Code') }}</th>
+        <th>{{ sort_link('cat', 'label', 'Label / Description') }}</th>
+        <th style="width:5rem;">{{ sort_link('cat', 'sort_order', 'Order') }}</th>
         <th style="width:5rem;"></th>
       </tr>
     </thead>
@@ -158,10 +188,12 @@
 </div>
 
 {# ── Dissemination Controls ── #}
-<div class="section-card">
+<div class="section-card" style="margin-bottom:1.5rem;">
   <div class="section-header">
     <span>Dissemination Controls</span>
     <span style="font-weight:400; font-size:0.82rem; color:#888;">
+      Appear after a second <code style="font-size:0.78rem; font-weight:400;">//</code> in the marking, e.g. <code style="font-size:0.78rem; font-weight:400;">CUI//SP-EXPT//NOFORN</code>
+      &nbsp;·&nbsp;
       {% if per_page and dissem_total_pages > 1 %}
         {{ (dissem_page - 1) * per_page + 1 }}–{{ [dissem_page * per_page, dissem_total]|min }} of {{ dissem_total }}
       {% else %}
@@ -169,15 +201,12 @@
       {% endif %}
     </span>
   </div>
-  <p style="margin:0.5rem 1rem 0; font-size:0.8rem; color:#888;">
-    Appear after a second <code>//</code> in the marking, e.g. <code>CUI//SP-EXPT//NOFORN</code>.
-  </p>
-  <table style="margin-top:0;">
+  <table>
     <thead>
       <tr>
-        <th style="width:9rem;">Code</th>
-        <th>Label / Description</th>
-        <th style="width:5rem;">Order</th>
+        <th style="width:9rem;">{{ sort_link('dissem', 'code', 'Code') }}</th>
+        <th>{{ sort_link('dissem', 'label', 'Label / Description') }}</th>
+        <th style="width:5rem;">{{ sort_link('dissem', 'sort_order', 'Order') }}</th>
         <th style="width:5rem;"></th>
       </tr>
     </thead>
@@ -220,6 +249,93 @@
     {% else %}
       <span class="disabled">Next →</span>
     {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Event Log ── #}
+<div class="section-card">
+  <div class="section-header" style="flex-wrap:wrap; gap:0.5rem;">
+    <span>Event Log
+      {% if log_total %}
+      <span style="font-weight:400; font-size:0.82rem; color:#888; margin-left:0.4rem;">
+        {% if log_per_page and log_total_pages > 1 %}
+          {{ (log_page - 1) * log_per_page + 1 }}–{{ [log_page * log_per_page, log_total]|min }} of {{ log_total }}
+        {% else %}
+          {{ log_total }} total
+        {% endif %}
+      </span>
+      {% endif %}
+    </span>
+    <form method="get" style="display:flex; align-items:center; gap:0.4rem; margin-left:auto; flex-wrap:wrap;">
+      <input type="hidden" name="q"           value="{{ q }}">
+      <input type="hidden" name="per_page"    value="{{ per_page or 'all' }}">
+      <input type="hidden" name="cat_page"    value="{{ cat_page }}">
+      <input type="hidden" name="dissem_page" value="{{ dissem_page }}">
+      <input type="hidden" name="cat_sort"    value="{{ cat_sort }}">
+      <input type="hidden" name="cat_order"   value="{{ cat_order }}">
+      <input type="hidden" name="dissem_sort"  value="{{ dissem_sort }}">
+      <input type="hidden" name="dissem_order" value="{{ dissem_order }}">
+      <input type="text" name="log_q" value="{{ log_q }}" placeholder="Search log…"
+             style="border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.4rem; font-size:0.78rem; font-family:inherit; width:150px; background:#fff;">
+      <select name="log_per_page" onchange="this.form.submit()"
+              style="font-size:0.78rem; border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.35rem; background:#fff; font-family:inherit; cursor:pointer;">
+        <option value="10"  {% if log_per_page == 10  %}selected{% endif %}>10</option>
+        <option value="25"  {% if log_per_page == 25  %}selected{% endif %}>25</option>
+        <option value="50"  {% if log_per_page == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if log_per_page == 100 %}selected{% endif %}>100</option>
+        <option value="all" {% if log_per_page == 0   %}selected{% endif %}>All</option>
+      </select>
+      <button type="submit" style="font-size:0.78rem; padding:0.2rem 0.5rem; border:1px solid #ccc; border-radius:3px; background:#fff; cursor:pointer; font-family:inherit;">Filter</button>
+      {% if log_q %}
+      <a href="{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_page, dissem_page=dissem_page, cat_sort=cat_sort, cat_order=cat_order, dissem_sort=dissem_sort, dissem_order=dissem_order, log_per_page=log_per_page or 'all', log_page=1) }}"
+         style="font-size:0.78rem; color:#888; text-decoration:none;">✕ Clear</a>
+      {% endif %}
+    </form>
+  </div>
+  {% if event_log %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:10rem;">Timestamp (UTC)</th>
+        <th style="width:7rem;">Type</th>
+        <th style="width:7rem;">Code</th>
+        <th>Event</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in event_log %}
+      <tr>
+        <td style="color:#888; font-size:0.82rem; white-space:nowrap;">{{ entry['timestamp'] }}</td>
+        <td style="font-size:0.82rem; color:#666; text-transform:capitalize;">{{ entry['marking_type'] }}</td>
+        <td style="font-family:monospace; font-size:0.82rem; font-weight:700; color:#1a3a5c;">{{ entry['code'] }}</td>
+        <td style="font-size:0.88rem;"><strong>{{ entry['action_type'] }}</strong>: {{ entry['description'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if log_total_pages > 1 %}
+  <div class="pager">
+    {% if log_page > 1 %}
+      <a href="{{ log_page_url(log_page - 1) }}">← Prev</a>
+    {% else %}
+      <span class="disabled">← Prev</span>
+    {% endif %}
+    {% for p in log_page_list %}
+      {% if p is none %}<span style="border:none; color:#999;">…</span>
+      {% elif p == log_page %}<span class="cur">{{ p }}</span>
+      {% else %}<a href="{{ log_page_url(p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if log_page < log_total_pages %}
+      <a href="{{ log_page_url(log_page + 1) }}">Next →</a>
+    {% else %}
+      <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="color:#888; text-align:center; padding:1.5rem 1rem;">
+    {% if log_q %}No log entries match "{{ log_q }}".{% else %}No events recorded yet.{% endif %}
   </div>
   {% endif %}
 </div>
@@ -304,8 +420,8 @@ const DISSEM_ADD_URL = '{{ url_for("ha.cui_dissem_add") }}';
 
 function openAddModal(type) {
   document.getElementById('addForm').action = type === 'cat' ? CAT_ADD_URL : DISSEM_ADD_URL;
-  document.getElementById('addModalTitle').textContent = type === 'cat' ? 'Add Category Marking' : 'Add Dissemination Control';
-  document.getElementById('add_submit_btn').textContent = type === 'cat' ? 'Add Category' : 'Add Control';
+  document.getElementById('addModalTitle').textContent    = type === 'cat' ? 'Add Category Marking' : 'Add Dissemination Control';
+  document.getElementById('add_submit_btn').textContent   = type === 'cat' ? 'Add Category' : 'Add Control';
   document.getElementById('add_code').value        = '';
   document.getElementById('add_label').value       = '';
   document.getElementById('add_description').value = '';
@@ -321,19 +437,15 @@ function closeAddModal() {
 function openEditModal(type, id) {
   const scriptId = type === 'cat' ? 'cui-cat-' + id : 'cui-dissem-' + id;
   const data = JSON.parse(document.getElementById(scriptId).textContent);
+  const prefix = type === 'cat' ? '/ha/cui-categories/' : '/ha/cui-dissem/';
 
-  const editPrefix  = type === 'cat' ? '/ha/cui-categories/' : '/ha/cui-dissem/';
-  const deletePrefix = type === 'cat' ? '/ha/cui-categories/' : '/ha/cui-dissem/';
-
-  document.getElementById('editModalTitle').textContent = type === 'cat' ? 'Edit Category Marking' : 'Edit Dissemination Control';
-  document.getElementById('editForm').action       = editPrefix  + id + '/edit';
-  document.getElementById('editDeleteForm').action = deletePrefix + id + '/delete';
-
+  document.getElementById('editModalTitle').textContent   = type === 'cat' ? 'Edit Category Marking' : 'Edit Dissemination Control';
+  document.getElementById('editForm').action       = prefix + id + '/edit';
+  document.getElementById('editDeleteForm').action = prefix + id + '/delete';
   document.getElementById('edit_code').value        = data.code;
   document.getElementById('edit_label').value       = data.label;
   document.getElementById('edit_description').value = data.description;
   document.getElementById('edit_sort').value        = data.sort_order;
-
   document.getElementById('editModal').classList.add('open');
 }
 

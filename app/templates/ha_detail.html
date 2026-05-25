@@ -28,6 +28,25 @@
   .rm-minimal  { background:#e2e3e5; color:#41464b; font-weight:700; }
 
   .hazard-row-closed td { opacity:0.55; }
+
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:100; align-items:center; justify-content:center; }
+  .modal-backdrop.open { display:flex; }
+  .modal-box { background:#fff; border-radius:6px; padding:1.5rem; width:500px; max-width:95vw; max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+  .modal-title { font-size:1rem; font-weight:700; margin-bottom:1rem; }
+  .modal-row { margin-bottom:0.75rem; }
+  .modal-row label { display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem; }
+  .modal-row select, .modal-row input[type=text] { width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box; }
+  .modal-actions { display:flex; gap:0.5rem; margin-top:1rem; }
+
+  .pager { display:flex; align-items:center; justify-content:center; gap:0.3rem; padding:0.8rem 0 0.2rem; flex-wrap:wrap; }
+  .pager a, .pager span {
+    display:inline-block; padding:0.25rem 0.55rem; border:1px solid #ccc;
+    border-radius:3px; font-size:0.8rem; text-decoration:none;
+  }
+  .pager a { color:#333; background:#fff; }
+  .pager a:hover { background:#f2f2f0; }
+  .pager .cur { background:#0b5f9c; color:#fff; border-color:#0b5f9c; font-weight:700; }
+  .pager .disabled { color:#bbb; background:#f7f7f7; border-color:#e0e0e0; }
 </style>
 
 {% set cls = (ha.preliminary_classification or '').lower() %}
@@ -52,11 +71,41 @@
       Add Hazard
     </a>
     <a href="{{ url_for('ha.ha_edit', ha_pk=ha.id) }}" class="secondary-button">Edit</a>
+    <a href="{{ url_for('ha.ha_export_docx', ha_pk=ha.id) }}" class="secondary-button">Export .docx</a>
     <form method="post" action="{{ url_for('ha.ha_delete', ha_pk=ha.id) }}" onsubmit="return confirm('Delete this entire hazard analysis?');" style="margin:0;">
       <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb;">Delete</button>
     </form>
   </div>
 </div>
+
+{% if ref_has_cui or ref_top_dist %}
+{% if ref_has_restricted %}
+<div style="background:#fff3cd; border:1px solid #d4a800; border-left:4px solid #d4a800; border-radius:5px; padding:0.6rem 1rem; margin-bottom:1rem; font-size:0.85rem; color:#5a4000;">
+{% else %}
+<div style="background:#d1e7dd; border:1px solid #75b798; border-left:4px solid #0f5132; border-radius:5px; padding:0.6rem 1rem; margin-bottom:1rem; font-size:0.85rem; color:#0f5132;">
+{% endif %}
+  <div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:0.5rem;">
+    <strong style="white-space:nowrap;">Effective markings:</strong>
+    {% if ref_cui_marking %}
+      <span style="font-family:monospace; font-size:0.78rem; font-weight:700; padding:0.12rem 0.45rem; border-radius:3px; background:#8b3a00; color:#fff; letter-spacing:0.03em;">{{ ref_cui_marking }}</span>
+    {% endif %}
+    {% if ref_top_dist %}
+      {% if ref_top_dist == 'A' %}
+        <span style="font-family:monospace; font-size:0.78rem; font-weight:700; padding:0.12rem 0.45rem; border-radius:3px; background:#1a6e3c; color:#fff;">DIST A</span>
+      {% else %}
+        <span style="font-family:monospace; font-size:0.78rem; font-weight:700; padding:0.12rem 0.45rem; border-radius:3px; background:#7a5c00; color:#fff;">DIST {{ ref_top_dist }}</span>
+      {% endif %}
+      <span style="font-size:0.82rem; {% if ref_has_restricted %}color:#5a4000;{% else %}color:#0f5132;{% endif %}">{{ ref_top_dist_desc }}</span>
+    {% endif %}
+  </div>
+  {% if ref_has_restricted %}
+  <div style="margin-top:0.3rem; font-size:0.8rem; color:#6b4e00;">
+    Recipients must satisfy all applicable controls. Handle in accordance with CUI policy and distribution statement requirements.
+    Individual document markings are shown in the References table below.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
 
 <!-- Overview -->
 <div class="section-card">
@@ -112,6 +161,8 @@
     <span style="font-size:0.75rem; font-weight:400; color:#888; margin-left:0.5rem;">
       &#128274; locked
     </span>
+    {% else %}
+    <button type="button" class="primary-button" style="padding:0.3rem 0.75rem; font-size:0.78rem;" onclick="openRefModal()">+ Add Reference</button>
     {% endif %}
   </div>
   {% if references %}
@@ -123,7 +174,7 @@
         <th>Title</th>
         <th style="width:7rem;">Revision</th>
         <th style="width:10rem;">Section Cited</th>
-        {% if not locked %}<th style="width:5rem;"></th>{% endif %}
+        {% if not locked %}<th style="width:3rem;"></th><th style="width:5rem;"></th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -131,10 +182,43 @@
       <tr>
         <td style="color:#aaa; font-size:0.82rem; text-align:center;">{{ loop.index }}</td>
         <td style="font-family:monospace; font-size:0.88rem; font-weight:700; color:#1a3a5c;">{{ ref['doc_number'] }}</td>
-        <td style="font-size:0.9rem;">{{ ref['title'] }}</td>
+        <td style="font-size:0.9rem;">
+          {{ ref['title'] }}
+          {% if ref['cui'] or ref['dist_statement'] %}
+          <div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.3rem;">
+            {% if ref['cui'] %}
+              {% set _cats = ref['cui_categories'].split(',') if ref['cui_categories'] else [] %}
+              {% set _dissems = ref['cui_dissem'].split(',') if ref['cui_dissem'] else [] %}
+              {% set _marking = 'CUI' + ('//' + _cats|join('/') if _cats else '') + ('//' + _dissems|join('/') if _dissems else '') %}
+              <span style="font-family:monospace; font-size:0.72rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:3px; background:#8b3a00; color:#fff; white-space:nowrap;">{{ _marking }}</span>
+            {% endif %}
+            {% if ref['dist_statement'] %}
+              {% if ref['dist_statement'] == 'A' %}
+                <span style="font-family:monospace; font-size:0.72rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:3px; background:#1a6e3c; color:#fff; white-space:nowrap;" title="{{ ref['dist_reason'] or 'Approved for Public Release; Distribution Unlimited' }}">DIST A</span>
+              {% else %}
+                <span style="font-family:monospace; font-size:0.72rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:3px; background:#7a5c00; color:#fff; white-space:nowrap;" title="{{ ref['dist_reason'] or '' }}">DIST {{ ref['dist_statement'] }}</span>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
         <td style="font-size:0.88rem; color:#555;">{{ ref['revision'] or '—' }}</td>
         <td style="font-size:0.88rem; color:#555;">{{ ref['section_cited'] or '—' }}</td>
         {% if not locked %}
+        <td style="text-align:center; padding:0.25rem; white-space:nowrap;">
+          {% if not loop.first %}
+          <form method="post" action="{{ url_for('ha.ha_ref_move', ha_pk=ha.id, ref_id=ref['id']) }}" style="display:inline;">
+            <input type="hidden" name="direction" value="up">
+            <button type="submit" class="action-btn" title="Move up" style="padding:0.15rem 0.4rem;">↑</button>
+          </form>
+          {% endif %}
+          {% if not loop.last %}
+          <form method="post" action="{{ url_for('ha.ha_ref_move', ha_pk=ha.id, ref_id=ref['id']) }}" style="display:inline;">
+            <input type="hidden" name="direction" value="down">
+            <button type="submit" class="action-btn" title="Move down" style="padding:0.15rem 0.4rem;">↓</button>
+          </form>
+          {% endif %}
+        </td>
         <td style="text-align:right; padding-right:0.75rem;">
           <form method="post" action="{{ url_for('ha.ha_ref_delete', ha_pk=ha.id, ref_id=ref['id']) }}" style="display:inline;"
                 onsubmit="return confirm('Remove this reference from the analysis?');">
@@ -147,74 +231,191 @@
     </tbody>
   </table>
   {% else %}
-  <div class="section-body" style="color:#888; font-size:0.9rem; padding-bottom:{% if locked %}0.5rem{% else %}0{% endif %};">
+  <div class="section-body" style="color:#888; font-size:0.9rem;">
     No reference documents added yet.
-  </div>
-  {% endif %}
-
-  {% if not locked %}
-  <div class="section-body" style="border-top:1px solid #eee; padding-top:1rem; margin-top:{% if references %}0{% else %}-0.5rem{% endif %};">
-    <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; margin-bottom:0.75rem;">Add Reference</div>
-    <form method="post" action="{{ url_for('ha.ha_ref_add', ha_pk=ha.id) }}">
-      <input type="hidden" name="ref_doc_id" id="ref_doc_id_hidden">
-      {% if ref_library %}
-      <div style="margin-bottom:0.75rem;">
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Pick from library</label>
-        <select id="ref_library_select" onchange="fillFromLibrary(this)"
-                style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
-          <option value="">— Select to pre-fill fields below —</option>
-          {% for d in ref_library %}
-          <option value="{{ d['id'] }}"
-                  data-num="{{ d['doc_number'] }}"
-                  data-title="{{ d['title'] }}"
-                  data-rev="{{ d['revision'] or '' }}">{{ d['doc_number'] }}{% if d['revision'] %} ({{ d['revision'] }}){% endif %} — {{ d['title'] }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-      <div style="display:grid; grid-template-columns:1fr 2fr 1fr 1fr; gap:0.75rem; align-items:end;">
-        <div>
-          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Document Number *</label>
-          <input type="text" name="doc_number" id="ref_doc_number" required
-                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
-                 placeholder="e.g. MWI 8715.15">
-        </div>
-        <div>
-          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Title *</label>
-          <input type="text" name="title" id="ref_title" required
-                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
-                 placeholder="Document title">
-        </div>
-        <div>
-          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
-          <input type="text" name="revision" id="ref_revision"
-                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
-                 placeholder="e.g. Rev C">
-        </div>
-        <div>
-          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Section Cited</label>
-          <input type="text" name="section_cited"
-                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
-                 placeholder="e.g. §5.3">
-        </div>
-      </div>
-      <div style="margin-top:0.75rem;">
-        <button type="submit" class="primary-button" style="padding:0.4rem 1rem; font-size:0.85rem;">Add Reference</button>
-      </div>
-    </form>
   </div>
   {% endif %}
 </div>
 
+{# ── Add Reference Modal ── #}
+{% if not locked %}
+<div class="modal-backdrop" id="refModal" onclick="if(event.target===this)closeRefModal();">
+  <div class="modal-box" style="width:560px;">
+    <div class="modal-title">Add Reference Document</div>
+
+    {# Tab toggle #}
+    <div style="display:flex; border:1px solid #ccc; border-radius:4px; overflow:hidden; margin-bottom:1.25rem;">
+      <button type="button" id="ref-tab-library" onclick="switchRefTab('library')"
+              style="flex:1; padding:0.45rem; font-size:0.82rem; font-weight:600; border:none; cursor:pointer; font-family:inherit; background:#0b5f9c; color:#fff;">
+        Pick from Library
+      </button>
+      <button type="button" id="ref-tab-new" onclick="switchRefTab('new')"
+              style="flex:1; padding:0.45rem; font-size:0.82rem; font-weight:600; border:none; border-left:1px solid #ccc; cursor:pointer; font-family:inherit; background:#fff; color:#555;">
+        Add New Document
+      </button>
+    </div>
+
+    {# Panel: library picker #}
+    <div id="ref-panel-library">
+      {% if ref_library %}
+      <form method="post" action="{{ url_for('ha.ha_ref_add', ha_pk=ha.id) }}">
+        <div class="modal-row">
+          <label>Document *</label>
+          <select name="ref_doc_id" required>
+            <option value="">— Select from library —</option>
+            {% for d in ref_library %}
+            <option value="{{ d['id'] }}">{{ d['doc_number'] }}{% if d['revision'] %} ({{ d['revision'] }}){% endif %} — {{ d['title'] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-row">
+          <label>Section Cited <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+          <input type="text" name="section_cited" placeholder="e.g. §5.3">
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="primary-button">Add Reference</button>
+          <button type="button" class="secondary-button" onclick="closeRefModal()">Cancel</button>
+        </div>
+      </form>
+      {% else %}
+      <div style="color:#888; font-size:0.88rem; padding:0.25rem 0 1rem;">
+        The reference library is empty. Use the <strong>Add New Document</strong> tab to add one, or
+        <a href="{{ url_for('ha.ref_docs_list') }}" style="color:var(--accent);">manage the full library ↗</a>.
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" onclick="closeRefModal()">Close</button>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Panel: add new document #}
+    <div id="ref-panel-new" style="display:none;">
+      <form method="post" action="{{ url_for('ha.ha_ref_add_new', ha_pk=ha.id) }}">
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:0.75rem; margin-bottom:0.75rem;">
+          <div>
+            <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Document Number *</label>
+            <input type="text" name="doc_number" required placeholder="e.g. MWI 8715.15"
+                   style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Title *</label>
+            <input type="text" name="title" required placeholder="Document title"
+                   style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+          <div>
+            <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
+            <input type="text" name="revision" placeholder="e.g. Rev C"
+                   style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Section Cited <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            <input type="text" name="section_cited" placeholder="e.g. §5.3"
+                   style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #eee; margin:0.75rem 0; padding-top:0.75rem;">
+          <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#888; margin-bottom:0.6rem;">Classification</div>
+
+          <div style="margin-bottom:0.6rem;">
+            <label style="display:flex; align-items:center; gap:0.45rem; font-size:0.88rem; font-weight:600; color:#333; cursor:pointer;">
+              <input type="checkbox" name="cui" id="new_cui_check" onchange="toggleNewCUI(this)">
+              Controlled Unclassified Information (CUI)
+            </label>
+            <div id="new_cui_detail" style="display:none; margin-top:0.5rem;">
+              {% if cui_categories %}
+              <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem;">Categories</div>
+              <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.4rem;">
+                {% for cat in cui_categories %}
+                <label style="display:flex; align-items:center; gap:0.25rem; border:1px solid #ccc; border-radius:4px; padding:0.18rem 0.45rem; font-size:0.78rem; cursor:pointer; background:#fafafa;" title="{{ cat['description'] or '' }}">
+                  <input type="checkbox" name="cui_categories" value="{{ cat['code'] }}">
+                  <span style="font-weight:700; font-family:monospace; color:#1a3a5c;">{{ cat['code'] }}</span>
+                  <span style="color:#555;">— {{ cat['label'] }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              <input type="text" name="cui_custom" placeholder="Other codes, comma-separated"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.3rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box; margin-bottom:0.6rem;">
+              {% endif %}
+              {% if dissem_controls %}
+              <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem;">Dissemination Controls</div>
+              <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.4rem;">
+                {% for ctrl in dissem_controls %}
+                <label style="display:flex; align-items:center; gap:0.25rem; border:1px solid #ccc; border-radius:4px; padding:0.18rem 0.45rem; font-size:0.78rem; cursor:pointer; background:#fafafa;" title="{{ ctrl['description'] or '' }}">
+                  <input type="checkbox" name="cui_dissem" value="{{ ctrl['code'] }}">
+                  <span style="font-weight:700; font-family:monospace; color:#1a3a5c;">{{ ctrl['code'] }}</span>
+                  <span style="color:#555;">— {{ ctrl['label'] }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              <input type="text" name="cui_dissem_custom" placeholder="Other controls, comma-separated"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.3rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Distribution Statement</label>
+            <select name="dist_statement" id="new_dist_stmt" onchange="toggleNewDistReason(this)"
+                    style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; margin-bottom:0.4rem;">
+              <option value="">— None —</option>
+              {% for code, desc in dist_statements %}
+              <option value="{{ code }}">{{ code }} — {{ desc[:60] }}{% if desc|length > 60 %}…{% endif %}</option>
+              {% endfor %}
+            </select>
+            <input type="text" name="dist_reason" id="new_dist_reason" placeholder="Basis/reason for restriction"
+                   style="display:none; width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div style="font-size:0.75rem; color:#888; margin-bottom:0.75rem;">
+          This will add the document to the <a href="{{ url_for('ha.ref_docs_list') }}" style="color:var(--accent);">reference library</a> and reference it here.
+          You can add a URL or file attachment to the library entry later.
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="primary-button">Add to Library &amp; Reference</button>
+          <button type="button" class="secondary-button" onclick="closeRefModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
 <script>
-function fillFromLibrary(sel) {
-  const opt = sel.options[sel.selectedIndex];
-  if (!opt.value) return;
-  document.getElementById('ref_doc_id_hidden').value = opt.value;
-  document.getElementById('ref_doc_number').value    = opt.dataset.num;
-  document.getElementById('ref_title').value         = opt.dataset.title;
-  document.getElementById('ref_revision').value      = opt.dataset.rev;
+const DIST_RESTRICTED = new Set(['B','C','D','E','F','X']);
+
+function openRefModal() {
+  document.getElementById('refModal').classList.add('open');
 }
+function closeRefModal() {
+  document.getElementById('refModal').classList.remove('open');
+}
+function switchRefTab(tab) {
+  const isLib = tab === 'library';
+  document.getElementById('ref-panel-library').style.display = isLib ? '' : 'none';
+  document.getElementById('ref-panel-new').style.display     = isLib ? 'none' : '';
+  document.getElementById('ref-tab-library').style.background = isLib ? '#0b5f9c' : '#fff';
+  document.getElementById('ref-tab-library').style.color      = isLib ? '#fff' : '#555';
+  document.getElementById('ref-tab-new').style.background     = isLib ? '#fff' : '#0b5f9c';
+  document.getElementById('ref-tab-new').style.color          = isLib ? '#555' : '#fff';
+}
+function toggleNewCUI(cb) {
+  document.getElementById('new_cui_detail').style.display = cb.checked ? '' : 'none';
+  if (!cb.checked) {
+    document.getElementById('new_cui_detail').querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+    document.getElementById('new_cui_detail').querySelectorAll('input[type=text]').forEach(t => t.value = '');
+  }
+}
+function toggleNewDistReason(sel) {
+  const r = document.getElementById('new_dist_reason');
+  r.style.display = DIST_RESTRICTED.has(sel.value) ? '' : 'none';
+  if (!DIST_RESTRICTED.has(sel.value)) r.value = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRefModal(); });
 </script>
 
 <!-- Risk Matrix Reference -->
@@ -345,6 +546,85 @@ function fillFromLibrary(sel) {
       </div>
     </form>
   </div>
+</div>
+
+{% macro log_page_url(p) %}{{ url_for('ha.ha_detail', ha_pk=ha.id, log_q=log_q, log_per_page=log_per_page or 25, log_page=p) }}{% endmacro %}
+
+<!-- Event Log -->
+<div class="section-card" id="event-log">
+  <div class="section-header" style="flex-wrap:wrap; gap:0.5rem;">
+    <span>Event Log
+      {% if log_total %}
+      <span style="font-weight:400; font-size:0.82rem; color:#888; margin-left:0.4rem;">
+        {% if log_per_page and log_total_pages > 1 %}
+          {{ (log_page - 1) * log_per_page + 1 }}–{{ [log_page * log_per_page, log_total]|min }} of {{ log_total }}
+        {% else %}
+          {{ log_total }} total
+        {% endif %}
+      </span>
+      {% endif %}
+    </span>
+    <form method="get" style="display:flex; align-items:center; gap:0.4rem; margin-left:auto; flex-wrap:wrap;">
+      <input type="text" name="log_q" value="{{ log_q }}" placeholder="Search log…"
+             style="border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.4rem; font-size:0.78rem; font-family:inherit; width:160px; background:#fff;">
+      <select name="log_per_page" onchange="this.form.submit()"
+              style="font-size:0.78rem; border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.35rem; background:#fff; font-family:inherit; cursor:pointer;">
+        <option value="10"  {% if log_per_page == 10  %}selected{% endif %}>10</option>
+        <option value="25"  {% if log_per_page == 25  %}selected{% endif %}>25</option>
+        <option value="50"  {% if log_per_page == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if log_per_page == 100 %}selected{% endif %}>100</option>
+        <option value="0"   {% if log_per_page == 0   %}selected{% endif %}>All</option>
+      </select>
+      <button type="submit" style="font-size:0.78rem; padding:0.2rem 0.5rem; border:1px solid #ccc; border-radius:3px; background:#fff; cursor:pointer; font-family:inherit;">Filter</button>
+      {% if log_q %}
+      <a href="{{ url_for('ha.ha_detail', ha_pk=ha.id, log_per_page=log_per_page or 25, log_page=1) }}"
+         style="font-size:0.78rem; color:#888; text-decoration:none;">✕ Clear</a>
+      {% endif %}
+    </form>
+  </div>
+  {% if event_log %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:10rem;">Timestamp (UTC)</th>
+        <th style="width:10rem;">Event</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in event_log %}
+      <tr>
+        <td style="color:#888; font-size:0.82rem; white-space:nowrap;">{{ entry['timestamp'] }}</td>
+        <td style="font-size:0.82rem; font-weight:600; color:#1a3a5c;">{{ entry['action_type'] }}</td>
+        <td style="font-size:0.88rem;">{{ entry['description'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if log_total_pages > 1 %}
+  <div class="pager">
+    {% if log_page > 1 %}
+      <a href="{{ log_page_url(log_page - 1) }}">← Prev</a>
+    {% else %}
+      <span class="disabled">← Prev</span>
+    {% endif %}
+    {% for p in log_page_list %}
+      {% if p is none %}<span style="border:none; color:#999;">…</span>
+      {% elif p == log_page %}<span class="cur">{{ p }}</span>
+      {% else %}<a href="{{ log_page_url(p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if log_page < log_total_pages %}
+      <a href="{{ log_page_url(log_page + 1) }}">Next →</a>
+    {% else %}
+      <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="color:#888; text-align:center; padding:1.5rem 1rem;">
+    {% if log_q %}No log entries match "{{ log_q }}".{% else %}No events recorded yet.{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 </div>{# end max-width wrapper #}

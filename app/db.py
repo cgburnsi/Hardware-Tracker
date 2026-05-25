@@ -905,6 +905,16 @@ def migrate_db():
         ]
     )
     db.execute("""
+        CREATE TABLE IF NOT EXISTS cui_marking_log (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            marking_type TEXT NOT NULL,
+            code         TEXT NOT NULL,
+            timestamp    TEXT NOT NULL,
+            action_type  TEXT NOT NULL,
+            description  TEXT NOT NULL
+        )
+    """)
+    db.execute("""
         CREATE TABLE IF NOT EXISTS ref_doc_log (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             ref_doc_id  INTEGER,
@@ -926,6 +936,17 @@ def migrate_db():
             sort_order    INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id),
             FOREIGN KEY (ref_doc_id) REFERENCES reference_documents(id)
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_analyses_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            ha_id       INTEGER NOT NULL,
+            ha_code     TEXT NOT NULL,
+            timestamp   TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
     """)
     db.executescript("""

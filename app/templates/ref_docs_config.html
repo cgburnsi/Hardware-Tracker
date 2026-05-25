@@ -24,7 +24,7 @@
 
 {% for doc in docs %}
 <script id="rd-{{ doc['id'] }}" type="application/json">
-{{ {'id': doc['id'], 'doc_number': doc['doc_number'], 'title': doc['title'], 'revision': doc['revision'] or '', 'description': doc['description'] or ''}|tojson }}
+{{ {'id': doc['id'], 'doc_number': doc['doc_number'], 'title': doc['title'], 'revision': doc['revision'] or '', 'description': doc['description'] or '', 'effective_date': doc['effective_date'] or '', 'expiration_date': doc['expiration_date'] or ''}|tojson }}
 </script>
 {% endfor %}
 
@@ -40,12 +40,15 @@
       <tr>
         <th style="width:11rem;">Document Number</th>
         <th>Title</th>
-        <th style="width:7rem;">Revision</th>
+        <th style="width:6rem;">Revision</th>
+        <th style="width:8rem;">Effective</th>
+        <th style="width:8rem;">Expires</th>
         <th style="width:9rem;"></th>
       </tr>
     </thead>
     <tbody>
       {% for doc in docs %}
+      {% set expired = doc['expiration_date'] and doc['expiration_date'] < today %}
       <tr>
         <td>
           <div class="doc-number">{{ doc['doc_number'] }}</div>
@@ -57,6 +60,15 @@
           {% endif %}
         </td>
         <td style="color:#555; font-size:0.88rem;">{{ doc['revision'] or '—' }}</td>
+        <td style="font-size:0.85rem; color:#555;">{{ doc['effective_date'] or '—' }}</td>
+        <td style="font-size:0.85rem;">
+          {% if expired %}
+            <span style="color:#842029; font-weight:600;">{{ doc['expiration_date'] }}</span>
+            <span style="display:inline-block; background:#f8d7da; color:#842029; border-radius:8px; padding:0.1rem 0.45rem; font-size:0.72rem; font-weight:700; margin-left:0.25rem;">Expired</span>
+          {% else %}
+            <span style="color:#555;">{{ doc['expiration_date'] or '—' }}</span>
+          {% endif %}
+        </td>
         <td style="white-space:nowrap; text-align:right; padding-right:0.75rem;">
           <button type="button" class="action-btn" onclick="openEditModal({{ doc['id'] }})">Edit</button>
           <form method="post" action="{{ url_for('ha.ref_doc_delete', doc_id=doc['id']) }}" style="display:inline;"
@@ -93,7 +105,15 @@
         <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
         <input type="text" name="revision" placeholder="e.g. Rev C" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
       </div>
-      <div style="grid-column:1/-1;">
+      <div>
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Effective Date</label>
+        <input type="date" name="effective_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Expiration Date</label>
+        <input type="date" name="expiration_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div>
         <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Description <span style="font-weight:400; color:#aaa;">(optional)</span></label>
         <input type="text" name="description" placeholder="Brief note about what this document covers" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
       </div>
@@ -121,6 +141,16 @@
         <label>Revision</label>
         <input type="text" name="revision" id="edit_revision" placeholder="e.g. Rev C">
       </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Effective Date</label>
+          <input type="date" name="effective_date" id="edit_effective_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+        </div>
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Expiration Date</label>
+          <input type="date" name="expiration_date" id="edit_expiration_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+        </div>
+      </div>
       <div class="modal-row">
         <label>Description</label>
         <textarea name="description" id="edit_description" placeholder="Optional note"></textarea>
@@ -137,10 +167,12 @@
 function openEditModal(id) {
   const data = JSON.parse(document.getElementById('rd-' + id).textContent);
   document.getElementById('editForm').action = '/ha/ref-docs/' + id + '/edit';
-  document.getElementById('edit_doc_number').value = data.doc_number;
-  document.getElementById('edit_title').value       = data.title;
-  document.getElementById('edit_revision').value    = data.revision;
-  document.getElementById('edit_description').value = data.description;
+  document.getElementById('edit_doc_number').value    = data.doc_number;
+  document.getElementById('edit_title').value         = data.title;
+  document.getElementById('edit_revision').value      = data.revision;
+  document.getElementById('edit_effective_date').value  = data.effective_date;
+  document.getElementById('edit_expiration_date').value = data.expiration_date;
+  document.getElementById('edit_description').value   = data.description;
   document.getElementById('editModal').classList.add('open');
 }
 function closeEditModal() {

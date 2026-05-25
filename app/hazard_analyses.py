@@ -458,22 +458,28 @@ def ref_docs_list():
     docs = db.execute(
         "SELECT * FROM reference_documents ORDER BY sort_order, doc_number"
     ).fetchall()
-    return render_template('ref_docs_config.html', docs=docs)
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('ref_docs_config.html', docs=docs, today=today)
 
 
 @bp.route('/ref-docs/add', methods=['POST'])
 def ref_doc_add():
     db = get_db()
-    doc_number  = request.form.get('doc_number', '').strip()
-    title       = request.form.get('title', '').strip()
-    revision    = request.form.get('revision', '').strip()
-    description = request.form.get('description', '').strip()
+    doc_number      = request.form.get('doc_number', '').strip()
+    title           = request.form.get('title', '').strip()
+    revision        = request.form.get('revision', '').strip()
+    description     = request.form.get('description', '').strip()
+    effective_date  = request.form.get('effective_date', '').strip()
+    expiration_date = request.form.get('expiration_date', '').strip()
     if doc_number and title:
         row = db.execute("SELECT MAX(sort_order) as mx FROM reference_documents").fetchone()
         next_order = (row['mx'] or 0) + 1
         db.execute(
-            "INSERT INTO reference_documents (doc_number, title, revision, description, sort_order) VALUES (?,?,?,?,?)",
-            (doc_number, title, revision or None, description or None, next_order)
+            "INSERT INTO reference_documents"
+            " (doc_number, title, revision, description, effective_date, expiration_date, sort_order)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (doc_number, title, revision or None, description or None,
+             effective_date or None, expiration_date or None, next_order)
         )
         db.commit()
         flash(f'"{doc_number}" added to reference library.', 'success')
@@ -483,14 +489,19 @@ def ref_doc_add():
 @bp.route('/ref-docs/<int:doc_id>/edit', methods=['POST'])
 def ref_doc_edit(doc_id):
     db = get_db()
-    doc_number  = request.form.get('doc_number', '').strip()
-    title       = request.form.get('title', '').strip()
-    revision    = request.form.get('revision', '').strip()
-    description = request.form.get('description', '').strip()
+    doc_number      = request.form.get('doc_number', '').strip()
+    title           = request.form.get('title', '').strip()
+    revision        = request.form.get('revision', '').strip()
+    description     = request.form.get('description', '').strip()
+    effective_date  = request.form.get('effective_date', '').strip()
+    expiration_date = request.form.get('expiration_date', '').strip()
     if doc_number and title:
         db.execute(
-            "UPDATE reference_documents SET doc_number=?, title=?, revision=?, description=? WHERE id=?",
-            (doc_number, title, revision or None, description or None, doc_id)
+            "UPDATE reference_documents"
+            " SET doc_number=?, title=?, revision=?, description=?, effective_date=?, expiration_date=?"
+            " WHERE id=?",
+            (doc_number, title, revision or None, description or None,
+             effective_date or None, expiration_date or None, doc_id)
         )
         db.commit()
         flash('Reference document updated.', 'success')

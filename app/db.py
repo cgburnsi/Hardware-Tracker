@@ -779,14 +779,21 @@ def migrate_db():
 
     db.execute("""
         CREATE TABLE IF NOT EXISTS reference_documents (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            doc_number  TEXT NOT NULL,
-            title       TEXT NOT NULL,
-            revision    TEXT,
-            description TEXT,
-            sort_order  INTEGER NOT NULL DEFAULT 0
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_number      TEXT NOT NULL,
+            title           TEXT NOT NULL,
+            revision        TEXT,
+            description     TEXT,
+            effective_date  TEXT,
+            expiration_date TEXT,
+            sort_order      INTEGER NOT NULL DEFAULT 0
         )
     """)
+    rd_cols = {row[1] for row in db.execute("PRAGMA table_info(reference_documents)").fetchall()}
+    if 'effective_date' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN effective_date TEXT")
+    if 'expiration_date' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN expiration_date TEXT")
     db.execute("""
         CREATE TABLE IF NOT EXISTS hazard_references (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,

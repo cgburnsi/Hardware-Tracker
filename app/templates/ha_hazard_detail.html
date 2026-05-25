@@ -53,6 +53,8 @@
   .nav-hazards span { color:#aaa; font-size:0.82rem; }
 </style>
 
+<div style="max-width:900px;">
+
 <!-- Breadcrumb + header -->
 <div class="page-title-row" style="flex-wrap:wrap; gap:0.75rem;">
   <div>
@@ -97,31 +99,60 @@
   </div>
 </div>
 
-<!-- Initial Risk -->
+<!-- Risk Assessment (initial + final combined) -->
 <div class="section-card">
-  <div class="section-header">Initial Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(without controls)</span></div>
-  <div class="section-body">
-    {% if item.initial_severity and item.initial_probability %}
-    <div style="display:flex; gap:2rem; flex-wrap:wrap;">
-      <div>
-        <div class="data-label">Severity</div>
-        <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_severity }} — {{ SEVERITY_LABELS.get(item.initial_severity, '') }}</div>
-      </div>
-      <div>
-        <div class="data-label">Probability</div>
-        <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_probability }} — {{ PROBABILITY_LABELS.get(item.initial_probability, '') }}</div>
-      </div>
-      <div>
-        <div class="data-label">RAC / Risk Ranking</div>
-        <div class="rac-block">
-          <span class="rac-code">{{ init_rac }}</span>
-          <span class="rac-rank badge-rac-{{ init_rank|lower }}">{{ init_rank }}</span>
+  <div class="section-header">Risk Assessment</div>
+  <div class="section-body" style="padding-bottom:0;">
+    <div style="display:grid; grid-template-columns:1fr 1fr;">
+      <div style="padding-bottom:1rem; padding-right:1.5rem; border-right:1px solid #eee;">
+        <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; color:#888; font-weight:700; margin-bottom:0.65rem;">Initial <span style="font-weight:400;">— without controls</span></div>
+        {% if item.initial_severity and item.initial_probability %}
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-end;">
+          <div>
+            <div class="data-label">Severity</div>
+            <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_severity }} — {{ SEVERITY_LABELS.get(item.initial_severity, '') }}</div>
+          </div>
+          <div>
+            <div class="data-label">Probability</div>
+            <div class="data-value" style="margin-top:0.2rem;">{{ item.initial_probability }} — {{ PROBABILITY_LABELS.get(item.initial_probability, '') }}</div>
+          </div>
+          <div>
+            <div class="data-label">RAC</div>
+            <div class="rac-block">
+              <span class="rac-code">{{ init_rac }}</span>
+              <span class="rac-rank badge-rac-{{ init_rank|lower }}">{{ init_rank }}</span>
+            </div>
+          </div>
         </div>
+        {% else %}
+        <span style="color:#aaa; font-size:0.9rem;">Not yet assessed.</span>
+        {% endif %}
+      </div>
+      <div style="padding-bottom:1rem; padding-left:1.5rem;">
+        <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; color:#888; font-weight:700; margin-bottom:0.65rem;">Final <span style="font-weight:400;">— with controls applied</span></div>
+        {% if item.final_severity and item.final_probability %}
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-end;">
+          <div>
+            <div class="data-label">Severity</div>
+            <div class="data-value" style="margin-top:0.2rem;">{{ item.final_severity }} — {{ SEVERITY_LABELS.get(item.final_severity, '') }}</div>
+          </div>
+          <div>
+            <div class="data-label">Probability</div>
+            <div class="data-value" style="margin-top:0.2rem;">{{ item.final_probability }} — {{ PROBABILITY_LABELS.get(item.final_probability, '') }}</div>
+          </div>
+          <div>
+            <div class="data-label">Residual RAC</div>
+            <div class="rac-block">
+              <span class="rac-code">{{ final_rac }}</span>
+              <span class="rac-rank badge-rac-{{ final_rank|lower }}">{{ final_rank }}</span>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <span style="color:#aaa; font-size:0.9rem;">Not yet assessed.</span>
+        {% endif %}
       </div>
     </div>
-    {% else %}
-    <span style="color:#aaa;">Not yet assessed.</span>
-    {% endif %}
   </div>
 </div>
 
@@ -224,34 +255,6 @@
   </div>
 </div>
 
-<!-- Final Risk -->
-<div class="section-card">
-  <div class="section-header">Final Risk Assessment <span style="font-size:0.75rem; font-weight:400; color:#888;">(with existing controls applied)</span></div>
-  <div class="section-body">
-    {% if item.final_severity and item.final_probability %}
-    <div style="display:flex; gap:2rem; flex-wrap:wrap;">
-      <div>
-        <div class="data-label">Severity</div>
-        <div class="data-value" style="margin-top:0.2rem;">{{ item.final_severity }} — {{ SEVERITY_LABELS.get(item.final_severity, '') }}</div>
-      </div>
-      <div>
-        <div class="data-label">Probability</div>
-        <div class="data-value" style="margin-top:0.2rem;">{{ item.final_probability }} — {{ PROBABILITY_LABELS.get(item.final_probability, '') }}</div>
-      </div>
-      <div>
-        <div class="data-label">RAC / Residual Risk</div>
-        <div class="rac-block">
-          <span class="rac-code">{{ final_rac }}</span>
-          <span class="rac-rank badge-rac-{{ final_rank|lower }}">{{ final_rank }}</span>
-        </div>
-      </div>
-    </div>
-    {% else %}
-    <span style="color:#aaa;">Not yet assessed.</span>
-    {% endif %}
-  </div>
-</div>
-
 <!-- Notes / Discussion -->
 <div class="section-card" id="notes">
   <div class="section-header">Notes &amp; Discussion</div>
@@ -285,4 +288,6 @@
     </div>
   </div>
 </div>
+
+</div>{# end max-width wrapper #}
 {% endblock %}

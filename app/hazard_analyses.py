@@ -29,6 +29,12 @@ RAC_RANK = {
 CONTROL_TYPES = ['Elimination', 'Substitution', 'Engineering', 'Administrative', 'PPE']
 
 
+def refs_locked(ha, sig_map):
+    if ha['status'] in ('approved', 'superseded'):
+        return True
+    return any(s.get('signed_date') for s in sig_map.values())
+
+
 def compute_rac(severity, probability):
     if severity and probability:
         key = f"{severity}{probability}"
@@ -158,6 +164,13 @@ def ha_detail(ha_pk):
         "SELECT * FROM hazard_signatures WHERE ha_id = ?", (ha_pk,)
     ).fetchall()
     sig_map = {s['role']: dict(s) for s in signatures}
+    references = db.execute(
+        "SELECT * FROM hazard_references WHERE ha_id = ? ORDER BY sort_order, id", (ha_pk,)
+    ).fetchall()
+    ref_library = db.execute(
+        "SELECT * FROM reference_documents ORDER BY sort_order, doc_number"
+    ).fetchall()
+    locked = refs_locked(ha, sig_map)
     linked_proc = None
     if ha['linked_procedure_id']:
         linked_proc = db.execute(
@@ -166,6 +179,7 @@ def ha_detail(ha_pk):
         ).fetchone()
     return render_template('ha_detail.html',
         ha=ha, items=items, sig_map=sig_map, linked_proc=linked_proc,
+        references=references, ref_library=ref_library, locked=locked,
         SEVERITY_LABELS=SEVERITY_LABELS, PROBABILITY_LABELS=PROBABILITY_LABELS,
     )
 
@@ -218,6 +232,7 @@ def ha_delete(ha_pk):
         db.execute("DELETE FROM hazard_notes WHERE hazard_item_id = ?", (row['id'],))
     db.execute("DELETE FROM hazard_items WHERE ha_id = ?", (ha_pk,))
     db.execute("DELETE FROM hazard_signatures WHERE ha_id = ?", (ha_pk,))
+    db.execute("DELETE FROM hazard_references WHERE ha_id = ?", (ha_pk,))
     db.execute("DELETE FROM hazard_analyses WHERE id = ?", (ha_pk,))
     db.commit()
     flash('Hazard Analysis deleted.', 'success')
@@ -433,3 +448,118 @@ def control_delete(ha_pk, item_id, ctrl_id):
     db.execute("DELETE FROM hazard_controls WHERE id=? AND hazard_item_id=?", (ctrl_id, item_id))
     db.commit()
     return redirect(url_for('ha.hazard_detail', ha_pk=ha_pk, item_id=item_id) + '#controls')
+
+
+# ── REFERENCE LIBRARY (config) ────────────────────────────────────────────────
+
+@bp.route('/ref-docs')
+def ref_docs_list():
+    db = get_db()
+    docs = db.execute(
+        "SELECT * FROM reference_documents ORDER BY sort_order, doc_number"
+    ).fetchall()
+    return render_template('ref_docs_config.html', docs=docs)
+
+
+@bp.route('/ref-docs/add', methods=['POST'])
+def ref_doc_add():
+    db = get_db()
+    doc_number  = request.form.get('doc_number', '').strip()
+    title       = request.form.get('title', '').strip()
+    revision    = request.form.get('revision', '').strip()
+    description = request.form.get('description', '').strip()
+    if doc_number and title:
+        row = db.execute("SELECT MAX(sort_order) as mx FROM reference_documents").fetchone()
+        next_order = (row['mx'] or 0) + 1
+        db.execute(
+            "INSERT INTO reference_documents (doc_number, title, revision, description, sort_order) VALUES (?,?,?,?,?)",
+            (doc_number, title, revision or None, description or None, next_order)
+        )
+        db.commit()
+        flash(f'"{doc_number}" added to reference library.', 'success')
+    return redirect(url_for('ha.ref_docs_list'))
+
+
+@bp.route('/ref-docs/<int:doc_id>/edit', methods=['POST'])
+def ref_doc_edit(doc_id):
+    db = get_db()
+    doc_number  = request.form.get('doc_number', '').strip()
+    title       = request.form.get('title', '').strip()
+    revision    = request.form.get('revision', '').strip()
+    description = request.form.get('description', '').strip()
+    if doc_number and title:
+        db.execute(
+            "UPDATE reference_documents SET doc_number=?, title=?, revision=?, description=? WHERE id=?",
+            (doc_number, title, revision or None, description or None, doc_id)
+        )
+        db.commit()
+        flash('Reference document updated.', 'success')
+    return redirect(url_for('ha.ref_docs_list'))
+
+
+@bp.route('/ref-docs/<int:doc_id>/delete', methods=['POST'])
+def ref_doc_delete(doc_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM reference_documents WHERE id = ?", (doc_id,)).fetchone()
+    if not row:
+        return redirect(url_for('ha.ref_docs_list'))
+    in_use = db.execute(
+        "SELECT COUNT(*) FROM hazard_references WHERE ref_doc_id = ?", (doc_id,)
+    ).fetchone()[0]
+    if in_use > 0:
+        flash(
+            f'Cannot delete "{row["doc_number"]}" — it is cited in {in_use} hazard analysis reference(s).',
+            'error'
+        )
+        return redirect(url_for('ha.ref_docs_list'))
+    db.execute("DELETE FROM reference_documents WHERE id = ?", (doc_id,))
+    db.commit()
+    flash(f'"{row["doc_number"]}" removed from reference library.', 'success')
+    return redirect(url_for('ha.ref_docs_list'))
+
+
+# ── PER-HA REFERENCES ─────────────────────────────────────────────────────────
+
+@bp.route('/<int:ha_pk>/refs/add', methods=['POST'])
+def ha_ref_add(ha_pk):
+    db = get_db()
+    ha = get_ha_or_404(db, ha_pk)
+    signatures = db.execute("SELECT * FROM hazard_signatures WHERE ha_id = ?", (ha_pk,)).fetchall()
+    sig_map = {s['role']: dict(s) for s in signatures}
+    if refs_locked(ha, sig_map):
+        flash('This hazard analysis is locked — references cannot be modified.', 'error')
+        return redirect(url_for('ha.ha_detail', ha_pk=ha_pk) + '#references')
+    doc_number    = request.form.get('doc_number', '').strip()
+    title         = request.form.get('title', '').strip()
+    revision      = request.form.get('revision', '').strip()
+    section_cited = request.form.get('section_cited', '').strip()
+    ref_doc_id    = request.form.get('ref_doc_id') or None
+    if not doc_number or not title:
+        flash('Document number and title are required.', 'error')
+        return redirect(url_for('ha.ha_detail', ha_pk=ha_pk) + '#references')
+    row = db.execute(
+        "SELECT MAX(sort_order) as mx FROM hazard_references WHERE ha_id = ?", (ha_pk,)
+    ).fetchone()
+    next_order = (row['mx'] or 0) + 1
+    db.execute(
+        "INSERT INTO hazard_references (ha_id, ref_doc_id, doc_number, title, revision, section_cited, sort_order)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (ha_pk, ref_doc_id, doc_number, title, revision or None, section_cited or None, next_order)
+    )
+    db.commit()
+    flash('Reference added.', 'success')
+    return redirect(url_for('ha.ha_detail', ha_pk=ha_pk) + '#references')
+
+
+@bp.route('/<int:ha_pk>/refs/<int:ref_id>/delete', methods=['POST'])
+def ha_ref_delete(ha_pk, ref_id):
+    db = get_db()
+    ha = get_ha_or_404(db, ha_pk)
+    signatures = db.execute("SELECT * FROM hazard_signatures WHERE ha_id = ?", (ha_pk,)).fetchall()
+    sig_map = {s['role']: dict(s) for s in signatures}
+    if refs_locked(ha, sig_map):
+        flash('This hazard analysis is locked — references cannot be modified.', 'error')
+        return redirect(url_for('ha.ha_detail', ha_pk=ha_pk) + '#references')
+    db.execute("DELETE FROM hazard_references WHERE id = ? AND ha_id = ?", (ref_id, ha_pk))
+    db.commit()
+    return redirect(url_for('ha.ha_detail', ha_pk=ha_pk) + '#references')

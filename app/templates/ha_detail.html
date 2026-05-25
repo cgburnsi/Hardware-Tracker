@@ -102,6 +102,119 @@
   </div>
 </div>
 
+<!-- Reference Documents -->
+<div class="section-card" id="references">
+  <div class="section-header">
+    Reference Documents
+    {% if locked %}
+    <span style="font-size:0.75rem; font-weight:400; color:#888; margin-left:0.5rem;">
+      &#128274; locked
+    </span>
+    {% endif %}
+  </div>
+  {% if references %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:2rem;">#</th>
+        <th style="width:10rem;">Document</th>
+        <th>Title</th>
+        <th style="width:7rem;">Revision</th>
+        <th style="width:10rem;">Section Cited</th>
+        {% if not locked %}<th style="width:5rem;"></th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for ref in references %}
+      <tr>
+        <td style="color:#aaa; font-size:0.82rem; text-align:center;">{{ loop.index }}</td>
+        <td style="font-family:monospace; font-size:0.88rem; font-weight:700; color:#1a3a5c;">{{ ref['doc_number'] }}</td>
+        <td style="font-size:0.9rem;">{{ ref['title'] }}</td>
+        <td style="font-size:0.88rem; color:#555;">{{ ref['revision'] or '—' }}</td>
+        <td style="font-size:0.88rem; color:#555;">{{ ref['section_cited'] or '—' }}</td>
+        {% if not locked %}
+        <td style="text-align:right; padding-right:0.75rem;">
+          <form method="post" action="{{ url_for('ha.ha_ref_delete', ha_pk=ha.id, ref_id=ref['id']) }}" style="display:inline;"
+                onsubmit="return confirm('Remove this reference from the analysis?');">
+            <button type="submit" class="action-btn action-btn-danger">Remove</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="section-body" style="color:#888; font-size:0.9rem; padding-bottom:{% if locked %}0.5rem{% else %}0{% endif %};">
+    No reference documents added yet.
+  </div>
+  {% endif %}
+
+  {% if not locked %}
+  <div class="section-body" style="border-top:1px solid #eee; padding-top:1rem; margin-top:{% if references %}0{% else %}-0.5rem{% endif %};">
+    <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; margin-bottom:0.75rem;">Add Reference</div>
+    <form method="post" action="{{ url_for('ha.ha_ref_add', ha_pk=ha.id) }}">
+      <input type="hidden" name="ref_doc_id" id="ref_doc_id_hidden">
+      {% if ref_library %}
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Pick from library</label>
+        <select id="ref_library_select" onchange="fillFromLibrary(this)"
+                style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+          <option value="">— Select to pre-fill fields below —</option>
+          {% for d in ref_library %}
+          <option value="{{ d['id'] }}"
+                  data-num="{{ d['doc_number'] }}"
+                  data-title="{{ d['title'] }}"
+                  data-rev="{{ d['revision'] or '' }}">{{ d['doc_number'] }}{% if d['revision'] %} ({{ d['revision'] }}){% endif %} — {{ d['title'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div style="display:grid; grid-template-columns:1fr 2fr 1fr 1fr; gap:0.75rem; align-items:end;">
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Document Number *</label>
+          <input type="text" name="doc_number" id="ref_doc_number" required
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
+                 placeholder="e.g. MWI 8715.15">
+        </div>
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Title *</label>
+          <input type="text" name="title" id="ref_title" required
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
+                 placeholder="Document title">
+        </div>
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
+          <input type="text" name="revision" id="ref_revision"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
+                 placeholder="e.g. Rev C">
+        </div>
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Section Cited</label>
+          <input type="text" name="section_cited"
+                 style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;"
+                 placeholder="e.g. §5.3">
+        </div>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <button type="submit" class="primary-button" style="padding:0.4rem 1rem; font-size:0.85rem;">Add Reference</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function fillFromLibrary(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  document.getElementById('ref_doc_id_hidden').value = opt.value;
+  document.getElementById('ref_doc_number').value    = opt.dataset.num;
+  document.getElementById('ref_title').value         = opt.dataset.title;
+  document.getElementById('ref_revision').value      = opt.dataset.rev;
+}
+</script>
+
 <!-- Risk Matrix Reference -->
 <div class="section-card">
   <div class="section-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';">

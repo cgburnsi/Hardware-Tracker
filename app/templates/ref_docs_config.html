@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Reference Documents — ER64 Ops Hub{% endblock %}
+
+{% block content %}
+<style>
+  .ref-table td, .ref-table th { vertical-align: top; }
+  .doc-number { font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #1a3a5c; }
+  .doc-desc   { font-size: 0.8rem; color: #777; margin-top: 0.2rem; }
+
+  /* Edit modal */
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:100; align-items:center; justify-content:center; }
+  .modal-backdrop.open { display:flex; }
+  .modal-box { background:#fff; border-radius:6px; padding:1.5rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+  .modal-title { font-size:1rem; font-weight:700; margin-bottom:1rem; }
+  .modal-row { margin-bottom:0.75rem; }
+  .modal-row label { display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem; }
+  .modal-row input, .modal-row textarea {
+    width:100%; border:1px solid #ccc; border-radius:4px;
+    padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;
+  }
+  .modal-row textarea { resize:vertical; min-height:60px; }
+  .modal-actions { display:flex; gap:0.5rem; margin-top:1rem; }
+</style>
+
+{% for doc in docs %}
+<script id="rd-{{ doc['id'] }}" type="application/json">
+{{ {'id': doc['id'], 'doc_number': doc['doc_number'], 'title': doc['title'], 'revision': doc['revision'] or '', 'description': doc['description'] or ''}|tojson }}
+</script>
+{% endfor %}
+
+<div class="page-title-row">
+  <h1 class="page-title">Reference Documents</h1>
+</div>
+
+{% if docs %}
+<div class="section-card">
+  <div class="section-header">Library</div>
+  <table class="ref-table">
+    <thead>
+      <tr>
+        <th style="width:11rem;">Document Number</th>
+        <th>Title</th>
+        <th style="width:7rem;">Revision</th>
+        <th style="width:9rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in docs %}
+      <tr>
+        <td>
+          <div class="doc-number">{{ doc['doc_number'] }}</div>
+        </td>
+        <td>
+          {{ doc['title'] }}
+          {% if doc['description'] %}
+          <div class="doc-desc">{{ doc['description'] }}</div>
+          {% endif %}
+        </td>
+        <td style="color:#555; font-size:0.88rem;">{{ doc['revision'] or '—' }}</td>
+        <td style="white-space:nowrap; text-align:right; padding-right:0.75rem;">
+          <button type="button" class="action-btn" onclick="openEditModal({{ doc['id'] }})">Edit</button>
+          <form method="post" action="{{ url_for('ha.ref_doc_delete', doc_id=doc['id']) }}" style="display:inline;"
+                onsubmit="return confirm('Remove \'{{ doc['doc_number'] }}\' from the library?');">
+            <button type="submit" class="action-btn action-btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="section-card">
+  <div class="section-body" style="color:#888; text-align:center; padding:2rem;">
+    No reference documents in the library yet. Add one below.
+  </div>
+</div>
+{% endif %}
+
+<div class="section-card">
+  <div class="section-header">Add Document</div>
+  <div class="section-body">
+    <form method="post" action="{{ url_for('ha.ref_doc_add') }}" style="display:grid; grid-template-columns:1fr 2fr 1fr; gap:0.75rem; align-items:end;">
+      <div>
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Document Number *</label>
+        <input type="text" name="doc_number" placeholder="e.g. MWI 8715.15" required style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Title *</label>
+        <input type="text" name="title" placeholder="e.g. ER64 Hazard Assessment Requirements" required style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
+        <input type="text" name="revision" placeholder="e.g. Rev C" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Description <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+        <input type="text" name="description" placeholder="Brief note about what this document covers" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      </div>
+      <div>
+        <button type="submit" class="primary-button">Add to Library</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="editModal" onclick="if(event.target===this)closeEditModal();">
+  <div class="modal-box">
+    <div class="modal-title">Edit Reference Document</div>
+    <form method="post" id="editForm">
+      <div class="modal-row">
+        <label>Document Number *</label>
+        <input type="text" name="doc_number" id="edit_doc_number" required>
+      </div>
+      <div class="modal-row">
+        <label>Title *</label>
+        <input type="text" name="title" id="edit_title" required>
+      </div>
+      <div class="modal-row">
+        <label>Revision</label>
+        <input type="text" name="revision" id="edit_revision" placeholder="e.g. Rev C">
+      </div>
+      <div class="modal-row">
+        <label>Description</label>
+        <textarea name="description" id="edit_description" placeholder="Optional note"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="primary-button">Save</button>
+        <button type="button" class="secondary-button" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(id) {
+  const data = JSON.parse(document.getElementById('rd-' + id).textContent);
+  document.getElementById('editForm').action = '/ha/ref-docs/' + id + '/edit';
+  document.getElementById('edit_doc_number').value = data.doc_number;
+  document.getElementById('edit_title').value       = data.title;
+  document.getElementById('edit_revision').value    = data.revision;
+  document.getElementById('edit_description').value = data.description;
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditModal(); });
+</script>
+{% endblock %}

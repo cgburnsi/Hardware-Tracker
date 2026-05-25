@@ -777,6 +777,30 @@ def migrate_db():
                 (row['id'], row['work_order_id'], _now)
             )
 
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS reference_documents (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_number  TEXT NOT NULL,
+            title       TEXT NOT NULL,
+            revision    TEXT,
+            description TEXT,
+            sort_order  INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hazard_references (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            ha_id         INTEGER NOT NULL,
+            ref_doc_id    INTEGER,
+            doc_number    TEXT NOT NULL,
+            title         TEXT NOT NULL,
+            revision      TEXT,
+            section_cited TEXT,
+            sort_order    INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id),
+            FOREIGN KEY (ref_doc_id) REFERENCES reference_documents(id)
+        )
+    """)
     db.executescript("""
         INSERT OR IGNORE INTO hazard_types (name, ppe_text, color, sort_order) VALUES
             ('High Pressure',       'Safety glasses required. Face shield required for pressures above 100 PSI. Verify pressure ratings on all fittings and tubing before pressurization.',                                                      '#c0392b', 1),

@@ -1,62 +1,283 @@
 {% extends 'base.html' %}
 {% block title %}Reference Documents — ER64 Ops Hub{% endblock %}
 
+{% block sidebar_filters %}
+<div class="subbar">
+  <form method="get" style="display:contents;">
+    <span class="sidebar-section-title">Filter</span>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search doc #, title…"
+           style="width:190px; border:1px solid #ccc; border-radius:3px; padding:0.28rem 0.45rem; font-size:0.82rem; background:#fff; font-family:inherit;">
+
+    <div class="filter-field">
+      <span class="filter-field-label">Dist</span>
+      <select name="dist" class="sidebar-select">
+        <option value="">(any)</option>
+        {% for code, desc in dist_statements %}
+        <option value="{{ code }}" {% if dist == code %}selected{% endif %}>{{ code }} — {{ desc[:40] }}{% if desc|length > 40 %}…{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-field">
+      <span class="filter-field-label">CUI</span>
+      <select name="cui_filter" class="sidebar-select">
+        <option value="">(any)</option>
+        <option value="cui"     {% if cui_filter == 'cui'     %}selected{% endif %}>CUI Only</option>
+        <option value="non_cui" {% if cui_filter == 'non_cui' %}selected{% endif %}>Non-CUI</option>
+      </select>
+    </div>
+
+    <div class="filter-field">
+      <span class="filter-field-label">Expiry</span>
+      <select name="expired" class="sidebar-select">
+        <option value="">(any)</option>
+        <option value="active"  {% if expired == 'active'  %}selected{% endif %}>Active</option>
+        <option value="expired" {% if expired == 'expired' %}selected{% endif %}>Expired</option>
+      </select>
+    </div>
+
+    <input type="hidden" name="sort"     value="{{ sort }}">
+    <input type="hidden" name="order"    value="{{ order }}">
+    <input type="hidden" name="per_page" value="{{ per_page or 'all' }}">
+
+    <button type="submit" class="sidebar-button">Apply</button>
+  </form>
+</div>
+
+{# ── Quick filters ── #}
+{% macro qf_url(key, val) %}{{ url_for('ha.ref_docs_list', q=q, dist=dist if key != 'dist' else val, cui_filter=cui_filter if key != 'cui_filter' else val, expired=expired if key != 'expired' else val, sort=sort, order=order, per_page=per_page or 'all') }}{% endmacro %}
+
+<div style="background:#e8eaed; border-bottom:1px solid #d1d1c8; padding:0.35rem 1.5rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+  <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#999; margin-right:0.25rem;">Quick Filters</span>
+
+  {# Dist A #}
+  {% if dist == 'A' %}
+    <a href="{{ qf_url('dist', '') }}" style="background:#1a6e3c; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">Dist A ✕</a>
+  {% else %}
+    <a href="{{ qf_url('dist', 'A') }}" style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">Dist A</a>
+  {% endif %}
+
+  {# Dist C #}
+  {% if dist == 'C' %}
+    <a href="{{ qf_url('dist', '') }}" style="background:#7a5c00; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">Dist C ✕</a>
+  {% else %}
+    <a href="{{ qf_url('dist', 'C') }}" style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">Dist C</a>
+  {% endif %}
+
+  {# CUI #}
+  {% if cui_filter == 'cui' %}
+    <a href="{{ qf_url('cui_filter', '') }}" style="background:#8b3a00; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">CUI ✕</a>
+  {% else %}
+    <a href="{{ qf_url('cui_filter', 'cui') }}" style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">CUI</a>
+  {% endif %}
+
+  {# Expired #}
+  {% if expired == 'expired' %}
+    <a href="{{ qf_url('expired', '') }}" style="background:#842029; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">Expired ✕</a>
+  {% else %}
+    <a href="{{ qf_url('expired', 'expired') }}" style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">Expired</a>
+  {% endif %}
+
+  {# Active only #}
+  {% if expired == 'active' %}
+    <a href="{{ qf_url('expired', '') }}" style="background:#0b5f9c; color:#fff; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:700; text-decoration:none;">Active Only ✕</a>
+  {% else %}
+    <a href="{{ qf_url('expired', 'active') }}" style="background:#fff; color:#555; border:1px solid #bbb; border-radius:3px; padding:0.22rem 0.6rem; font-size:0.75rem; font-weight:600; text-decoration:none;">Active Only</a>
+  {% endif %}
+</div>
+{% endblock %}
+
 {% block content %}
 <style>
   .ref-table td, .ref-table th { vertical-align: top; }
   .doc-number { font-family: monospace; font-size: 0.88rem; font-weight: 700; color: #1a3a5c; }
   .doc-desc   { font-size: 0.8rem; color: #777; margin-top: 0.2rem; }
+  .ref-link   { display:inline-block; font-size:0.78rem; font-weight:600; padding:0.15rem 0.5rem;
+                border-radius:4px; border:1px solid #ccc; background:#f5f5f5; color:#1a3a5c;
+                text-decoration:none; margin:0.1rem 0.1rem 0.1rem 0; white-space:nowrap; }
+  .ref-link:hover { background:#e8edf3; }
+
+  /* Classification badges */
+  .class-badges { display:flex; flex-wrap:wrap; gap:0.25rem; margin-top:0.35rem; }
+  .class-badge  {
+    font-family: monospace; font-size: 0.72rem; font-weight: 700;
+    padding: 0.12rem 0.45rem; border-radius: 3px; letter-spacing: 0.03em;
+  }
+  .badge-cui    { background: #8b3a00; color: #fff; }
+  .badge-dist-a { background: #1a6e3c; color: #fff; }
+  .badge-dist-b, .badge-dist-c, .badge-dist-d,
+  .badge-dist-e, .badge-dist-f, .badge-dist-x { background: #7a5c00; color: #fff; }
+
+  /* Sensitive docs banner */
+  .sensitive-banner {
+    background: #fff3cd; border: 1px solid #d4a800; border-left: 4px solid #d4a800;
+    border-radius: 5px; padding: 0.65rem 1rem; margin-bottom: 1rem;
+    font-size: 0.85rem; color: #5a4000;
+  }
+  .sensitive-banner strong { color: #3d2b00; }
+
+  /* Classification form section */
+  .class-section {
+    grid-column: 1 / -1;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+  }
+  .class-section-title {
+    font-size: 0.73rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: #888; margin-bottom: 0.6rem;
+  }
+  .class-row { margin-bottom: 0.6rem; }
+  .class-row label.toggle-label {
+    display: flex; align-items: center; gap: 0.45rem;
+    font-size: 0.88rem; cursor: pointer; font-weight: 600; color: #333;
+  }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.45rem; }
+  .cat-chip {
+    display: flex; align-items: center; gap: 0.3rem;
+    border: 1px solid #ccc; border-radius: 4px; padding: 0.2rem 0.5rem;
+    font-size: 0.8rem; cursor: pointer; background: #fafafa;
+  }
+  .cat-chip:hover { background: #f0f4f8; }
+  .cat-chip input { margin: 0; }
+  .cat-chip .cat-code { font-weight: 700; font-family: monospace; color: #1a3a5c; }
+  .cat-chip .cat-label { color: #555; }
+  .dist-fulltext {
+    font-size: 0.78rem; color: #555; font-style: italic;
+    margin-top: 0.3rem; padding: 0.3rem 0.5rem; background: #f8f8f8;
+    border-radius: 4px; border: 1px solid #e5e5e5;
+  }
 
   /* Edit modal */
   .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:100; align-items:center; justify-content:center; }
   .modal-backdrop.open { display:flex; }
-  .modal-box { background:#fff; border-radius:6px; padding:1.5rem; width:480px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+  .modal-box { background:#fff; border-radius:6px; padding:1.5rem; width:560px; max-width:95vw;
+               max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
   .modal-title { font-size:1rem; font-weight:700; margin-bottom:1rem; }
   .modal-row { margin-bottom:0.75rem; }
   .modal-row label { display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem; }
-  .modal-row input, .modal-row textarea {
+  .modal-row input[type=text], .modal-row input[type=date], .modal-row input[type=url],
+  .modal-row select, .modal-row textarea {
     width:100%; border:1px solid #ccc; border-radius:4px;
-    padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;
+    padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;
   }
   .modal-row textarea { resize:vertical; min-height:60px; }
   .modal-actions { display:flex; gap:0.5rem; margin-top:1rem; }
+  .file-meta { font-size:0.82rem; color:#555; margin-bottom:0.35rem; }
+  .modal-class-section { border-top:1px solid #e0e0e0; margin-top:0.75rem; padding-top:0.75rem; }
 </style>
 
 {% for doc in docs %}
 <script id="rd-{{ doc['id'] }}" type="application/json">
-{{ {'id': doc['id'], 'doc_number': doc['doc_number'], 'title': doc['title'], 'revision': doc['revision'] or '', 'description': doc['description'] or '', 'effective_date': doc['effective_date'] or '', 'expiration_date': doc['expiration_date'] or ''}|tojson }}
+{{ {
+  'id':             doc['id'],
+  'doc_number':     doc['doc_number'],
+  'title':          doc['title'],
+  'revision':       doc['revision'] or '',
+  'description':    doc['description'] or '',
+  'effective_date': doc['effective_date'] or '',
+  'expiration_date':doc['expiration_date'] or '',
+  'url':            doc['url'] or '',
+  'file_original':  doc['file_original'] or '',
+  'cui':            doc['cui'] or 0,
+  'cui_categories': doc['cui_categories'] or '',
+  'cui_dissem':     doc['cui_dissem'] or '',
+  'dist_statement': doc['dist_statement'] or '',
+  'dist_reason':    doc['dist_reason'] or ''
+}|tojson }}
 </script>
 {% endfor %}
 
 <div class="page-title-row">
   <h1 class="page-title">Reference Documents</h1>
+  <div style="display:flex; align-items:center; gap:1rem; margin-left:auto;">
+    <span style="font-size:0.82rem; color:#666;">
+      {% if total == 0 %}No documents{% elif per_page %}
+        {% set _s = (page - 1) * per_page + 1 %}
+        {% set _e = page * per_page if page * per_page < total else total %}
+        Showing {{ _s }}–{{ _e }} of {{ total }}
+      {% else %}Showing all {{ total }}{% endif %}
+    </span>
+    <form method="get" style="display:inline-flex; align-items:center; gap:0.35rem;">
+      <input type="hidden" name="q"          value="{{ q }}">
+      <input type="hidden" name="dist"       value="{{ dist }}">
+      <input type="hidden" name="cui_filter" value="{{ cui_filter }}">
+      <input type="hidden" name="expired"    value="{{ expired }}">
+      <input type="hidden" name="sort"       value="{{ sort }}">
+      <input type="hidden" name="order"      value="{{ order }}">
+      <label style="font-size:0.82rem; color:#666;">Per page:</label>
+      <select name="per_page" onchange="this.form.submit()"
+              style="font-size:0.82rem; border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.35rem; background:#fff; font-family:inherit; cursor:pointer;">
+        <option value="10"  {% if per_page == 10  %}selected{% endif %}>10</option>
+        <option value="25"  {% if per_page == 25  %}selected{% endif %}>25</option>
+        <option value="50"  {% if per_page == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        <option value="all" {% if per_page == 0   %}selected{% endif %}>All</option>
+      </select>
+    </form>
+    <button type="button" class="primary-button" onclick="openAddModal()">+ Add Document</button>
+  </div>
 </div>
 
-{% if docs %}
+{% if has_sensitive %}
+<div class="sensitive-banner">
+  <strong>Handling Notice:</strong> This library contains CUI and/or distribution-limited documents.
+  Handle in accordance with applicable CUI policy and distribution statement requirements.
+  This tool does not enforce access controls — ensure documents are shared only per their markings.
+</div>
+{% endif %}
+
+{% macro sort_link(col, label) %}
+  {% set new_order = 'asc' if (sort == col and order == 'desc') else ('desc' if sort == col else 'asc') %}
+  <a href="{{ url_for('ha.ref_docs_list', q=q, dist=dist, cui_filter=cui_filter, expired=expired, sort=col, order=new_order, per_page=per_page or 'all') }}"
+     style="color:inherit; text-decoration:none; white-space:nowrap;">
+    {{ label }}
+    {% if sort == col %}{{ '↑' if order == 'asc' else '↓' }}
+    {% else %}<span style="opacity:0.3;">↕</span>{% endif %}
+  </a>
+{% endmacro %}
+
+{% macro page_url(p) %}{{ url_for('ha.ref_docs_list', q=q, dist=dist, cui_filter=cui_filter, expired=expired, sort=sort, order=order, per_page=per_page or 'all', page=p) }}{% endmacro %}
+
 <div class="section-card">
   <div class="section-header">Library</div>
   <table class="ref-table">
     <thead>
       <tr>
-        <th style="width:11rem;">Document Number</th>
-        <th>Title</th>
-        <th style="width:6rem;">Revision</th>
-        <th style="width:8rem;">Effective</th>
-        <th style="width:8rem;">Expires</th>
-        <th style="width:9rem;"></th>
+        <th style="width:11rem;">{{ sort_link('doc_number', 'Document Number') }}</th>
+        <th>{{ sort_link('title', 'Title') }}</th>
+        <th style="width:6rem;">{{ sort_link('revision', 'Revision') }}</th>
+        <th style="width:8rem;">{{ sort_link('effective_date', 'Effective') }}</th>
+        <th style="width:8rem;">{{ sort_link('expiration_date', 'Expires') }}</th>
+        <th style="width:10rem;">Links</th>
+        <th style="width:5rem;"></th>
       </tr>
     </thead>
     <tbody>
       {% for doc in docs %}
       {% set expired = doc['expiration_date'] and doc['expiration_date'] < today %}
       <tr>
-        <td>
-          <div class="doc-number">{{ doc['doc_number'] }}</div>
-        </td>
+        <td><div class="doc-number">{{ doc['doc_number'] }}</div></td>
         <td>
           {{ doc['title'] }}
           {% if doc['description'] %}
           <div class="doc-desc">{{ doc['description'] }}</div>
+          {% endif %}
+          {% if doc['cui'] or doc['dist_statement'] %}
+          <div class="class-badges">
+            {% if doc['cui'] %}
+              {% set _cats = doc['cui_categories'].split(',') if doc['cui_categories'] else [] %}
+              {% set _dissems = doc['cui_dissem'].split(',') if doc['cui_dissem'] else [] %}
+              {% set _marking = 'CUI' + ('//' + _cats|join('/') if _cats else '') + ('//' + _dissems|join('/') if _dissems else '') %}
+              <span class="class-badge badge-cui" title="Controlled Unclassified Information">{{ _marking }}</span>
+            {% endif %}
+            {% if doc['dist_statement'] %}
+              <span class="class-badge badge-dist-{{ doc['dist_statement']|lower }}"
+                    title="{{ doc['dist_reason'] or '' }}">
+                DIST {{ doc['dist_statement'] }}{% if doc['dist_reason'] %} — {{ doc['dist_reason'] }}{% endif %}
+              </span>
+            {% endif %}
+          </div>
           {% endif %}
         </td>
         <td style="color:#555; font-size:0.88rem;">{{ doc['revision'] or '—' }}</td>
@@ -69,66 +290,200 @@
             <span style="color:#555;">{{ doc['expiration_date'] or '—' }}</span>
           {% endif %}
         </td>
-        <td style="white-space:nowrap; text-align:right; padding-right:0.75rem;">
+        <td>
+          {% if doc['file_stored'] %}
+            <a class="ref-link" href="{{ url_for('ha.serve_ref_doc_file', stored_name=doc['file_stored']) }}" target="_blank">
+              &#8681; {{ doc['file_original'] or 'Download' }}
+            </a>
+          {% endif %}
+          {% if doc['url'] %}
+            <a class="ref-link" href="{{ doc['url'] }}" target="_blank" rel="noopener noreferrer">&#8599; Open</a>
+          {% endif %}
+          {% if not doc['file_stored'] and not doc['url'] %}
+            <span style="color:#bbb; font-size:0.85rem;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; padding-right:0.75rem;">
           <button type="button" class="action-btn" onclick="openEditModal({{ doc['id'] }})">Edit</button>
-          <form method="post" action="{{ url_for('ha.ref_doc_delete', doc_id=doc['id']) }}" style="display:inline;"
-                onsubmit="return confirm('Remove \'{{ doc['doc_number'] }}\' from the library?');">
-            <button type="submit" class="action-btn action-btn-danger">Delete</button>
-          </form>
         </td>
       </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center; padding:2rem; color:#777;">
+        {% if q or dist or cui_filter or expired %}
+          No documents match the current filters.
+        {% else %}
+          No reference documents in the library yet.
+        {% endif %}
+      </td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-{% else %}
-<div class="section-card">
-  <div class="section-body" style="color:#888; text-align:center; padding:2rem;">
-    No reference documents in the library yet. Add one below.
-  </div>
+
+{% if total_pages > 1 %}
+<div style="display:flex; align-items:center; justify-content:center; gap:0.3rem; padding:1.1rem 0 0.5rem; flex-wrap:wrap;">
+  {% if page > 1 %}
+    <a href="{{ page_url(page - 1) }}" style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #ccc; border-radius:3px; font-size:0.82rem; color:#333; text-decoration:none; background:#fff;">← Prev</a>
+  {% else %}
+    <span style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #e0e0e0; border-radius:3px; font-size:0.82rem; color:#bbb; background:#f7f7f7;">← Prev</span>
+  {% endif %}
+  {% for p in page_list %}
+    {% if p is none %}
+      <span style="padding:0 0.2rem; color:#999; font-size:0.82rem;">…</span>
+    {% elif p == page %}
+      <span style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #0b5f9c; border-radius:3px; font-size:0.82rem; background:#0b5f9c; color:#fff; font-weight:700;">{{ p }}</span>
+    {% else %}
+      <a href="{{ page_url(p) }}" style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #ccc; border-radius:3px; font-size:0.82rem; color:#333; text-decoration:none; background:#fff;">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+    <a href="{{ page_url(page + 1) }}" style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #ccc; border-radius:3px; font-size:0.82rem; color:#333; text-decoration:none; background:#fff;">Next →</a>
+  {% else %}
+    <span style="display:inline-block; padding:0.28rem 0.6rem; border:1px solid #e0e0e0; border-radius:3px; font-size:0.82rem; color:#bbb; background:#f7f7f7;">Next →</span>
+  {% endif %}
 </div>
 {% endif %}
 
-<div class="section-card">
-  <div class="section-header">Add Document</div>
-  <div class="section-body">
-    <form method="post" action="{{ url_for('ha.ref_doc_add') }}" style="display:grid; grid-template-columns:1fr 2fr 1fr; gap:0.75rem; align-items:end;">
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Document Number *</label>
-        <input type="text" name="doc_number" placeholder="e.g. MWI 8715.15" required style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+{# ── Add Document modal ── #}
+<div class="modal-backdrop" id="addModal" onclick="if(event.target===this)closeAddModal();">
+  <div class="modal-box">
+    <div class="modal-title">Add Document</div>
+    <form method="post" action="{{ url_for('ha.ref_doc_add') }}" enctype="multipart/form-data">
+      <div class="modal-row">
+        <label>Document Number *</label>
+        <input type="text" name="doc_number" placeholder="e.g. MWI 8715.15" required>
       </div>
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Title *</label>
-        <input type="text" name="title" placeholder="e.g. ER64 Hazard Assessment Requirements" required style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      <div class="modal-row">
+        <label>Title *</label>
+        <input type="text" name="title" placeholder="e.g. ER64 Hazard Assessment Requirements" required>
       </div>
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Revision</label>
-        <input type="text" name="revision" placeholder="e.g. Rev C" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      <div class="modal-row">
+        <label>Revision</label>
+        <input type="text" name="revision" placeholder="e.g. Rev C">
       </div>
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Effective Date</label>
-        <input type="date" name="effective_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Effective Date</label>
+          <input type="date" name="effective_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+        </div>
+        <div>
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Expiration Date</label>
+          <input type="date" name="expiration_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+        </div>
       </div>
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Expiration Date</label>
-        <input type="date" name="expiration_date" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      <div class="modal-row">
+        <label>Description <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+        <textarea name="description" placeholder="Brief note about what this document covers" rows="3"></textarea>
       </div>
-      <div>
-        <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Description <span style="font-weight:400; color:#aaa;">(optional)</span></label>
-        <input type="text" name="description" placeholder="Brief note about what this document covers" style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.45rem 0.6rem; font-size:0.9rem; font-family:inherit;">
+      <div class="modal-row">
+        <label>URL <span style="font-weight:400; color:#aaa;">(link to where this document lives)</span></label>
+        <input type="url" name="url" placeholder="https://…">
       </div>
-      <div>
+      <div class="modal-row">
+        <label>Attach File <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+        <input type="file" name="file" style="font-size:0.85rem;">
+      </div>
+
+      <div class="modal-class-section">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.6rem;">
+          <div class="class-section-title" style="font-size:0.73rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#888;">Classification</div>
+          <a href="{{ url_for('ha.cui_categories_list') }}" style="font-size:0.72rem; color:var(--accent);">Manage categories ↗</a>
+        </div>
+        <div class="class-row">
+          <label class="toggle-label" style="display:flex; align-items:center; gap:0.45rem; font-size:0.88rem; cursor:pointer; font-weight:600; color:#333;">
+            <input type="checkbox" name="cui" id="add_cui_check" onchange="toggleCUI(this, 'add')">
+            Controlled Unclassified Information (CUI)
+          </label>
+          <div id="add_cui_cats" style="display:none;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem; margin-top:0.45rem;">Categories</div>
+            <div class="cat-chips">
+              {% for cat in cui_categories %}
+              <label class="cat-chip" title="{{ cat['description'] or '' }}">
+                <input type="checkbox" name="cui_categories" value="{{ cat['code'] }}">
+                <span class="cat-code">{{ cat['code'] }}</span>
+                <span class="cat-label">— {{ cat['label'] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div style="margin-top:0.4rem;">
+              <input type="text" name="cui_custom" id="add_cui_custom" placeholder="Other category codes (comma-separated, e.g. SP-PRVCY)"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.35rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+            </div>
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem; margin-top:0.75rem;">Dissemination Controls</div>
+            <div class="cat-chips">
+              {% for ctrl in dissem_controls %}
+              <label class="cat-chip" title="{{ ctrl['description'] or '' }}">
+                <input type="checkbox" name="cui_dissem" value="{{ ctrl['code'] }}">
+                <span class="cat-code">{{ ctrl['code'] }}</span>
+                <span class="cat-label">— {{ ctrl['label'] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div style="margin-top:0.4rem;">
+              <input type="text" name="cui_dissem_custom" id="add_cui_dissem_custom" placeholder="Other dissemination controls (comma-separated, e.g. REL TO GBR)"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.35rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+        <div class="class-row" style="margin-top:0.5rem;">
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Distribution Statement</label>
+          <select name="dist_statement" id="add_dist_stmt" onchange="toggleDistReason(this,'add_dist_reason','add_dist_fulltext')"
+                  style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; margin-bottom:0.4rem;">
+            <option value="">— None —</option>
+            {% for code, desc in dist_statements %}
+            <option value="{{ code }}">{{ code }} — {{ desc[:60] }}{% if desc|length > 60 %}…{% endif %}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="dist_reason" id="add_dist_reason" placeholder="Basis/reason for restriction"
+                 style="display:none; width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; box-sizing:border-box;">
+          <div id="add_dist_fulltext" class="dist-fulltext" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
         <button type="submit" class="primary-button">Add to Library</button>
+        <button type="button" class="secondary-button" onclick="closeAddModal()">Cancel</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Edit modal -->
+{# ── Event Log ── #}
+<div class="section-card">
+  <div class="section-header">Event Log</div>
+  <div class="section-body">
+    {% if event_log %}
+    <table style="width:100%; font-size:0.88rem;">
+      <thead>
+        <tr>
+          <th style="text-align:left; width:10rem; color:#999; font-weight:600; padding:0.4rem 0;">Timestamp (UTC)</th>
+          <th style="text-align:left; width:7rem; color:#999; font-weight:600; padding:0.4rem 0;">Document</th>
+          <th style="text-align:left; color:#999; font-weight:600; padding:0.4rem 0;">Event</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in event_log %}
+        <tr style="border-top:1px solid #eee;">
+          <td style="padding:0.45rem 0.5rem 0.45rem 0; color:#888; font-size:0.82rem; white-space:nowrap;">{{ entry['timestamp'] }}</td>
+          <td style="padding:0.45rem 0.5rem; font-family:monospace; font-size:0.82rem; font-weight:700; color:#1a3a5c;">{{ entry['doc_number'] }}</td>
+          <td style="padding:0.45rem 0;">
+            <strong>{{ entry['action_type'] }}</strong>: {{ entry['description'] }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="color:#888; text-align:center; padding:0.5rem 0;">No events recorded yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Edit modal ── #}
 <div class="modal-backdrop" id="editModal" onclick="if(event.target===this)closeEditModal();">
   <div class="modal-box">
     <div class="modal-title">Edit Reference Document</div>
-    <form method="post" id="editForm">
+    <form method="post" id="editForm" enctype="multipart/form-data">
       <div class="modal-row">
         <label>Document Number *</label>
         <input type="text" name="doc_number" id="edit_doc_number" required>
@@ -155,29 +510,216 @@
         <label>Description</label>
         <textarea name="description" id="edit_description" placeholder="Optional note"></textarea>
       </div>
+      <div class="modal-row">
+        <label>URL <span style="font-weight:400; color:#aaa;">(link to where this document lives)</span></label>
+        <input type="url" name="url" id="edit_url" placeholder="https://…">
+      </div>
+      <div class="modal-row">
+        <label>Attached File</label>
+        <div class="file-meta" id="edit_current_file"></div>
+        <label id="edit_clear_file_row" style="display:none; align-items:center; gap:0.4rem; font-size:0.8rem; color:#555; font-weight:400; margin-bottom:0.4rem; cursor:pointer;">
+          <input type="checkbox" name="clear_file" value="1" id="edit_clear_file"> Remove existing file
+        </label>
+        <div>
+          <span style="font-size:0.75rem; color:#aaa;">Upload replacement</span><br>
+          <input type="file" name="file" id="edit_file_input" style="font-size:0.85rem; margin-top:0.2rem;">
+        </div>
+      </div>
+
+      {# ── Classification (modal) ── #}
+      <div class="modal-class-section">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.6rem;">
+          <div class="class-section-title" style="font-size:0.73rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#888;">Classification</div>
+          <a href="{{ url_for('ha.cui_categories_list') }}" style="font-size:0.72rem; color:var(--accent);">Manage categories ↗</a>
+        </div>
+
+        <div class="class-row">
+          <label class="toggle-label" style="display:flex; align-items:center; gap:0.45rem; font-size:0.88rem; cursor:pointer; font-weight:600; color:#333;">
+            <input type="checkbox" name="cui" id="edit_cui_check" onchange="toggleCUI(this, 'edit')">
+            Controlled Unclassified Information (CUI)
+          </label>
+          <div id="edit_cui_cats" style="display:none;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem; margin-top:0.45rem;">Categories</div>
+            <div class="cat-chips">
+              {% for cat in cui_categories %}
+              <label class="cat-chip" title="{{ cat['description'] or '' }}">
+                <input type="checkbox" name="cui_categories" value="{{ cat['code'] }}" class="edit-cui-cat">
+                <span class="cat-code">{{ cat['code'] }}</span>
+                <span class="cat-label">— {{ cat['label'] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div style="margin-top:0.4rem;">
+              <input type="text" name="cui_custom" id="edit_cui_custom" placeholder="Other category codes (comma-separated, e.g. SP-PRVCY)"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.35rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+            </div>
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#aaa; margin-bottom:0.3rem; margin-top:0.75rem;">Dissemination Controls</div>
+            <div class="cat-chips">
+              {% for ctrl in dissem_controls %}
+              <label class="cat-chip" title="{{ ctrl['description'] or '' }}">
+                <input type="checkbox" name="cui_dissem" value="{{ ctrl['code'] }}" class="edit-dissem-ctrl">
+                <span class="cat-code">{{ ctrl['code'] }}</span>
+                <span class="cat-label">— {{ ctrl['label'] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div style="margin-top:0.4rem;">
+              <input type="text" name="cui_dissem_custom" id="edit_cui_dissem_custom" placeholder="Other dissemination controls (comma-separated, e.g. REL TO GBR)"
+                     style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.35rem 0.5rem; font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+
+        <div class="class-row" style="margin-top:0.5rem;">
+          <label style="display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem;">Distribution Statement</label>
+          <select name="dist_statement" id="edit_dist_stmt" onchange="toggleDistReason(this,'edit_dist_reason','edit_dist_fulltext')"
+                  style="width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; margin-bottom:0.4rem;">
+            <option value="">— None —</option>
+            {% for code, desc in dist_statements %}
+            <option value="{{ code }}">{{ code }} — {{ desc[:60] }}{% if desc|length > 60 %}…{% endif %}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="dist_reason" id="edit_dist_reason" placeholder="Basis/reason for restriction"
+                 style="display:none; width:100%; border:1px solid #ccc; border-radius:4px; padding:0.4rem 0.6rem; font-size:0.88rem; font-family:inherit; box-sizing:border-box;">
+          <div id="edit_dist_fulltext" class="dist-fulltext" style="display:none;"></div>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button type="submit" class="primary-button">Save</button>
         <button type="button" class="secondary-button" onclick="closeEditModal()">Cancel</button>
       </div>
     </form>
+
+    <div style="border-top:1px solid #f0d0d0; margin-top:1.25rem; padding-top:1rem;">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#c0392b; margin-bottom:0.5rem;">Danger Zone</div>
+      <form method="post" id="editDeleteForm"
+            onsubmit="return confirm('Permanently remove this document from the library? This cannot be undone.');">
+        <button type="submit" class="action-btn action-btn-danger">Remove from Library</button>
+      </form>
+    </div>
   </div>
 </div>
 
 <script>
+const DIST_FULLTEXT = {
+  'A': 'Approved for Public Release; Distribution Unlimited',
+  'B': 'U.S. Government Agencies Only',
+  'C': 'U.S. Government Agencies and Their Contractors',
+  'D': 'Department of Defense and U.S. DoD Contractors Only',
+  'E': 'DoD Components Only',
+  'F': 'Further Distribution Only as Directed by Controlling DoD Office',
+  'X': 'U.S. Government Agencies and Private Individuals or Enterprises Eligible to Obtain Export-Controlled Technical Data'
+};
+const DIST_RESTRICTED = new Set(['B','C','D','E','F','X']);
+
+function toggleCUI(checkbox, prefix) {
+  const cats = document.getElementById(prefix + '_cui_cats');
+  cats.style.display = checkbox.checked ? '' : 'none';
+  if (!checkbox.checked) {
+    cats.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+    const custom = document.getElementById(prefix + '_cui_custom');
+    if (custom) custom.value = '';
+    const dissemCustom = document.getElementById(prefix + '_cui_dissem_custom');
+    if (dissemCustom) dissemCustom.value = '';
+  }
+}
+
+function toggleDistReason(select, reasonId, fulltextId) {
+  const code     = select.value;
+  const reason   = document.getElementById(reasonId);
+  const fulltext = document.getElementById(fulltextId);
+  reason.style.display   = DIST_RESTRICTED.has(code) ? '' : 'none';
+  if (code && DIST_FULLTEXT[code]) {
+    fulltext.textContent = DIST_FULLTEXT[code];
+    fulltext.style.display = '';
+  } else {
+    fulltext.style.display = 'none';
+  }
+}
+
 function openEditModal(id) {
   const data = JSON.parse(document.getElementById('rd-' + id).textContent);
-  document.getElementById('editForm').action = '/ha/ref-docs/' + id + '/edit';
-  document.getElementById('edit_doc_number').value    = data.doc_number;
-  document.getElementById('edit_title').value         = data.title;
-  document.getElementById('edit_revision').value      = data.revision;
+  document.getElementById('editForm').action       = '/ha/ref-docs/' + id + '/edit';
+  document.getElementById('editDeleteForm').action = '/ha/ref-docs/' + id + '/delete';
+
+  // Basic fields
+  document.getElementById('edit_doc_number').value      = data.doc_number;
+  document.getElementById('edit_title').value           = data.title;
+  document.getElementById('edit_revision').value        = data.revision;
   document.getElementById('edit_effective_date').value  = data.effective_date;
   document.getElementById('edit_expiration_date').value = data.expiration_date;
-  document.getElementById('edit_description').value   = data.description;
+  document.getElementById('edit_description').value     = data.description;
+  document.getElementById('edit_url').value             = data.url;
+
+  // File
+  const fileDisplay = document.getElementById('edit_current_file');
+  const clearRow    = document.getElementById('edit_clear_file_row');
+  document.getElementById('edit_clear_file').checked = false;
+  document.getElementById('edit_file_input').value   = '';
+  if (data.file_original) {
+    fileDisplay.textContent = 'Current: ' + data.file_original;
+    clearRow.style.display  = 'flex';
+  } else {
+    fileDisplay.textContent = 'No file attached.';
+    clearRow.style.display  = 'none';
+  }
+
+  // CUI — split stored codes into known (checkboxes) vs unknown (custom field)
+  const cuiCheck = document.getElementById('edit_cui_check');
+  cuiCheck.checked = data.cui == 1;
+  const cuiCatsDiv = document.getElementById('edit_cui_cats');
+  cuiCatsDiv.style.display = cuiCheck.checked ? '' : 'none';
+
+  // Categories
+  const selectedCats = data.cui_categories ? data.cui_categories.split(',') : [];
+  const knownCatCodes = new Set();
+  cuiCatsDiv.querySelectorAll('.edit-cui-cat').forEach(c => {
+    c.checked = selectedCats.includes(c.value);
+    if (c.checked) knownCatCodes.add(c.value);
+  });
+  const customCats = selectedCats.filter(c => c && !knownCatCodes.has(c));
+  document.getElementById('edit_cui_custom').value = customCats.join(', ');
+
+  // Dissemination controls
+  const selectedDissems = data.cui_dissem ? data.cui_dissem.split(',') : [];
+  const knownDissemCodes = new Set();
+  cuiCatsDiv.querySelectorAll('.edit-dissem-ctrl').forEach(c => {
+    c.checked = selectedDissems.includes(c.value);
+    if (c.checked) knownDissemCodes.add(c.value);
+  });
+  const customDissems = selectedDissems.filter(d => d && !knownDissemCodes.has(d));
+  document.getElementById('edit_cui_dissem_custom').value = customDissems.join(', ');
+
+  // Distribution
+  const distStmt = document.getElementById('edit_dist_stmt');
+  distStmt.value = data.dist_statement;
+  document.getElementById('edit_dist_reason').value = data.dist_reason;
+  toggleDistReason(distStmt, 'edit_dist_reason', 'edit_dist_fulltext');
+
   document.getElementById('editModal').classList.add('open');
 }
+
 function closeEditModal() {
   document.getElementById('editModal').classList.remove('open');
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditModal(); });
+
+function openAddModal() {
+  const m = document.getElementById('addModal');
+  // reset CUI section
+  const cuiCheck = document.getElementById('add_cui_check');
+  if (cuiCheck.checked) {
+    cuiCheck.checked = false;
+    toggleCUI(cuiCheck, 'add');
+  }
+  m.classList.add('open');
+}
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeEditModal(); closeAddModal(); }
+});
 </script>
 {% endblock %}

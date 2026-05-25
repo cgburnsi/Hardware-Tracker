@@ -32,6 +32,8 @@
 
 {% set cls = (ha.preliminary_classification or '').lower() %}
 
+<div style="max-width:900px;">
+
 <div class="page-title-row">
   <div>
     <a href="{{ url_for('ha.ha_list') }}" style="color:#888; text-decoration:none; font-size:0.85rem;">← Hazard Analyses</a>
@@ -282,7 +284,7 @@ function fillFromLibrary(sel) {
         <td style="color:#888; font-size:0.85rem; white-space:nowrap;">H-{{ '%02d'|format(loop.index) }}</td>
         <td>
           <a href="{{ url_for('ha.hazard_detail', ha_pk=ha.id, item_id=item.id) }}" style="color:var(--accent); text-decoration:none; font-weight:500;">
-            {{ item.hazard_description | truncate(80) }}
+            {{ (item.hazard_title or item.hazard_description) | truncate(80) }}
           </a>
         </td>
         <td>
@@ -344,4 +346,6 @@ function fillFromLibrary(sel) {
     </form>
   </div>
 </div>
+
+</div>{# end max-width wrapper #}
 {% endblock %}

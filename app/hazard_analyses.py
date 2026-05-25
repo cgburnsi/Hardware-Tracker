@@ -1,5 +1,8 @@
+import os
+import uuid
 from datetime import datetime
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from werkzeug.utils import secure_filename
 from app.db import get_db
 
 bp = Blueprint('ha', __name__, url_prefix='/ha')
@@ -18,6 +21,17 @@ PROBABILITY_LABELS = {
     'D': 'Remote',
     'E': 'Improbable',
 }
+
+DIST_STATEMENTS = [
+    ('A', 'Approved for Public Release; Distribution Unlimited'),
+    ('B', 'U.S. Government Agencies Only'),
+    ('C', 'U.S. Government Agencies and Their Contractors'),
+    ('D', 'Department of Defense and U.S. DoD Contractors Only'),
+    ('E', 'DoD Components Only'),
+    ('F', 'Further Distribution Only as Directed by Controlling DoD Office'),
+    ('X', 'U.S. Government Agencies and Private Individuals or Enterprises '
+          'Eligible to Obtain Export-Controlled Technical Data'),
+]
 
 RAC_RANK = {
     '1A': 'High',     '1B': 'High',     '1C': 'High',     '1D': 'High',     '1E': 'Moderate',
@@ -280,12 +294,13 @@ def hazard_new(ha_pk):
         next_idx = (row['mx'] or 0) + 1
         db.execute("""
             INSERT INTO hazard_items
-              (ha_id, order_index, hazard_description, cause, consequence,
+              (ha_id, order_index, hazard_title, hazard_description, cause, consequence,
                initial_severity, initial_probability, final_severity, final_probability, closed)
-            VALUES (?,?,?,?,?,?,?,?,?,0)
+            VALUES (?,?,?,?,?,?,?,?,?,?,0)
         """, (
             ha_pk, next_idx,
-            request.form['hazard_description'].strip(),
+            request.form['hazard_title'].strip(),
+            request.form.get('hazard_description', '').strip(),
             request.form.get('cause', '').strip(),
             request.form.get('consequence', '').strip(),
             request.form.get('initial_severity') or None,
@@ -355,12 +370,13 @@ def hazard_edit(ha_pk, item_id):
     if request.method == 'POST':
         db.execute("""
             UPDATE hazard_items SET
-              hazard_description=?, cause=?, consequence=?,
+              hazard_title=?, hazard_description=?, cause=?, consequence=?,
               initial_severity=?, initial_probability=?,
               final_severity=?, final_probability=?
             WHERE id=?
         """, (
-            request.form['hazard_description'].strip(),
+            request.form['hazard_title'].strip(),
+            request.form.get('hazard_description', '').strip(),
             request.form.get('cause', '').strip(),
             request.form.get('consequence', '').strip(),
             request.form.get('initial_severity') or None,
@@ -501,14 +517,173 @@ def control_delete(ha_pk, item_id, rec_id, ctrl_id):
 
 # ── REFERENCE LIBRARY (config) ────────────────────────────────────────────────
 
+_ALLOWED_REF_DOC_EXT = {
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'txt', 'csv', 'dwg', 'dxf', 'zip', 'png', 'jpg', 'jpeg',
+}
+
+def _parse_cui_categories(form):
+    checked = form.getlist('cui_categories')
+    custom  = [c.strip().upper() for c in form.get('cui_custom', '').split(',') if c.strip()]
+    seen, result = set(), []
+    for code in checked + custom:
+        if code not in seen:
+            seen.add(code)
+            result.append(code)
+    return ','.join(result) or None
+
+
+def _build_cui_marking(cui_categories, cui_dissem):
+    """Build the full CUI marking string per CUI Registry format."""
+    parts = ['CUI']
+    cats = [c for c in (cui_categories or '').split(',') if c]
+    dissems = [d for d in (cui_dissem or '').split(',') if d]
+    if cats:
+        parts.append('//' + '/'.join(cats))
+    if dissems:
+        parts.append('//' + '/'.join(dissems))
+    return ''.join(parts)
+
+
+def _parse_cui_dissem(form):
+    checked = form.getlist('cui_dissem')
+    custom  = [c.strip().upper() for c in form.get('cui_dissem_custom', '').split(',') if c.strip()]
+    seen, result = set(), []
+    for code in checked + custom:
+        if code not in seen:
+            seen.add(code)
+            result.append(code)
+    return ','.join(result) or None
+
+
+def _log_ref_doc(db, ref_doc_id, doc_number, action_type, description):
+    db.execute(
+        "INSERT INTO ref_doc_log (ref_doc_id, doc_number, timestamp, action_type, description)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (ref_doc_id, doc_number, datetime.utcnow().isoformat(timespec='seconds'), action_type, description)
+    )
+
+
+def _ref_doc_folder():
+    folder = os.path.join(current_app.instance_path, 'uploads', 'ref_docs')
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+@bp.route('/ref-docs/file/<path:stored_name>')
+def serve_ref_doc_file(stored_name):
+    return send_from_directory(_ref_doc_folder(), stored_name)
+
+
+_REF_DOC_SORT_COLS = {'doc_number', 'title', 'revision', 'effective_date', 'expiration_date'}
+
+_VALID_REF_PER_PAGE = (10, 25, 50, 100)
+
 @bp.route('/ref-docs')
 def ref_docs_list():
     db = get_db()
-    docs = db.execute(
-        "SELECT * FROM reference_documents ORDER BY sort_order, doc_number"
-    ).fetchall()
+    q          = request.args.get('q', '').strip()
+    dist       = request.args.get('dist', '').strip()
+    cui_filter = request.args.get('cui_filter', '').strip()
+    expired    = request.args.get('expired', '').strip()
+    sort       = request.args.get('sort', 'doc_number').strip()
+    order      = request.args.get('order', 'asc').strip()
+    per_page_raw = request.args.get('per_page', '25').strip()
+    try:
+        page = max(1, int(request.args.get('page', '1')))
+    except ValueError:
+        page = 1
+
+    if sort not in _REF_DOC_SORT_COLS:
+        sort = 'doc_number'
+    if order not in ('asc', 'desc'):
+        order = 'asc'
+    if per_page_raw == 'all':
+        per_page = 0
+    else:
+        try:
+            per_page = int(per_page_raw)
+        except ValueError:
+            per_page = 25
+        if per_page not in _VALID_REF_PER_PAGE:
+            per_page = 25
+
     today = datetime.now().strftime('%Y-%m-%d')
-    return render_template('ref_docs_config.html', docs=docs, today=today)
+
+    conditions, params = [], []
+    if q:
+        conditions.append("(doc_number LIKE ? OR title LIKE ? OR description LIKE ?)")
+        params.extend([f'%{q}%', f'%{q}%', f'%{q}%'])
+    if dist:
+        conditions.append("dist_statement = ?")
+        params.append(dist)
+    if cui_filter == 'cui':
+        conditions.append("cui = 1")
+    elif cui_filter == 'non_cui':
+        conditions.append("(cui = 0 OR cui IS NULL)")
+    if expired == 'active':
+        conditions.append("(expiration_date IS NULL OR expiration_date >= ?)")
+        params.append(today)
+    elif expired == 'expired':
+        conditions.append("expiration_date IS NOT NULL AND expiration_date < ?")
+        params.append(today)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    total = db.execute(
+        f"SELECT COUNT(*) FROM reference_documents {where}", params
+    ).fetchone()[0]
+
+    if per_page:
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        docs = db.execute(
+            f"SELECT * FROM reference_documents {where}"
+            f" ORDER BY {sort} {order.upper()} LIMIT ? OFFSET ?",
+            params + [per_page, offset]
+        ).fetchall()
+        visible = sorted({1, total_pages} | set(range(max(1, page - 2), min(total_pages, page + 2) + 1)))
+        page_list = []
+        for i, p in enumerate(visible):
+            if i > 0 and p > visible[i - 1] + 1:
+                page_list.append(None)
+            page_list.append(p)
+    else:
+        page, total_pages, page_list = 1, 1, [1]
+        docs = db.execute(
+            f"SELECT * FROM reference_documents {where} ORDER BY {sort} {order.upper()}",
+            params
+        ).fetchall()
+
+    has_sensitive = db.execute(
+        "SELECT COUNT(*) FROM reference_documents"
+        " WHERE cui=1 OR (dist_statement IS NOT NULL AND dist_statement != 'A')"
+    ).fetchone()[0] > 0
+
+    cui_categories = db.execute(
+        "SELECT code, label, description FROM cui_categories ORDER BY sort_order, code"
+    ).fetchall()
+
+    dissem_controls = db.execute(
+        "SELECT code, label, description FROM cui_dissem_controls ORDER BY sort_order, code"
+    ).fetchall()
+
+    event_log = db.execute(
+        "SELECT * FROM ref_doc_log ORDER BY timestamp DESC LIMIT 100"
+    ).fetchall()
+
+    return render_template(
+        'ref_docs_config.html', docs=docs, today=today,
+        has_sensitive=has_sensitive,
+        cui_categories=cui_categories,
+        dissem_controls=dissem_controls,
+        dist_statements=DIST_STATEMENTS,
+        event_log=event_log,
+        sort=sort, order=order,
+        q=q, dist=dist, cui_filter=cui_filter, expired=expired,
+        per_page=per_page, page=page, total=total,
+        total_pages=total_pages, page_list=page_list,
+    )
 
 
 @bp.route('/ref-docs/add', methods=['POST'])
@@ -520,16 +695,42 @@ def ref_doc_add():
     description     = request.form.get('description', '').strip()
     effective_date  = request.form.get('effective_date', '').strip()
     expiration_date = request.form.get('expiration_date', '').strip()
+    url             = request.form.get('url', '').strip()
+    cui             = 1 if request.form.get('cui') else 0
+    cui_categories  = _parse_cui_categories(request.form)
+    cui_dissem      = _parse_cui_dissem(request.form)
+    dist_statement  = request.form.get('dist_statement', '').strip() or None
+    dist_reason     = request.form.get('dist_reason', '').strip() or None
     if doc_number and title:
         row = db.execute("SELECT MAX(sort_order) as mx FROM reference_documents").fetchone()
         next_order = (row['mx'] or 0) + 1
         db.execute(
             "INSERT INTO reference_documents"
-            " (doc_number, title, revision, description, effective_date, expiration_date, sort_order)"
-            " VALUES (?,?,?,?,?,?,?)",
+            " (doc_number, title, revision, description, effective_date, expiration_date,"
+            "  url, cui, cui_categories, cui_dissem, dist_statement, dist_reason, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (doc_number, title, revision or None, description or None,
-             effective_date or None, expiration_date or None, next_order)
+             effective_date or None, expiration_date or None, url or None,
+             cui, cui_categories, cui_dissem, dist_statement, dist_reason, next_order)
         )
+        doc_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        f = request.files.get('file')
+        if f and f.filename:
+            ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+            if ext in _ALLOWED_REF_DOC_EXT:
+                stored = f"rdoc_{doc_id}_{uuid.uuid4().hex[:8]}.{ext}"
+                f.save(os.path.join(_ref_doc_folder(), stored))
+                db.execute(
+                    "UPDATE reference_documents SET file_original=?, file_stored=? WHERE id=?",
+                    (secure_filename(f.filename), stored, doc_id)
+                )
+        marking = _build_cui_marking(cui_categories, cui_dissem)
+        parts = [title]
+        if cui:
+            parts.append(marking)
+        if dist_statement:
+            parts.append(f'Dist {dist_statement}')
+        _log_ref_doc(db, doc_id, doc_number, 'Added', f"Added to library: {'; '.join(parts)}")
         db.commit()
         flash(f'"{doc_number}" added to reference library.', 'success')
     return redirect(url_for('ha.ref_docs_list'))
@@ -544,16 +745,73 @@ def ref_doc_edit(doc_id):
     description     = request.form.get('description', '').strip()
     effective_date  = request.form.get('effective_date', '').strip()
     expiration_date = request.form.get('expiration_date', '').strip()
-    if doc_number and title:
-        db.execute(
-            "UPDATE reference_documents"
-            " SET doc_number=?, title=?, revision=?, description=?, effective_date=?, expiration_date=?"
-            " WHERE id=?",
-            (doc_number, title, revision or None, description or None,
-             effective_date or None, expiration_date or None, doc_id)
-        )
-        db.commit()
-        flash('Reference document updated.', 'success')
+    url             = request.form.get('url', '').strip()
+    clear_file      = request.form.get('clear_file') == '1'
+    cui             = 1 if request.form.get('cui') else 0
+    cui_categories  = _parse_cui_categories(request.form)
+    cui_dissem      = _parse_cui_dissem(request.form)
+    dist_statement  = request.form.get('dist_statement', '').strip() or None
+    dist_reason     = request.form.get('dist_reason', '').strip() or None
+    if not (doc_number and title):
+        return redirect(url_for('ha.ref_docs_list'))
+    existing = db.execute("SELECT * FROM reference_documents WHERE id=?", (doc_id,)).fetchone()
+    if not existing:
+        return redirect(url_for('ha.ref_docs_list'))
+    file_original = existing['file_original']
+    file_stored   = existing['file_stored']
+    f = request.files.get('file')
+    if f and f.filename:
+        ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+        if ext in _ALLOWED_REF_DOC_EXT:
+            if file_stored:
+                old_path = os.path.join(_ref_doc_folder(), file_stored)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            file_stored   = f"rdoc_{doc_id}_{uuid.uuid4().hex[:8]}.{ext}"
+            file_original = secure_filename(f.filename)
+            f.save(os.path.join(_ref_doc_folder(), file_stored))
+    elif clear_file and file_stored:
+        old_path = os.path.join(_ref_doc_folder(), file_stored)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+        file_original = None
+        file_stored   = None
+    db.execute(
+        "UPDATE reference_documents"
+        " SET doc_number=?, title=?, revision=?, description=?, effective_date=?, expiration_date=?,"
+        "     url=?, file_original=?, file_stored=?,"
+        "     cui=?, cui_categories=?, cui_dissem=?, dist_statement=?, dist_reason=?"
+        " WHERE id=?",
+        (doc_number, title, revision or None, description or None,
+         effective_date or None, expiration_date or None, url or None,
+         file_original, file_stored,
+         cui, cui_categories, cui_dissem, dist_statement, dist_reason, doc_id)
+    )
+    changes = []
+    if doc_number != existing['doc_number']:
+        changes.append(f"Doc# → {doc_number}")
+    if title != existing['title']:
+        changes.append("Title updated")
+    if (revision or '') != (existing['revision'] or ''):
+        changes.append(f"Revision → {revision or '—'}")
+    if (url or '') != (existing['url'] or ''):
+        changes.append("URL updated")
+    if bool(cui) != bool(existing['cui']):
+        changes.append("CUI " + ("added" if cui else "removed"))
+    elif cui and (cui_categories or '') != (existing['cui_categories'] or ''):
+        changes.append("CUI categories updated")
+    elif cui and (cui_dissem or '') != (existing.get('cui_dissem') or ''):
+        changes.append("CUI dissemination controls updated")
+    if (dist_statement or '') != (existing['dist_statement'] or ''):
+        changes.append(f"Dist statement → {dist_statement or 'None'}")
+    if file_stored and file_stored != existing['file_stored']:
+        changes.append(f"File attached: {file_original}")
+    elif clear_file:
+        changes.append("File removed")
+    desc = "Updated" + (f": {'; '.join(changes)}" if changes else " (no field changes)")
+    _log_ref_doc(db, doc_id, doc_number, 'Edited', desc)
+    db.commit()
+    flash('Reference document updated.', 'success')
     return redirect(url_for('ha.ref_docs_list'))
 
 
@@ -572,10 +830,216 @@ def ref_doc_delete(doc_id):
             'error'
         )
         return redirect(url_for('ha.ref_docs_list'))
+    _log_ref_doc(db, doc_id, row['doc_number'], 'Deleted', f"Removed from library: {row['title']}")
+    if row['file_stored']:
+        try:
+            old_path = os.path.join(_ref_doc_folder(), row['file_stored'])
+            if os.path.exists(old_path):
+                os.remove(old_path)
+        except OSError:
+            pass
     db.execute("DELETE FROM reference_documents WHERE id = ?", (doc_id,))
     db.commit()
     flash(f'"{row["doc_number"]}" removed from reference library.', 'success')
     return redirect(url_for('ha.ref_docs_list'))
+
+
+# ── CUI CATEGORY CONFIG ────────────────────────────────────────────────────────
+
+_VALID_CUI_PER_PAGE = {10, 25, 50, 100}
+
+
+def _cui_paginate(db, table, where, params, per_page, page):
+    total = db.execute(f"SELECT COUNT(*) FROM {table} {where}", params).fetchone()[0]
+    if per_page:
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(max(1, page), total_pages)
+        offset = (page - 1) * per_page
+        rows = db.execute(
+            f"SELECT * FROM {table} {where} ORDER BY sort_order, code LIMIT ? OFFSET ?",
+            params + [per_page, offset]
+        ).fetchall()
+        visible = sorted({1, total_pages} | set(range(max(1, page - 2), min(total_pages, page + 2) + 1)))
+        page_list = []
+        for i, p in enumerate(visible):
+            if i > 0 and p > visible[i - 1] + 1:
+                page_list.append(None)
+            page_list.append(p)
+    else:
+        page, total_pages, page_list = 1, 1, [1]
+        rows = db.execute(
+            f"SELECT * FROM {table} {where} ORDER BY sort_order, code", params
+        ).fetchall()
+    return rows, total, page, total_pages, page_list
+
+
+@bp.route('/cui-categories')
+def cui_categories_list():
+    db = get_db()
+    q            = request.args.get('q', '').strip()
+    per_page_raw = request.args.get('per_page', 'all')
+    cat_page     = max(1, int(request.args.get('cat_page', 1) or 1))
+    dissem_page  = max(1, int(request.args.get('dissem_page', 1) or 1))
+
+    if per_page_raw == 'all':
+        per_page = 0
+    else:
+        try:
+            per_page = int(per_page_raw)
+        except ValueError:
+            per_page = 25
+        if per_page not in _VALID_CUI_PER_PAGE:
+            per_page = 25
+
+    if q:
+        where  = "WHERE (code LIKE ? OR label LIKE ? OR description LIKE ?)"
+        params = [f'%{q}%', f'%{q}%', f'%{q}%']
+    else:
+        where, params = '', []
+
+    cats,   cat_total,   cat_page,   cat_total_pages,   cat_page_list   = _cui_paginate(db, 'cui_categories',     where, params[:], per_page, cat_page)
+    dissems, dissem_total, dissem_page, dissem_total_pages, dissem_page_list = _cui_paginate(db, 'cui_dissem_controls', where, params[:], per_page, dissem_page)
+
+    return render_template(
+        'cui_categories_config.html',
+        cats=cats, cat_total=cat_total, cat_page=cat_page,
+        cat_total_pages=cat_total_pages, cat_page_list=cat_page_list,
+        dissems=dissems, dissem_total=dissem_total, dissem_page=dissem_page,
+        dissem_total_pages=dissem_total_pages, dissem_page_list=dissem_page_list,
+        q=q, per_page=per_page,
+    )
+
+
+@bp.route('/cui-categories/add', methods=['POST'])
+def cui_category_add():
+    db    = get_db()
+    code  = request.form.get('code', '').strip().upper()
+    label = request.form.get('label', '').strip()
+    if code and label:
+        description    = request.form.get('description', '').strip() or None
+        sort_order_str = request.form.get('sort_order', '').strip()
+        if sort_order_str.isdigit():
+            sort_order = int(sort_order_str)
+        else:
+            row = db.execute("SELECT MAX(sort_order) as mx FROM cui_categories").fetchone()
+            sort_order = (row['mx'] or 0) + 1
+        db.execute(
+            "INSERT OR IGNORE INTO cui_categories (code, label, description, sort_order) VALUES (?, ?, ?, ?)",
+            (code, label, description, sort_order)
+        )
+        db.commit()
+        flash(f'Category {code} added.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
+
+
+@bp.route('/cui-categories/<int:cat_id>/edit', methods=['POST'])
+def cui_category_edit(cat_id):
+    db    = get_db()
+    code  = request.form.get('code', '').strip().upper()
+    label = request.form.get('label', '').strip()
+    if code and label:
+        description    = request.form.get('description', '').strip() or None
+        sort_order_str = request.form.get('sort_order', '').strip()
+        if sort_order_str.isdigit():
+            db.execute(
+                "UPDATE cui_categories SET code=?, label=?, description=?, sort_order=? WHERE id=?",
+                (code, label, description, int(sort_order_str), cat_id)
+            )
+        else:
+            db.execute(
+                "UPDATE cui_categories SET code=?, label=?, description=? WHERE id=?",
+                (code, label, description, cat_id)
+            )
+        db.commit()
+        flash('Category updated.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
+
+
+@bp.route('/cui-categories/<int:cat_id>/delete', methods=['POST'])
+def cui_category_delete(cat_id):
+    db  = get_db()
+    row = db.execute("SELECT * FROM cui_categories WHERE id=?", (cat_id,)).fetchone()
+    if not row:
+        return redirect(url_for('ha.cui_categories_list'))
+    in_use = db.execute(
+        "SELECT COUNT(*) FROM reference_documents"
+        " WHERE ',' || cui_categories || ',' LIKE ?",
+        (f'%,{row["code"]},%',)
+    ).fetchone()[0]
+    if in_use:
+        flash(f'{row["code"]} is cited in {in_use} document(s) and cannot be removed.', 'error')
+    else:
+        db.execute("DELETE FROM cui_categories WHERE id=?", (cat_id,))
+        db.commit()
+        flash(f'{row["code"]} removed.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
+
+
+# ── CUI DISSEMINATION CONTROL CONFIG ──────────────────────────────────────────
+
+@bp.route('/cui-dissem/add', methods=['POST'])
+def cui_dissem_add():
+    db    = get_db()
+    code  = request.form.get('code', '').strip().upper()
+    label = request.form.get('label', '').strip()
+    if code and label:
+        description    = request.form.get('description', '').strip() or None
+        sort_order_str = request.form.get('sort_order', '').strip()
+        if sort_order_str.isdigit():
+            sort_order = int(sort_order_str)
+        else:
+            row = db.execute("SELECT MAX(sort_order) as mx FROM cui_dissem_controls").fetchone()
+            sort_order = (row['mx'] or 0) + 1
+        db.execute(
+            "INSERT OR IGNORE INTO cui_dissem_controls (code, label, description, sort_order) VALUES (?, ?, ?, ?)",
+            (code, label, description, sort_order)
+        )
+        db.commit()
+        flash(f'Dissemination control {code} added.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
+
+
+@bp.route('/cui-dissem/<int:ctrl_id>/edit', methods=['POST'])
+def cui_dissem_edit(ctrl_id):
+    db    = get_db()
+    code  = request.form.get('code', '').strip().upper()
+    label = request.form.get('label', '').strip()
+    if code and label:
+        description    = request.form.get('description', '').strip() or None
+        sort_order_str = request.form.get('sort_order', '').strip()
+        if sort_order_str.isdigit():
+            db.execute(
+                "UPDATE cui_dissem_controls SET code=?, label=?, description=?, sort_order=? WHERE id=?",
+                (code, label, description, int(sort_order_str), ctrl_id)
+            )
+        else:
+            db.execute(
+                "UPDATE cui_dissem_controls SET code=?, label=?, description=? WHERE id=?",
+                (code, label, description, ctrl_id)
+            )
+        db.commit()
+        flash('Dissemination control updated.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
+
+
+@bp.route('/cui-dissem/<int:ctrl_id>/delete', methods=['POST'])
+def cui_dissem_delete(ctrl_id):
+    db  = get_db()
+    row = db.execute("SELECT * FROM cui_dissem_controls WHERE id=?", (ctrl_id,)).fetchone()
+    if not row:
+        return redirect(url_for('ha.cui_categories_list'))
+    in_use = db.execute(
+        "SELECT COUNT(*) FROM reference_documents"
+        " WHERE ',' || cui_dissem || ',' LIKE ?",
+        (f'%,{row["code"]},%',)
+    ).fetchone()[0]
+    if in_use:
+        flash(f'{row["code"]} is applied to {in_use} document(s) and cannot be removed.', 'error')
+    else:
+        db.execute("DELETE FROM cui_dissem_controls WHERE id=?", (ctrl_id,))
+        db.commit()
+        flash(f'{row["code"]} removed.', 'success')
+    return redirect(url_for('ha.cui_categories_list'))
 
 
 # ── PER-HA REFERENCES ─────────────────────────────────────────────────────────

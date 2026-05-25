@@ -25,8 +25,14 @@
 
   .risk-block { background:#fafaf8; border:1px solid #e2e2df; border-radius:4px; padding:1rem; margin-bottom:1rem; }
   .risk-block-title { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#666; font-weight:700; margin-bottom:0.75rem; }
-  .list-btn { font-size:0.72rem; padding:0.15rem 0.55rem; border:1px solid #d0d0cc; border-radius:3px; background:#f5f5f3; cursor:pointer; color:#555; font-family:inherit; margin-bottom:0.3rem; display:inline-block; }
-  .list-btn:hover { background:#e8e8e5; }
+  .bullet-editor {
+    width:100%; border:1px solid #ccc; border-radius:4px; padding:0.5rem 0.6rem;
+    font-size:0.9rem; font-family:inherit; background:#fff; min-height:80px;
+    box-sizing:border-box; outline:none;
+  }
+  .bullet-editor:focus { border-color:#0d6efd; box-shadow:0 0 0 2px rgba(13,110,253,0.15); }
+  .bullet-editor ul { margin:0; padding-left:1.3em; list-style-type:disc; }
+  .bullet-editor li { margin:0; padding:0; }
 </style>
 
 <div class="page-title-row">
@@ -43,23 +49,25 @@
     <div class="section-body">
       <div class="form-group">
         <label>Hazard *</label>
-        <textarea name="hazard_description" required rows="3"
-          placeholder="Describe the hazardous condition. Be specific — e.g. 'Pressurized system failure releasing propellant' rather than 'propellant hazard'.">{{ item.hazard_description if item else '' }}</textarea>
+        <input type="text" name="hazard_title" required
+          placeholder="Short name for the hazard — e.g. 'Pressurized system failure releasing propellant'"
+          value="{{ item.hazard_title if item else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Description <span style="font-weight:400; color:#aaa;">(optional)</span></label>
+        <textarea name="hazard_description" rows="3"
+          placeholder="Additional detail, context, or elaboration on the hazardous condition.">{{ item.hazard_description if item else '' }}</textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Cause</label>
-          <button type="button" class="list-btn" onclick="startBullet('ta_cause')">• Start list</button>
-          <textarea id="ta_cause" name="cause"
-            onkeydown="bulletEnter(event,'ta_cause')"
-            placeholder="The triggering mechanism or initiating event that leads to the hazard.">{{ item.cause if item else '' }}</textarea>
+          <div class="bullet-editor" id="cause_editor" contenteditable="true"></div>
+          <input type="hidden" name="cause" id="cause_hidden" value="{{ item.cause if item else '' }}">
         </div>
         <div class="form-group">
           <label>Consequence (Undesired Event)</label>
-          <button type="button" class="list-btn" onclick="startBullet('ta_consequence')">• Start list</button>
-          <textarea id="ta_consequence" name="consequence"
-            onkeydown="bulletEnter(event,'ta_consequence')"
-            placeholder="The result of the hazard — injury, property damage, or environmental impact.">{{ item.consequence if item else '' }}</textarea>
+          <div class="bullet-editor" id="consequence_editor" contenteditable="true"></div>
+          <input type="hidden" name="consequence" id="consequence_hidden" value="{{ item.consequence if item else '' }}">
         </div>
       </div>
     </div>
@@ -133,6 +141,17 @@
   </div>
 </form>
 
+{% if item %}
+<div style="margin-top:2.5rem; border-top:1px solid #f5c6cb; padding-top:1.25rem;">
+  <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:#842029; font-weight:700; margin-bottom:0.4rem;">Danger Zone</div>
+  <p style="font-size:0.85rem; color:#666; margin:0 0 0.75rem;">Permanently removes this hazard, all its recommendations, controls, and notes. This cannot be undone.</p>
+  <form method="post" action="{{ url_for('ha.hazard_delete', ha_pk=ha.id, item_id=item.id) }}"
+        onsubmit="return confirm('Permanently delete this hazard and all its controls? This cannot be undone.');">
+    <button type="submit" class="secondary-button" style="color:#842029; border-color:#f5c6cb;">Delete This Hazard</button>
+  </form>
+</div>
+{% endif %}
+
 <script>
 const RAC_RANK = {
   '1A':'High','1B':'High','1C':'High','1D':'High','1E':'Moderate',
@@ -154,41 +173,38 @@ function updateRac(sevId, probId, displayId) {
     el.className   = 'rac-preview';
   }
 }
-// Initialize displays if editing an existing item
 document.addEventListener('DOMContentLoaded', function() {
   updateRac('init_sev',  'init_prob',  'init_rac_display');
   updateRac('final_sev', 'final_prob', 'final_rac_display');
+  loadEditor('cause_editor', 'cause_hidden');
+  loadEditor('consequence_editor', 'consequence_hidden');
+  document.querySelector('form').addEventListener('submit', saveEditors);
 });
 
-function startBullet(id) {
-  const ta = document.getElementById(id);
-  const pos = ta.selectionStart;
-  const val = ta.value;
-  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
-  if (val.substring(lineStart, lineStart + 2) === '• ') { ta.focus(); return; }
-  ta.value = val.substring(0, lineStart) + '• ' + val.substring(lineStart);
-  ta.selectionStart = ta.selectionEnd = pos + 2;
-  ta.focus();
+function loadEditor(editorId, hiddenId) {
+  const editor = document.getElementById(editorId);
+  const raw = document.getElementById(hiddenId).value.trim();
+  const lines = raw ? raw.split('\n') : [];
+  const ul = document.createElement('ul');
+  if (lines.length === 0) {
+    ul.appendChild(document.createElement('li'));
+  } else {
+    lines.forEach(line => {
+      const li = document.createElement('li');
+      li.textContent = line.startsWith('• ') ? line.slice(2) : line;
+      ul.appendChild(li);
+    });
+  }
+  editor.innerHTML = '';
+  editor.appendChild(ul);
 }
 
-function bulletEnter(e, id) {
-  if (e.key !== 'Enter') return;
-  const ta = document.getElementById(id);
-  const pos = ta.selectionStart;
-  const val = ta.value;
-  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
-  const currentLine = val.substring(lineStart, pos);
-  if (!currentLine.startsWith('• ')) return;
-  e.preventDefault();
-  if (currentLine === '• ') {
-    // Empty bullet — remove it and exit list mode
-    ta.value = val.substring(0, lineStart) + val.substring(pos);
-    ta.selectionStart = ta.selectionEnd = lineStart;
-  } else {
-    const ins = '\n• ';
-    ta.value = val.substring(0, pos) + ins + val.substring(ta.selectionEnd);
-    ta.selectionStart = ta.selectionEnd = pos + ins.length;
-  }
+function saveEditors() {
+  [['cause_editor','cause_hidden'], ['consequence_editor','consequence_hidden']].forEach(([edId, hidId]) => {
+    const lis = document.querySelectorAll('#' + edId + ' li');
+    const lines = Array.from(lis).map(li => '• ' + li.textContent).filter(l => l !== '• ');
+    document.getElementById(hidId).value = lines.join('\n');
+  });
 }
 </script>
 {% endblock %}

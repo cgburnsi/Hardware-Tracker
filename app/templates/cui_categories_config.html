@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% block title %}CUI Marking Configuration — ER64 Ops Hub{% endblock %}
+
+{% block sidebar_filters %}
+<div class="subbar">
+  <form method="get" style="display:contents;">
+    <span class="sidebar-section-title">Filter</span>
+    <input type="text" name="q" value="{{ q }}" placeholder="Search code, label, description…"
+           style="width:220px; border:1px solid #ccc; border-radius:3px; padding:0.28rem 0.45rem; font-size:0.82rem; background:#fff; font-family:inherit;">
+    <button type="submit" class="sidebar-button">Apply</button>
+    {% if q %}
+      <a href="{{ url_for('ha.cui_categories_list') }}"
+         style="font-size:0.8rem; color:#888; text-decoration:none; margin-left:0.25rem;">✕ Clear</a>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .action-btn {
+    background: #fff; border: 1px solid #ccc; border-radius: 3px;
+    padding: 0.22rem 0.55rem; font-size: 0.78rem; cursor: pointer;
+    font-family: inherit; color: #333;
+  }
+  .action-btn:hover { background: #f2f2f0; }
+  .action-btn-danger { border-color: #e8b4b4; color: #842029; }
+  .action-btn-danger:hover { background: #fdf0f0; }
+
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:100; align-items:center; justify-content:center; }
+  .modal-backdrop.open { display:flex; }
+  .modal-box { background:#fff; border-radius:6px; padding:1.5rem; width:500px; max-width:95vw;
+               max-height:92vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+  .modal-title { font-size:1rem; font-weight:700; margin-bottom:1rem; }
+  .modal-row { margin-bottom:0.75rem; }
+  .modal-row label { display:block; font-size:0.78rem; color:#555; font-weight:600; margin-bottom:0.25rem; }
+  .modal-row input[type=text], .modal-row input[type=number], .modal-row textarea {
+    width:100%; border:1px solid #ccc; border-radius:4px;
+    padding:0.4rem 0.6rem; font-size:0.9rem; font-family:inherit; box-sizing:border-box;
+  }
+  .modal-row textarea { resize:vertical; min-height:56px; }
+  .modal-actions { display:flex; gap:0.5rem; margin-top:1rem; }
+
+  .row-desc { font-size:0.78rem; color:#888; margin-top:0.15rem; font-style:italic; }
+
+  .pager { display:flex; align-items:center; justify-content:center; gap:0.3rem; padding:0.8rem 0 0.2rem; flex-wrap:wrap; }
+  .pager a, .pager span {
+    display:inline-block; padding:0.25rem 0.55rem; border:1px solid #ccc;
+    border-radius:3px; font-size:0.8rem; text-decoration:none;
+  }
+  .pager a { color:#333; background:#fff; }
+  .pager a:hover { background:#f2f2f0; }
+  .pager .cur { background:#0b5f9c; color:#fff; border-color:#0b5f9c; font-weight:700; }
+  .pager .disabled { color:#bbb; background:#f7f7f7; border-color:#e0e0e0; }
+</style>
+
+{# JSON data blobs for the edit modal #}
+{% for cat in cats %}
+<script id="cui-cat-{{ cat['id'] }}" type="application/json">
+{{ {'id': cat['id'], 'type': 'cat', 'code': cat['code'], 'label': cat['label'], 'description': cat['description'] or '', 'sort_order': cat['sort_order']}|tojson }}
+</script>
+{% endfor %}
+{% for ctrl in dissems %}
+<script id="cui-dissem-{{ ctrl['id'] }}" type="application/json">
+{{ {'id': ctrl['id'], 'type': 'dissem', 'code': ctrl['code'], 'label': ctrl['label'], 'description': ctrl['description'] or '', 'sort_order': ctrl['sort_order']}|tojson }}
+</script>
+{% endfor %}
+
+<div class="page-title-row">
+  <div style="display:flex; align-items:baseline; gap:0.75rem;">
+    <h1 class="page-title">CUI Marking Configuration</h1>
+    <span style="font-size:0.82rem; color:#888;">
+      {% if q %}Filtered results{% else %}{{ cat_total }} categories · {{ dissem_total }} dissemination controls{% endif %}
+    </span>
+  </div>
+  <div style="display:flex; align-items:center; gap:0.75rem; margin-left:auto;">
+    <form method="get" style="display:inline-flex; align-items:center; gap:0.35rem;">
+      <input type="hidden" name="q" value="{{ q }}">
+      <label style="font-size:0.82rem; color:#666;">Per page:</label>
+      <select name="per_page" onchange="this.form.submit()"
+              style="font-size:0.82rem; border:1px solid #ccc; border-radius:3px; padding:0.2rem 0.35rem; background:#fff; font-family:inherit; cursor:pointer;">
+        <option value="10"  {% if per_page == 10  %}selected{% endif %}>10</option>
+        <option value="25"  {% if per_page == 25  %}selected{% endif %}>25</option>
+        <option value="50"  {% if per_page == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        <option value="all" {% if per_page == 0   %}selected{% endif %}>All</option>
+      </select>
+    </form>
+    <button type="button" class="secondary-button" onclick="openAddModal('cat')">+ Add Category</button>
+    <button type="button" class="primary-button" onclick="openAddModal('dissem')">+ Add Control</button>
+  </div>
+</div>
+
+{% macro pager_url(cat_p, dissem_p) %}{{ url_for('ha.cui_categories_list', q=q, per_page=per_page or 'all', cat_page=cat_p, dissem_page=dissem_p) }}{% endmacro %}
+
+{# ── Category Markings ── #}
+<div class="section-card" style="margin-bottom:1.5rem;">
+  <div class="section-header">
+    <span>Category Markings</span>
+    <span style="font-weight:400; font-size:0.82rem; color:#888;">
+      {% if per_page and cat_total_pages > 1 %}
+        {{ (cat_page - 1) * per_page + 1 }}–{{ [cat_page * per_page, cat_total]|min }} of {{ cat_total }}
+      {% else %}
+        {{ cat_total }} total
+      {% endif %}
+    </span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:9rem;">Code</th>
+        <th>Label / Description</th>
+        <th style="width:5rem;">Order</th>
+        <th style="width:5rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cat in cats %}
+      <tr>
+        <td><code style="font-size:0.88rem; color:#1a3a5c; font-weight:700;">{{ cat['code'] }}</code></td>
+        <td>
+          <div style="font-size:0.88rem;">{{ cat['label'] }}</div>
+          {% if cat['description'] %}
+          <div class="row-desc">{{ cat['description'] }}</div>
+          {% endif %}
+        </td>
+        <td style="color:#888; font-size:0.85rem;">{{ cat['sort_order'] }}</td>
+        <td style="text-align:right; padding-right:0.75rem;">
+          <button type="button" class="action-btn" onclick="openEditModal('cat', {{ cat['id'] }})">Edit</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="text-align:center; padding:2rem; color:#888; font-style:italic;">
+        {% if q %}No categories match "{{ q }}".{% else %}No categories configured yet.{% endif %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if cat_total_pages > 1 %}
+  <div class="pager">
+    {% if cat_page > 1 %}
+      <a href="{{ pager_url(cat_page - 1, dissem_page) }}">← Prev</a>
+    {% else %}
+      <span class="disabled">← Prev</span>
+    {% endif %}
+    {% for p in cat_page_list %}
+      {% if p is none %}<span style="border:none; color:#999;">…</span>
+      {% elif p == cat_page %}<span class="cur">{{ p }}</span>
+      {% else %}<a href="{{ pager_url(p, dissem_page) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if cat_page < cat_total_pages %}
+      <a href="{{ pager_url(cat_page + 1, dissem_page) }}">Next →</a>
+    {% else %}
+      <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Dissemination Controls ── #}
+<div class="section-card">
+  <div class="section-header">
+    <span>Dissemination Controls</span>
+    <span style="font-weight:400; font-size:0.82rem; color:#888;">
+      {% if per_page and dissem_total_pages > 1 %}
+        {{ (dissem_page - 1) * per_page + 1 }}–{{ [dissem_page * per_page, dissem_total]|min }} of {{ dissem_total }}
+      {% else %}
+        {{ dissem_total }} total
+      {% endif %}
+    </span>
+  </div>
+  <p style="margin:0.5rem 1rem 0; font-size:0.8rem; color:#888;">
+    Appear after a second <code>//</code> in the marking, e.g. <code>CUI//SP-EXPT//NOFORN</code>.
+  </p>
+  <table style="margin-top:0;">
+    <thead>
+      <tr>
+        <th style="width:9rem;">Code</th>
+        <th>Label / Description</th>
+        <th style="width:5rem;">Order</th>
+        <th style="width:5rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ctrl in dissems %}
+      <tr>
+        <td><code style="font-size:0.88rem; color:#1a3a5c; font-weight:700;">{{ ctrl['code'] }}</code></td>
+        <td>
+          <div style="font-size:0.88rem;">{{ ctrl['label'] }}</div>
+          {% if ctrl['description'] %}
+          <div class="row-desc">{{ ctrl['description'] }}</div>
+          {% endif %}
+        </td>
+        <td style="color:#888; font-size:0.85rem;">{{ ctrl['sort_order'] }}</td>
+        <td style="text-align:right; padding-right:0.75rem;">
+          <button type="button" class="action-btn" onclick="openEditModal('dissem', {{ ctrl['id'] }})">Edit</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="text-align:center; padding:2rem; color:#888; font-style:italic;">
+        {% if q %}No dissemination controls match "{{ q }}".{% else %}No dissemination controls configured yet.{% endif %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if dissem_total_pages > 1 %}
+  <div class="pager">
+    {% if dissem_page > 1 %}
+      <a href="{{ pager_url(cat_page, dissem_page - 1) }}">← Prev</a>
+    {% else %}
+      <span class="disabled">← Prev</span>
+    {% endif %}
+    {% for p in dissem_page_list %}
+      {% if p is none %}<span style="border:none; color:#999;">…</span>
+      {% elif p == dissem_page %}<span class="cur">{{ p }}</span>
+      {% else %}<a href="{{ pager_url(cat_page, p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if dissem_page < dissem_total_pages %}
+      <a href="{{ pager_url(cat_page, dissem_page + 1) }}">Next →</a>
+    {% else %}
+      <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Add modal (shared, type-aware) ── #}
+<div class="modal-backdrop" id="addModal" onclick="if(event.target===this)closeAddModal();">
+  <div class="modal-box">
+    <div class="modal-title" id="addModalTitle">Add</div>
+    <form method="post" id="addForm">
+      <div class="modal-row">
+        <label>Code *</label>
+        <input type="text" name="code" id="add_code" required
+               style="font-family:monospace; font-weight:700; text-transform:uppercase;"
+               oninput="this.value=this.value.toUpperCase()"
+               placeholder="e.g. SP-EXPT or NOFORN">
+      </div>
+      <div class="modal-row">
+        <label>Label *</label>
+        <input type="text" name="label" id="add_label" required
+               placeholder="Short name for this marking">
+      </div>
+      <div class="modal-row">
+        <label>Description <span style="font-weight:400; color:#aaa;">(optional — shown in reference document forms)</span></label>
+        <textarea name="description" id="add_description" rows="2"
+                  placeholder="Brief explanation of when this marking applies"></textarea>
+      </div>
+      <div class="modal-row">
+        <label>Sort Order <span style="font-weight:400; color:#aaa;">(leave blank to append)</span></label>
+        <input type="number" name="sort_order" id="add_sort" min="0" placeholder="auto">
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="primary-button" id="add_submit_btn">Add</button>
+        <button type="button" class="secondary-button" onclick="closeAddModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Edit modal (shared, type-aware) ── #}
+<div class="modal-backdrop" id="editModal" onclick="if(event.target===this)closeEditModal();">
+  <div class="modal-box">
+    <div class="modal-title" id="editModalTitle">Edit</div>
+    <form method="post" id="editForm">
+      <div class="modal-row">
+        <label>Code *</label>
+        <input type="text" name="code" id="edit_code" required
+               style="font-family:monospace; font-weight:700; text-transform:uppercase;"
+               oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="modal-row">
+        <label>Label *</label>
+        <input type="text" name="label" id="edit_label" required>
+      </div>
+      <div class="modal-row">
+        <label>Description</label>
+        <textarea name="description" id="edit_description" rows="2"
+                  placeholder="Brief explanation of when this marking applies"></textarea>
+      </div>
+      <div class="modal-row">
+        <label>Sort Order</label>
+        <input type="number" name="sort_order" id="edit_sort" min="0">
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="primary-button">Save</button>
+        <button type="button" class="secondary-button" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </form>
+
+    <div style="border-top:1px solid #f0d0d0; margin-top:1.25rem; padding-top:1rem;">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#c0392b; margin-bottom:0.5rem;">Danger Zone</div>
+      <form method="post" id="editDeleteForm"
+            onsubmit="return confirm('Remove this marking? This cannot be undone.');">
+        <button type="submit" class="action-btn action-btn-danger">Remove</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const CAT_ADD_URL    = '{{ url_for("ha.cui_category_add") }}';
+const DISSEM_ADD_URL = '{{ url_for("ha.cui_dissem_add") }}';
+
+function openAddModal(type) {
+  document.getElementById('addForm').action = type === 'cat' ? CAT_ADD_URL : DISSEM_ADD_URL;
+  document.getElementById('addModalTitle').textContent = type === 'cat' ? 'Add Category Marking' : 'Add Dissemination Control';
+  document.getElementById('add_submit_btn').textContent = type === 'cat' ? 'Add Category' : 'Add Control';
+  document.getElementById('add_code').value        = '';
+  document.getElementById('add_label').value       = '';
+  document.getElementById('add_description').value = '';
+  document.getElementById('add_sort').value        = '';
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(() => document.getElementById('add_code').focus(), 30);
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('open');
+}
+
+function openEditModal(type, id) {
+  const scriptId = type === 'cat' ? 'cui-cat-' + id : 'cui-dissem-' + id;
+  const data = JSON.parse(document.getElementById(scriptId).textContent);
+
+  const editPrefix  = type === 'cat' ? '/ha/cui-categories/' : '/ha/cui-dissem/';
+  const deletePrefix = type === 'cat' ? '/ha/cui-categories/' : '/ha/cui-dissem/';
+
+  document.getElementById('editModalTitle').textContent = type === 'cat' ? 'Edit Category Marking' : 'Edit Dissemination Control';
+  document.getElementById('editForm').action       = editPrefix  + id + '/edit';
+  document.getElementById('editDeleteForm').action = deletePrefix + id + '/delete';
+
+  document.getElementById('edit_code').value        = data.code;
+  document.getElementById('edit_label').value       = data.label;
+  document.getElementById('edit_description').value = data.description;
+  document.getElementById('edit_sort').value        = data.sort_order;
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAddModal(); closeEditModal(); }
+});
+</script>
+{% endblock %}

@@ -1423,7 +1423,7 @@ def handle_simple_list(table_name, page_title):
                 ).fetchone()[0]
         items.append({'name': row['name'], 'count': count})
 
-    # --- operational history ---
+    # --- event log ---
     valid_log_limits = (10, 25, 50, 100)
     try:
         log_limit = int(request.args.get('log_limit', 25))

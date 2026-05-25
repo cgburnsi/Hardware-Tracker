@@ -243,7 +243,8 @@ def init_db():
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         ha_id               INTEGER NOT NULL,
         order_index         INTEGER NOT NULL DEFAULT 0,
-        hazard_description  TEXT NOT NULL,
+        hazard_title        TEXT,
+        hazard_description  TEXT,
         cause               TEXT,
         consequence         TEXT,
         initial_severity    INTEGER,
@@ -445,7 +446,8 @@ def migrate_db():
             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
             ha_id               INTEGER NOT NULL,
             order_index         INTEGER NOT NULL DEFAULT 0,
-            hazard_description  TEXT NOT NULL,
+            hazard_title        TEXT,
+            hazard_description  TEXT,
             cause               TEXT,
             consequence         TEXT,
             initial_severity    INTEGER,
@@ -456,6 +458,9 @@ def migrate_db():
             FOREIGN KEY (ha_id) REFERENCES hazard_analyses(id)
         )
     """)
+    hi_cols = {row[1] for row in db.execute("PRAGMA table_info(hazard_items)").fetchall()}
+    if 'hazard_title' not in hi_cols:
+        db.execute("ALTER TABLE hazard_items ADD COLUMN hazard_title TEXT")
     db.execute("""
         CREATE TABLE IF NOT EXISTS hazard_controls (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -832,6 +837,83 @@ def migrate_db():
         db.execute("ALTER TABLE reference_documents ADD COLUMN effective_date TEXT")
     if 'expiration_date' not in rd_cols:
         db.execute("ALTER TABLE reference_documents ADD COLUMN expiration_date TEXT")
+    if 'url' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN url TEXT")
+    if 'file_original' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN file_original TEXT")
+    if 'file_stored' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN file_stored TEXT")
+    if 'cui' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN cui INTEGER NOT NULL DEFAULT 0")
+    if 'cui_categories' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN cui_categories TEXT")
+    if 'dist_statement' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN dist_statement TEXT")
+    if 'dist_reason' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN dist_reason TEXT")
+    if 'cui_dissem' not in rd_cols:
+        db.execute("ALTER TABLE reference_documents ADD COLUMN cui_dissem TEXT")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS cui_categories (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            code       TEXT NOT NULL UNIQUE,
+            label      TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    db.executemany(
+        "INSERT OR IGNORE INTO cui_categories (code, label, sort_order) VALUES (?, ?, ?)",
+        [
+            ('SP-EXPT',    'Export Controlled (EAR)',                        1),
+            ('SP-EXPTR',   'Export Controlled Research',                     2),
+            ('SP-PROPIN',  'Proprietary Manufacturing/Business Information',  3),
+            ('SP-PROCURE', 'Procurement and Acquisition',                    4),
+            ('SP-CTI',     'Controlled Technical Information',               5),
+            ('SP-PRVCY',   'Privacy Act',                                    6),
+        ]
+    )
+    cui_cat_cols = {row[1] for row in db.execute("PRAGMA table_info(cui_categories)").fetchall()}
+    if 'description' not in cui_cat_cols:
+        db.execute("ALTER TABLE cui_categories ADD COLUMN description TEXT")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS cui_dissem_controls (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            code        TEXT NOT NULL UNIQUE,
+            label       TEXT NOT NULL,
+            description TEXT,
+            sort_order  INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    cui_dissem_cols = {row[1] for row in db.execute("PRAGMA table_info(cui_dissem_controls)").fetchall()}
+    if 'description' not in cui_dissem_cols:
+        db.execute("ALTER TABLE cui_dissem_controls ADD COLUMN description TEXT")
+    db.executemany(
+        "INSERT OR IGNORE INTO cui_dissem_controls (code, label, description, sort_order) VALUES (?, ?, ?, ?)",
+        [
+            ('NOFORN',   'Not Releasable to Foreign Nationals',
+             'Cannot be released to foreign nationals or representative of foreign nations.', 1),
+            ('FED ONLY', 'Federal Employees and DoD Contractors Only',
+             'Dissemination limited to federal government employees and DoD contractors.', 2),
+            ('FEDCON',   'Federal and Contractor Employees Only',
+             'Dissemination limited to federal employees and authorized contractors.', 3),
+            ('NOCON',    'Not Releasable to Contractors',
+             'Cannot be released to contractor personnel regardless of clearance level.', 4),
+            ('DL ONLY',  'Dissemination and Extraction Controlled by Originator',
+             'Further dissemination or extraction of information requires originator approval.', 5),
+            ('REL TO',   'Authorized for Release To (append country codes)',
+             'Authorized for release to the listed countries only, e.g. REL TO USA, GBR.', 6),
+        ]
+    )
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS ref_doc_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            ref_doc_id  INTEGER,
+            doc_number  TEXT NOT NULL,
+            timestamp   TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            description TEXT NOT NULL
+        )
+    """)
     db.execute("""
         CREATE TABLE IF NOT EXISTS hazard_references (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
